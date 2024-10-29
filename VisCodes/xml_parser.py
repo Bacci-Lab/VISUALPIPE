@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 import numpy as np
-
+# TODO  This section of code is adapted from the physion Pipeline.
+# TODO URL/Reference: https://github.com/yzerlaut/physion/tree/main
 def bruker_xml_parser(filename):
     """
     function to parse the xml metadata file produced by the Prairie software
