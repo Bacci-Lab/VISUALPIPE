@@ -4,11 +4,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os.path
 import json
+import Photodiode
 base_path = r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59"
 #inputs
 neuropil_impact_factor = 0.7
 F0_method = 'sliding'
 neuron_type = "PYR"
+save_dir = r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59\fig"
+num_samples = 1000
+Photon_fre = 29.7597
 ##----------------------------------load Speed----------------------------------
 speed_time_stamps, speed = compute_speed(base_path)
 ##----------------------------------Load Ca-Imaging data----------------------------------
@@ -46,4 +50,22 @@ F0, _ = Ca_imaging.detect_cell(invalid_cell_F0, F0)
 Fneu_raw, Ca_imaging.detect_cell(invalid_cell_F0, Fneu_raw)
 dF = Ca_imaging.deltaF_calculate(F, F0)
 
+#--------------------------- Load photodiode data --------------------
+stim_Time_start_realigned, Psignal = Photodiode.realign_from_photodiode(base_path)
+visual_stim, NIdaq, Acquisition_Frequency =Photodiode.load_and_data_extraction(base_path)
+time_duration, protocol_id, time_start, interstim = Photodiode.extract_visual_stim_items(visual_stim)
+Flou_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(stim_Time_start_realigned, F_time_stamp_updated)
 
+protocol_id_o = [0,1,2,3,4,5,6]
+protocol_duration = [3,3,1,5,2,1200,3]
+protocol_name = ["moving dots","random dots", "static patch", "looming stim", "Natural Images 4 repeats", "grey 20min","drifting gratings" ]
+merged_list = [
+    {"id": pid, "duration": duration, "name": name}
+    for pid, duration, name in zip(protocol_id_o, protocol_duration, protocol_name)]
+# Photodiode.avarage_image(dF, protocol_id,3,5,'looming stim', F_stim_init_indexes,Photon_fre, num_samples, save_dir)
+
+for protocol in range(len(merged_list)):
+    chosen_protocol = merged_list[protocol]['id']
+    protocol_duration = merged_list[protocol]['duration']
+    protocol_name = merged_list[protocol]['name']
+    Photodiode.avarage_image(dF, protocol_id,chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes,Photon_fre, num_samples, save_dir)

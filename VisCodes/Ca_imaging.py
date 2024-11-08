@@ -8,7 +8,6 @@ from sklearn.linear_model import LinearRegression
 from scipy.ndimage import filters, gaussian_filter1d
 import matplotlib.pyplot as plt
 
-
 base_path = r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59"
 def find_Tseries(base_path):
     file = [f for f in os.listdir(base_path) if f.startswith("TSeries")]
