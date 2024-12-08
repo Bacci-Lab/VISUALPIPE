@@ -5,7 +5,7 @@ import Running_computation
 import Ca_imaging
 from scipy.ndimage import filters, gaussian_filter1d
 base_path = r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59"
-F, Fneu_raw, iscell = Ca_imaging.load_Suite2p(base_path)
+F, Fneu_raw, iscell, _, _ = Ca_imaging.load_Suite2p(base_path)
 xml = Ca_imaging.load_xml(base_path)
 F_time_stamp = xml['Green']['relativeTime']
 F_time_stamp_updated = F_time_stamp + 0.100

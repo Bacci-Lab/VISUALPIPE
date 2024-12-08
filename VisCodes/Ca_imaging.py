@@ -2,13 +2,14 @@ import numpy as np
 import os.path
 import xml_parser
 import glob
+import cv2
 from scipy.signal.windows import hamming
 from scipy.signal import convolve
 from sklearn.linear_model import LinearRegression
 from scipy.ndimage import filters, gaussian_filter1d
 import matplotlib.pyplot as plt
 
-base_path = r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59"
+base_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
 def find_Tseries(base_path):
     file = [f for f in os.listdir(base_path) if f.startswith("TSeries")]
     if len (file) > 1:
@@ -24,7 +25,10 @@ def load_Suite2p(base_path):
     F = np.load(os.path.join(Suite2p_path, "F.npy"), allow_pickle=True)
     Fneu_raw = np.load(os.path.join(Suite2p_path, "Fneu.npy"), allow_pickle=True)
     iscell = np.load(os.path.join(Suite2p_path, "iscell.npy"), allow_pickle=True)
-    return F, Fneu_raw, iscell
+    ops = np.load((os.path.join(Suite2p_path, "ops.npy")), allow_pickle=True).item()
+    stat = np.load((os.path.join(Suite2p_path, "stat.npy")), allow_pickle=True)
+    Mean_image = ((ops['meanImg']))
+    return F, Fneu_raw, iscell, stat, Mean_image
 def load_xml(base_path, metadate = False):
     Tseries_directory = find_Tseries(base_path)
     xml_direction = glob.glob(os.path.join(Tseries_directory, '*.xml'))[0]
@@ -119,3 +123,9 @@ def calculate_alpha (F, Fneu):
             alpha.append(Slope[i])
     alpha = np.mean(alpha)
     return alpha, remove
+
+def Save_mean_Image(Mean_image, save_dir):
+    normalized_image = (Mean_image - Mean_image.min()) / (Mean_image.max() - Mean_image.min()) * 255
+    normalized_image = normalized_image.astype(np.uint8)
+    save_image_dir = os.path.join(save_dir, "Mean_image_grayscale.png")
+    cv2.imwrite(save_image_dir, normalized_image)

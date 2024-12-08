@@ -1,11 +1,9 @@
 import os.path
 import json
 import numpy as np
-import matplotlib.pyplot as plt
 import figures
 import General_functions
 import Running_computation
-import Ca_imaging
 from scipy.ndimage import filters, gaussian_filter1d
 
 def load_and_data_extraction(base_path):
@@ -27,7 +25,6 @@ def load_and_data_extraction(base_path):
     else:
         raise Exception("No JSON metadata file exists in this directory")
     return visual_stim, NIdaq, Acquisition_Frequency
-
 
 
 def visual_stim_extraction(visual_stim):
@@ -76,7 +73,7 @@ def extract_visual_stim_items(visual_stim):
     return time_duration, protocol_id, time_start, interstim
 
 def Find_F_stim_index(stim_Time_start_realigned, F_time_stamp_updated):
-    # find the stim time in Flourscence time scale
+    # find the stim time in Fluorescence time-scale
     Flou_Time_start_realigned = []
     F_stim_init_indexes = []
     for value in stim_Time_start_realigned:
@@ -147,32 +144,75 @@ def get_base_line(F, F_stim_init_indexes):
     base_line = np.array(base_line)
     return base_line
 
-def avarage_image(F, protocol_ids,chosen_protocol,protocol_duration_s, protocol_name, F_stim_init_indexes,Photon_fre, num_samples, save_dir):
+def average_image(
+    F, protocol_ids, chosen_protocol, protocol_duration_s, protocol_name,
+    F_stim_init_indexes, Photon_fre, num_samples, save_dir
+):
+    """
+    Analyze neurons for the given protocol and determine valid neurons.
+    """
     print(protocol_name)
     protocol_duration = int(protocol_duration_s * Photon_fre)
+    Valid_Neuron = np.zeros(len(F))
+    protocol_validity = None  # Initialize protocol_validity
+
     for Neuron_index in range(len(F)):
         test_F = F[Neuron_index]
         base_line_F_I = get_base_line(test_F, F_stim_init_indexes)
         bootstrapped_base, fith_bootstraping_base = General_functions.bootstrap(base_line_F_I, num_samples)
         F_specific_protocol = []
         F_stim = []
+
+        # Process the chosen protocol
         for i in range(len(protocol_ids)):
             if protocol_ids[i] == chosen_protocol:
                 F_indexes = int(F_stim_init_indexes[i])
-                F_specific_protocol_i = test_F[F_indexes-29:F_indexes + protocol_duration + 29]
-                F_stim_i = test_F[F_indexes: F_indexes + protocol_duration]
+                F_specific_protocol_i = test_F[F_indexes - 29:F_indexes + protocol_duration + 29]
+                F_stim_i = test_F[F_indexes:F_indexes + protocol_duration]
                 F_stim.append(np.percentile(F_stim_i, 95))
                 F_specific_protocol.append(F_specific_protocol_i)
+
+        # Calculate p-value
         twenty_perc_F_stim = np.percentile(F_stim, 80)
         p_value = np.sum(fith_bootstraping_base >= twenty_perc_F_stim) / num_samples
 
+        # Check if neuron is valid
         if p_value <= 0.05:
+            Valid_Neuron[Neuron_index] = 1
             color_histo = "skyblue"
         else:
             color_histo = "thistle"
-        figures.Bootstrapping_fig(fith_bootstraping_base, twenty_perc_F_stim,protocol_name, p_value, Neuron_index,color_histo, save_dir)
+
+        # Generate figures
+        figures.Bootstrapping_fig(
+            fith_bootstraping_base, twenty_perc_F_stim, protocol_name,
+            p_value, Neuron_index, color_histo, save_dir
+        )
         mean_F_specific_protocol = np.mean(F_specific_protocol, 0)
         std_F_specific_protocol = np.std(F_specific_protocol, 0)
-        figures.stim_period(protocol_duration_s, Photon_fre, mean_F_specific_protocol, std_F_specific_protocol, protocol_name,
-                    Neuron_index, save_dir)
+        figures.stim_period(
+            protocol_duration_s, Photon_fre, mean_F_specific_protocol,
+            std_F_specific_protocol, protocol_name, Neuron_index, save_dir
+        )
+    # Finalize protocol_validity
+    protocol_validity = {protocol_name: Valid_Neuron}
 
+    return protocol_validity
+
+
+def get_spontaneous_F (F, protocol_ids,chosen_protocol,protocol_duration_s, F_stim_init_indexes,Photon_fre):
+    protocol_duration = int(protocol_duration_s * Photon_fre)
+    F_spontaneous = []
+    for Neuron_index in range(len(F)):
+        test_F = F[Neuron_index]
+        for i in range(len(protocol_ids)):
+            if protocol_ids[i] == chosen_protocol:
+                start_spon_index = int(F_stim_init_indexes[i])
+                # F_specific_protocol_i = test_F[start_spon_index-29:start_spon_index + protocol_duration + 29]
+                F_spontaneous_i = test_F[start_spon_index: start_spon_index + protocol_duration]
+                F_spontaneous.append(F_spontaneous_i)
+    if "start_spon_index" in locals():
+        end_spon_index = start_spon_index + protocol_duration
+        return F_spontaneous, start_spon_index, end_spon_index
+    else:
+        return F_spontaneous
