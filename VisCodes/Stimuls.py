@@ -13,13 +13,11 @@ _ , detected_roi = Ca_imaging.detect_cell(iscell, F)
 iscell, neuron_chosen3 = Ca_imaging.detect_bad_neuropils(detected_roi,Fneu_raw, F, iscell)
 Fneu_raw, keeped_ROI = Ca_imaging.detect_cell(iscell, Fneu_raw)
 F, _ = Ca_imaging.detect_cell(iscell, F)
-print(len(F), len(F))
 
 
 visual_stim = np.load(r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59\visual-stim.npy", allow_pickle=True)
 NIdaq_path = r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59\NIdaq.npy"
 NIdaq = np.load(NIdaq_path, allow_pickle=True).item()
-print(NIdaq.keys())
 max_episode=-1
 _, Psignal =Running_computation.resample_signal(NIdaq['analog'][0],
                              original_freq=float(10000),

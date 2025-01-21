@@ -212,8 +212,6 @@ class SelectCell(QtWidgets.QMainWindow):
         self.currentRedObjects.clear()
         self.currentGreenObjects.clear()
 
-
-
         # Re-populate the lists based on current state in Green_Cell
         for idx, state in enumerate(self.Red_view.Green_Cell):
             if state == 0:

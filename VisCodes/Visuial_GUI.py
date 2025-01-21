@@ -7,11 +7,17 @@ from PyQt5.QtGui import QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import cm, colors
+import numpy as np
+from Time_series_GUI import Ui_MainWindow as TimeseriesUI  # Import your previous class
+# Add the previous code tab
+
+
 class CustomGraphicsView_red(QGraphicsView):
     objectClicked = pyqtSignal(int)
-    def __init__(self, cell_info, Chosen_Protocol,All_protocols, background_image_path, corr_behavioral):
+    def __init__(self, cell_info, Chosen_Protocol,All_protocols, background_image_path,
+                 corr_running, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
         super().__init__()
-        self.corr_behavioral = corr_behavioral
+        self.corr_running = corr_running
         self.setScene(QGraphicsScene())
         self.Chosen_Protocol = Chosen_Protocol
         self.All_protocols = All_protocols
@@ -19,6 +25,12 @@ class CustomGraphicsView_red(QGraphicsView):
         self.background_image_path = background_image_path
         self.setBackgroundImage()
         self.drawObjects()
+        self.F = F
+        self.Time = Time
+        self.Run = Run
+        self.FaceMotion = FaceMotion
+        self.Pupil = Pupil
+        self.Photodiode = Photodiode
 
     def setBackgroundImage(self):
         if self.background_image_path:
@@ -37,7 +49,7 @@ class CustomGraphicsView_red(QGraphicsView):
         scene = self.scene()
 
         # Normalize the values to [0, 1] for colormap
-        norm = colors.Normalize(vmin=min(self.corr_behavioral), vmax=max(self.corr_behavioral))
+        norm = colors.Normalize(vmin=min(self.corr_running), vmax=max(self.corr_running))
 
         # Choose a colormap (e.g., "viridis")
         colormap = cm.get_cmap('viridis')
@@ -45,7 +57,7 @@ class CustomGraphicsView_red(QGraphicsView):
         # Iterate through cells and draw them with color-mapped values
         for i, cell in enumerate(self.cell_info):
             # Get RGBA color from colormap
-            rgba = colormap(norm(self.corr_behavioral[i]))
+            rgba = colormap(norm(self.corr_running[i]))
             # Convert RGBA to QColor
             color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], rgba[3])
 
@@ -120,25 +132,60 @@ class CustomGraphicsView_protocol(QGraphicsView):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_behavioral):
+    def __init__(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
         super().__init__()
         self.All_protocols = All_protocols
         self.Chosen_Protocol = Chosen_Protocol
-        self.setupFirstTab(cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_behavioral)
+        self.setupFirstTab(cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode,stimulus)
         self.setupSecondTab()
         Green_Cell = Chosen_Protocol
         self.SetUpThirdTab(cell_info, Green_Cell)
+        self.F = F
+        self.Time = Time
+        self.Run = Run
+        self.FaceMotion = FaceMotion
+        self.Pupil = Pupil
+        self.Photodiode = Photodiode
+        self.stimulus = stimulus
 
-    def setupFirstTab(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_behavioral):
-        self.setupMainWindow()
+    def setupFirstTab(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
+        self.setupMainWindow(F, Time, Run,FaceMotion, Pupil, Photodiode,stimulus)
         self.setupLayouts()
-        self.setupFrame1(cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_behavioral)
+        self.setupFrame1(cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus)
         self.setupFrame2(cell_info, Chosen_Protocol, background_image_path, All_protocols)
         self.setupMenuBar()
         self.setup_buttons()
         self.retranslateUi()
 
-    def setupMainWindow(self):
+    def Data_visualisationTab(self, F,Time,Run, FaceMotion,Pupil,Photodiode, stimulus):
+        """
+        Set up a new tab to include the previous GUI functionality.
+
+        Args:
+            datasets: The primary datasets for plotting.
+            dataset2: The secondary datasets for plotting.
+        """
+        # Create a new QWidget for the tab
+        self.previous_code_tab = QtWidgets.QWidget()
+
+        # Add a layout to the tab
+        layout = QtWidgets.QVBoxLayout(self.previous_code_tab)
+
+        # Import and initialize the previous UI class
+
+        self.previous_ui = TimeseriesUI()
+
+        # Create a container widget for the previous code
+        self.previous_code_window = QtWidgets.QMainWindow()
+        self.previous_ui.setupUi(self.previous_code_window, F,Time,Run, FaceMotion,Pupil,Photodiode, stimulus)
+
+        # Embed the previous code into the tab
+        layout.addWidget(self.previous_code_window.centralWidget())
+
+        # Add the tab to the tab widget
+        self.tabWidget.addTab(self.previous_code_tab, "Data Visualisation")
+
+    def setupMainWindow(self, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
         """Set up main window properties and the tab widget."""
         # Initialize the tab widget
         self.tabWidget = QtWidgets.QTabWidget(self)
@@ -154,10 +201,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.third_tab = QtWidgets.QWidget()
         self.tabWidget.addTab(self.third_tab, "Red cell control")
 
+        self.Data_visualisationTab(F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus)
+
         # Set window properties
         self.setWindowTitle("You can transfer masks between channels")
         self.setStyleSheet("""
-            background-color: rgb(27, 27, 27);
+            background-color: rgb(85, 85, 85);
             gridline-color: rgb(213, 213, 213);
             border-top-color: rgb(197, 197, 197);
         """)
@@ -205,7 +254,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.horizontalLayout_4.addLayout(self.horizontalLayout_6)
 
 
-    def setupFrame1(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_behavioral):
+    def setupFrame1(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
         """Set up the first frame with red view."""
         self.frame = self.createFrame()
         self.verticalLayout_2 = self.createVerticalLayout(self.frame)
@@ -216,7 +265,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit_Red = self.createLineEdit( self.frame, True)
         self.verticalLayout_2.addWidget(self.lineEdit_Red)
 
-        self.Red_view = CustomGraphicsView_red(cell_info, Chosen_Protocol,All_protocols, background_image_path, corr_behavioral)
+        self.Red_view = CustomGraphicsView_red(cell_info, Chosen_Protocol,All_protocols, background_image_path, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus)
         self.verticalLayout_2.addWidget(self.Red_view)
         self.horizontalLayout_2.addWidget(self.frame)
 
@@ -287,8 +336,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addColormapToLayout(
             grid_layout=self.gridLayout,
             colormap_name="viridis",
-            min_val=min(self.Red_view.corr_behavioral),
-            max_val=max(self.Red_view.corr_behavioral),
+            min_val=min(self.Red_view.corr_running),
+            max_val=max(self.Red_view.corr_running),
             row=2,
             col=0,
             colspan=1

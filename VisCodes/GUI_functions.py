@@ -65,7 +65,7 @@ def load_init_image(scene, BasePath):
     ## check if you wantn clahe
     # clahe = cv2.createCLAHE(clipLimit=9.0, tileGridSize=(15,15))
     # image = clahe.apply(image)
-    print("normalized_image", normalized_image)
+
     pixmap = cv2_to_pixmap(normalized_image)
     scene.clear()
     item = QtWidgets.QGraphicsPixmapItem(pixmap)

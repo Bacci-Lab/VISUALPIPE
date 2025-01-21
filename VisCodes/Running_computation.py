@@ -76,7 +76,7 @@ def compute_position_from_binary_signals(A, B):
     return np.cumsum(np.concatenate([[0], Delta_position]))
 
 def get_alignment_index(Flourscnce_time,original_signal, original_freq):
-    tlim_photodiode = np.linspace(1000, len(original_signal),len(original_signal) - 1000 )
+    tlim_photodiode = np.linspace(1000, len(original_signal),len(original_signal) - 1000)
     original_signal = original_signal[1000:]
     last_photodiode_stamp = tlim_photodiode[-1]
     Flourscnce_time2 = Flourscnce_time * original_freq
@@ -109,7 +109,6 @@ def resample_running_signal(original_signal,
 
     t_sample = np.linspace(1000, len(original_signal)+1000, len(original_signal))/ original_freq
 
-    print("this is speed time ", t_sample)
 
     if verbose:
         print(' - signal interpolation')
@@ -141,14 +140,14 @@ def compute_speed(base_path,new_freq,Flourscnce_time = None, position_smoothing 
 
     speed *= acq_freq
 
-    Interpolate_time, last_Flourscnce_index, speed = get_alignment_index(Flourscnce_time,speed, acq_freq)
+    Interpolate_time, last_Flourscnce_index, speed = get_alignment_index(Flourscnce_time, speed, acq_freq)
 
     #sub sampling and filtering speed
     speed = resample_running_signal(speed, Interpolate_time,
                                     original_freq=acq_freq,
                                     new_freq = new_freq,
                                     pre_smoothing=0,
-                                    post_smoothing=2. / 50.,
+                                    post_smoothing = 2. / 50.,
                                     verbose=True)
 
     if with_raw_position:

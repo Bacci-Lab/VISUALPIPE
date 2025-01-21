@@ -37,7 +37,7 @@ def visual_stim_extraction(visual_stim):
 def realign_from_photodiode(base_path):
     # Calculate threshold for photodiode activity
     visual_stim, NIdaq, Acquisition_Frequency = load_and_data_extraction(base_path)
-    _, Psignal = Running_computation.resample_signal(NIdaq['analog'][0],
+    Psignal_time, Psignal = Running_computation.resample_signal(NIdaq['analog'][0],
                                                      original_freq=Acquisition_Frequency,
                                                      pre_smoothing=2. / Acquisition_Frequency,
                                                      new_freq=1000)
@@ -61,7 +61,7 @@ def realign_from_photodiode(base_path):
         if index < len(true_indices):
             stim_Time_start_realigned.append(true_indices[index])
     stim_Time_start_realigned = [float(val) for val in stim_Time_start_realigned]
-    return stim_Time_start_realigned, Psignal
+    return stim_Time_start_realigned, Psignal, Psignal_time
 
 
 def extract_visual_stim_items(visual_stim):
@@ -174,6 +174,7 @@ def average_image(
 
         # Calculate p-value
         twenty_perc_F_stim = np.percentile(F_stim, 80)
+        print("twenty_perc_F_stim",twenty_perc_F_stim)
         p_value = np.sum(fith_bootstraping_base >= twenty_perc_F_stim) / num_samples
 
         # Check if neuron is valid
@@ -200,7 +201,7 @@ def average_image(
     return protocol_validity
 
 
-def get_spontaneous_F (F, protocol_ids,chosen_protocol,protocol_duration_s, F_stim_init_indexes,Photon_fre):
+def get_spontaneous_F (F, protocol_ids,chosen_protocol, protocol_duration_s, F_stim_init_indexes,Photon_fre):
     protocol_duration = int(protocol_duration_s * Photon_fre)
     F_spontaneous = []
     for Neuron_index in range(len(F)):
