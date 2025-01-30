@@ -21,7 +21,7 @@ def find_Tseries(base_path):
 
 def load_Suite2p(base_path):
     Tseries_directory = find_Tseries(base_path)
-    Suite2p_path = os.path.join(Tseries_directory,"suite2p\plane0")
+    Suite2p_path = os.path.join(Tseries_directory,"suite2p/plane0")
     F = np.load(os.path.join(Suite2p_path, "F.npy"), allow_pickle=True)
     Fneu_raw = np.load(os.path.join(Suite2p_path, "Fneu.npy"), allow_pickle=True)
     iscell = np.load(os.path.join(Suite2p_path, "iscell.npy"), allow_pickle=True)
