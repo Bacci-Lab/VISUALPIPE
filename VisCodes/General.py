@@ -8,27 +8,9 @@ from Visuial_GUI import MainWindow
 import Photodiode
 from PyQt5 import QtWidgets
 import os
-from init_vis import Ui_MainWindow
+from init_vis import InputWindow
 import matplotlib.pyplot as plt
-class InputWindow(QtWidgets.QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.ui = Ui_MainWindow()
-        self.ui.setupUi(self)
 
-    def get_inputs(self):
-        """Retrieve user inputs from the first GUI."""
-        return {
-            "base_path": self.ui.lineEdit_data_directory.text(),
-            "save_dir": self.ui.lineEdit_save_directory.text(),
-            "neuropil_impact_factor": self.ui.lineEdit_Neuropil_IF.text(),
-            "F0_method": self.ui.comboBox_F0_method.currentText(),
-            "neuron_type": self.ui.comboBox_neural_type.currentText(),
-            "starting_delay_2p": self.ui.lineEdit_starting_delay.text(),
-            "Photon_fre": self.ui.lineEdit_Fre.text(),
-            "protocol_ids": self.ui.protocol_numbers if hasattr(self.ui, 'protocol_numbers') else [],
-            "protocol_names": self.ui.protocol_names if hasattr(self.ui, 'protocol_names') else [],
-        }
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
 

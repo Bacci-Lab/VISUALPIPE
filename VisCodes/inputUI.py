@@ -1,9 +1,29 @@
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout, QComboBox, QLabel, QLineEdit, QPushButton, QListView, QStatusBar, QMenuBar, QFileDialog
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtWidgets
 import sys
 from PyQt5.QtGui import QIntValidator
 import json
 from PyQt5.QtCore import QStringListModel
+
+class InputWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
+
+    def get_inputs(self):
+        """Retrieve user inputs from the first GUI."""
+        return {
+            "base_path": self.ui.lineEdit_data_directory.text(),
+            "save_dir": self.ui.lineEdit_save_directory.text(),
+            "neuropil_impact_factor": self.ui.lineEdit_Neuropil_IF.text(),
+            "F0_method": self.ui.comboBox_F0_method.currentText(),
+            "neuron_type": self.ui.comboBox_neural_type.currentText(),
+            "starting_delay_2p": self.ui.lineEdit_starting_delay.text(),
+            "Photon_fre": self.ui.lineEdit_Fre.text(),
+            "protocol_ids": self.ui.protocol_numbers if hasattr(self.ui, 'protocol_numbers') else [],
+            "protocol_names": self.ui.protocol_names if hasattr(self.ui, 'protocol_names') else [],
+        }
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -90,6 +110,7 @@ class Ui_MainWindow(object):
         self.neuropil_if = float(self.lineEdit_Neuropil_IF.text())
         self.data_directory = str(self.lineEdit_data_directory.text())
         self.save_directory = str(self.lineEdit_save_directory.text())
+    
     def open_folder_dialog(self):
         folder_path = QFileDialog.getExistingDirectory(None, "Select Folder contains data")
         if folder_path:
@@ -115,6 +136,7 @@ class Ui_MainWindow(object):
         combo_box.addItems(items)
         layout.addWidget(combo_box, row, col)
         return combo_box
+    
     def loadprotocol(self):
         protocol_path, _ = QFileDialog.getOpenFileName(None, "Select the protocol File", "", "All Files (*.*);;JSON Files (*.json)")
         if protocol_path:
@@ -143,12 +165,10 @@ class Ui_MainWindow(object):
             self.listView.setModel(model)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle("MainWindow")
+        MainWindow.setWindowTitle("InputWindow")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    MainWindow = QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
-    MainWindow.show()
-    sys.exit(app.exec_())
+    input_window = InputWindow()
+    input_window.show()
+    sys.exit(app.exec())
