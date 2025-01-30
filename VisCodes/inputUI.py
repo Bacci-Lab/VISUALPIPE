@@ -1,9 +1,10 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout, QComboBox, QLabel, QLineEdit, QPushButton, QListView, QStatusBar, QMenuBar, QFileDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QGridLayout, QComboBox, QLabel, QLineEdit, QPushButton, QListView, QStatusBar, QMenuBar, QFileDialog
 from PyQt5 import QtCore, QtWidgets
 import sys
 from PyQt5.QtGui import QIntValidator
 import json
 from PyQt5.QtCore import QStringListModel
+from pathlib import Path
 
 class InputWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -26,9 +27,10 @@ class InputWindow(QtWidgets.QMainWindow):
         }
 
 class Ui_MainWindow(object):
+
     def setupUi(self, MainWindow):
         MainWindow.resize(457, 563)
-        MainWindow.setStyleSheet("background-color: rgb(85, 85, 85);")
+        MainWindow.setStyleSheet("background-color: rgb(165, 165, 165);")
 
         self.centralwidget = QWidget(MainWindow)
         self.main_layout = QVBoxLayout(self.centralwidget)
@@ -55,11 +57,14 @@ class Ui_MainWindow(object):
         self.main_layout.addWidget(self.pushButton_save_changes)
 
         MainWindow.setCentralWidget(self.centralwidget)
-        MainWindow.setStatusBar(QStatusBar(MainWindow))
+        self.statusbar = QStatusBar(MainWindow)
+        MainWindow.setStatusBar(self.statusbar)
         MainWindow.setMenuBar(QMenuBar(MainWindow))
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
+        self.protocolLoaded = False
 
     def setup_first_grid(self):
         self.first_grid = QGridLayout()
@@ -110,11 +115,32 @@ class Ui_MainWindow(object):
         self.neuropil_if = float(self.lineEdit_Neuropil_IF.text())
         self.data_directory = str(self.lineEdit_data_directory.text())
         self.save_directory = str(self.lineEdit_save_directory.text())
+        
+        if not self.data_directory.strip():
+            self.show_error_popup('No data folder selected. Please select a folder')
+        elif not self.save_directory.strip():
+            self.show_error_popup('No saving folder selected. Please select a folder')
+        elif not self.protocolLoaded :
+            self.show_error_popup('Protocol not loaded. Please select a file')
+        else : 
+            self.statusbar.showMessage('Information saved. Close the window.', 0)
+
+    def show_error_popup(self, message):
+        msg = QtWidgets.QMessageBox()
+        msg.setIcon(QtWidgets.QMessageBox.Critical)
+        msg.setText(message)
+        msg.setWindowTitle("Error")
+        msg.exec_()
     
     def open_folder_dialog(self):
         folder_path = QFileDialog.getExistingDirectory(None, "Select Folder contains data")
         if folder_path:
             self.lineEdit_data_directory.setText(folder_path)
+            self.lineEdit_save_directory.setText(folder_path)
+            protocol_filepath = Path(folder_path + "/protocol.json")
+            if protocol_filepath.is_file():
+                self.get_protocol(protocol_filepath)
+                self.protocolLoaded = True
 
     def open_save_folder(self):
         save_folder = QFileDialog.getExistingDirectory(None, "Select Saving directory")
@@ -163,6 +189,9 @@ class Ui_MainWindow(object):
             model = QStringListModel()
             model.setStringList(self.protocol_items)
             self.listView.setModel(model)
+
+        self.statusbar.showMessage('Protocol was loaded', 5000)
+        self.protocolLoaded = True
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle("InputWindow")

@@ -8,7 +8,7 @@ from Visuial_GUI import MainWindow
 import Photodiode
 from PyQt5 import QtWidgets
 import os
-from init_vis import InputWindow
+from inputUI import InputWindow
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
