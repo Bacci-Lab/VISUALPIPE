@@ -34,9 +34,12 @@ if __name__ == "__main__":
     # Use inputs to process data
     num_samples = 1000
     face_dir = os.path.join(base_path, "FaceIt")
+    visual_stim_path = os.path.join(base_path, "visual-stim.npy")
+    visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
+
     protocol_id = inputs["protocol_ids"]
     protocol_name = inputs["protocol_names"]
-    protocol_duration = [3, 3, 1, 5, 2, 1200, 3]
+    protocol_duration = dict(zip(visual_stim['protocol_id'], visual_stim['time_duration']))
 
 ##---------------------------------- Load Ca-Imaging data ----------------------
 raw_F, raw_Fneu, iscell, stat, mean_image = Ca_imaging.load_Suite2p(base_path)
