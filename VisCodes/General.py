@@ -92,7 +92,7 @@ dF = Ca_imaging.deltaF_calculate(raw_F, f0)
 #---------------------------------- Load photodiode data -----------------------------
 stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
 ###-------------------------Downsampling Photodiode for visualization-----------------
-visual_stim, NIdaq, acq_freq =Photodiode.load_and_data_extraction(base_path)
+visual_stim, NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
 stim_time_durations, protocol_id, stim_start_times, interstim_times = Photodiode.extract_visual_stim_items(visual_stim)
 F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(stim_Time_start_realigned, F_time_stamp_updated)
 stim_time_end = F_Time_start_realigned+ stim_time_durations
@@ -151,13 +151,13 @@ plt.show() """
 
 plt.plot(fvideo_time_spont, facemotion_spont)
 plt.show()
-Photodiode = (Psignal_time, Psignal)
+photodiode = (Psignal_time, Psignal)
 pupil = (fvideo_time, pupil)
 facemotion = (fvideo_time, facemotion)
 print("len speed_time_stamps ", len(speed_time_stamps[start_spont_index: end_spont_index]))
 print("Face_time_spo ", len(fvideo_time_spont))
 ################################
 background_image_path = r"Y:\raw-imaging\TESTS\Mai-An\visual_test\16-00-59\Mean_image_grayscale.png"
-main_window = MainWindow(stat, Green_Cell, background_image_path, loaded_data, speed_corr, raw_F, F_time_stamp_updated, speedAndTimeSt, facemotion, pupil, Photodiode, stim_time_period)
+main_window = MainWindow(stat, Green_Cell, background_image_path, loaded_data, speed_corr, raw_F, F_time_stamp_updated, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period)
 main_window.show()
 app.exec_()
