@@ -133,10 +133,10 @@ class Ui_MainWindow(object):
         msg.exec_()
     
     def open_folder_dialog(self):
-        folder_path = QFileDialog.getExistingDirectory(None, "Select Folder contains data")
+        folder_path = QFileDialog.getExistingDirectory(None, "Select folder containing data")
         if folder_path:
             self.lineEdit_data_directory.setText(folder_path)
-            self.lineEdit_save_directory.setText(folder_path)
+            self.lineEdit_save_directory.setText(folder_path + "/output")
             protocol_filepath = Path(folder_path + "/protocol.json")
             if protocol_filepath.is_file():
                 self.get_protocol(protocol_filepath)
