@@ -102,16 +102,17 @@ protocol_dict = [
     {"id": pid, "duration": duration, "name": name}
     for pid, duration, name in zip(protocol_id, protocol_duration, protocol_name)]
 
-""" Photodiode.average_image(dF, protocol_id,3,5,'looming stim', F_stim_init_indexes, freq_2p, num_samples, save_dir)
-protocol_validity = []
-for protocol in range(len(protocol_dict)):
-    chosen_protocol = protocol_dict[protocol]['id']
-    protocol_duration = protocol_dict[protocol]['duration']
-    protocol_name = protocol_dict[protocol]['name']
-    protocol_validity_i = Photodiode.average_image(dF, protocol_id,chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
-protocol_validity.append(protocol_validity_i)
-np.savez(r"D:\Faezeh 2p2analyze\2024_09_03\16-00-59\fig2\protocol_validity.npz", **{key: value for d in protocol_validity for key, value in d.items()})
-print(protocol_validity) """
+if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
+    #Photodiode.average_image(dF, protocol_id,3,5,'looming stim', F_stim_init_indexes, freq_2p, num_samples, save_dir)
+    protocol_validity = []
+    for protocol in range(len(protocol_dict)):
+        chosen_protocol = protocol_dict[protocol]['id']
+        protocol_duration = protocol_dict[protocol]['duration']
+        protocol_name = protocol_dict[protocol]['name']
+        protocol_validity_i = Photodiode.average_image(dF, protocol_id,chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
+        protocol_validity.append(protocol_validity_i)
+    np.savez(os.path.join(base_path, "protocol_validity.npz"), **{key: value for d in protocol_validity for key, value in d.items()})
+    print(protocol_validity)
 
 F_spontaneous, start_spont_index, end_spont_index = Photodiode.get_spontaneous_F(raw_F, protocol_id, 5, 1200, F_stim_init_indexes, freq_2p)
 time_start_spon_index = F_time_stamp_updated[start_spont_index]
@@ -124,7 +125,7 @@ fvideo_last_spont_index = np.argmin(np.abs(fvideo_time - time_end_spon_index))
 speed_corr = [pearsonr(speed[start_spont_index:end_spont_index], ROI)[0] for ROI in F_spontaneous]
 speed_corr = [float(value) for value in speed_corr]
 ###############################
-protocol_validity_npz = np.load(r"Y:\raw-imaging\TESTS\Mai-An\visual_test\16-00-59\protocol_validity.npz")
+protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
 loaded_data = [{key: protocol_validity_npz[key] for key in protocol_validity_npz}]
 for d in loaded_data:
     Green_Cell = d['static patch']
