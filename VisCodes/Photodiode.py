@@ -3,7 +3,6 @@ import json
 import numpy as np
 import figures
 import General_functions
-import Running_computation
 from scipy.ndimage import filters, gaussian_filter1d
 
 def load_and_data_extraction(base_path):
@@ -37,7 +36,7 @@ def visual_stim_extraction(visual_stim):
 def realign_from_photodiode(base_path):
     # Calculate threshold for photodiode activity
     visual_stim, NIdaq, Acquisition_Frequency = load_and_data_extraction(base_path)
-    Psignal_time, Psignal = Running_computation.resample_signal(NIdaq['analog'][0],
+    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
                                                      original_freq=Acquisition_Frequency,
                                                      pre_smoothing=2. / Acquisition_Frequency,
                                                      new_freq=1000)
