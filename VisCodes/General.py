@@ -10,6 +10,7 @@ from PyQt5 import QtWidgets
 import os
 from inputUI import InputWindow
 import matplotlib.pyplot as plt
+import pandas as pd
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -37,9 +38,11 @@ if __name__ == "__main__":
     visual_stim_path = os.path.join(base_path, "visual-stim.npy")
     visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
 
-    protocol_id = inputs["protocol_ids"]
-    protocol_name = inputs["protocol_names"]
-    protocol_duration = dict(zip(visual_stim['protocol_id'], visual_stim['time_duration']))
+protocol_id = inputs["protocol_ids"]
+protocol_name = inputs["protocol_names"]
+protocol_df = pd.DataFrame({"id" : protocol_id, "name" : protocol_name})
+protocol_duration = pd.DataFrame({ "id" : visual_stim['protocol_id'], "duration" : visual_stim['time_duration']}).groupby(by="id").mean()
+protocol_df = protocol_df.join(protocol_duration, on="id", how="inner").set_index("id")
 
 ##---------------------------------- Load Ca-Imaging data ----------------------
 raw_F, raw_Fneu, iscell, stat, mean_image = Ca_imaging.load_Suite2p(base_path)
@@ -92,23 +95,21 @@ dF = Ca_imaging.deltaF_calculate(raw_F, f0)
 #---------------------------------- Load photodiode data -----------------------------
 stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
 ###-------------------------Downsampling Photodiode for visualization-----------------
-visual_stim, NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
-stim_time_durations, protocol_id, stim_start_times, interstim_times = Photodiode.extract_visual_stim_items(visual_stim)
+#visual_stim, NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
+#stim_time_durations, protocol_id, stim_start_times, interstim_times = Photodiode.extract_visual_stim_items(visual_stim)
+stim_time_durations = visual_stim['time_duration']
 F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(stim_Time_start_realigned, F_time_stamp_updated)
 stim_time_end = F_Time_start_realigned+ stim_time_durations
 stim_time_end = stim_time_end.tolist()
 stim_time_period = [stim_Time_start_realigned, stim_time_end]
-protocol_dict = [
-    {"id": pid, "duration": duration, "name": name}
-    for pid, duration, name in zip(protocol_id, protocol_duration, protocol_name)]
 
 if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
     #Photodiode.average_image(dF, protocol_id,3,5,'looming stim', F_stim_init_indexes, freq_2p, num_samples, save_dir)
     protocol_validity = []
-    for protocol in range(len(protocol_dict)):
-        chosen_protocol = protocol_dict[protocol]['id']
-        protocol_duration = protocol_dict[protocol]['duration']
-        protocol_name = protocol_dict[protocol]['name']
+    for protocol in range(len(protocol_df)):
+        chosen_protocol = protocol_df.index[protocol]
+        protocol_duration = protocol_df['duration'][protocol]
+        protocol_name = protocol_df['name'][protocol]
         protocol_validity_i = Photodiode.average_image(dF, protocol_id,chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
         protocol_validity.append(protocol_validity_i)
     np.savez(os.path.join(base_path, "protocol_validity.npz"), **{key: value for d in protocol_validity for key, value in d.items()})
