@@ -9,7 +9,6 @@ from sklearn.linear_model import LinearRegression
 from scipy.ndimage import filters, gaussian_filter1d
 import matplotlib.pyplot as plt
 
-base_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
 def find_Tseries(base_path):
     file = [f for f in os.listdir(base_path) if f.startswith("TSeries")]
     if len (file) > 1:
@@ -29,6 +28,7 @@ def load_Suite2p(base_path):
     stat = np.load((os.path.join(Suite2p_path, "stat.npy")), allow_pickle=True)
     Mean_image = ((ops['meanImg']))
     return F, Fneu_raw, iscell, stat, Mean_image
+
 def load_xml(base_path, metadate = False):
     Tseries_directory = find_Tseries(base_path)
     xml_direction = glob.glob(os.path.join(Tseries_directory, '*.xml'))[0]
@@ -48,12 +48,14 @@ def load_xml(base_path, metadate = False):
         bitDepth, dwellTime, framePeriod, micronsPerPixel, TwophotonLaserPower
     else:
         return xml
+
 def detect_cell(cell, F):
     removed_ROI = [i for i, c in enumerate(cell) if c[0] == 0]
     keeped_ROI = [j for j, i in enumerate(cell) if i[0] != 0]
     if len(F) != len(keeped_ROI):
         F = np.delete(F, removed_ROI, axis=0)
     return F, keeped_ROI
+
 def detect_bad_neuropils(detected_roi,neuropil, F,iscell ,direction= None):
     neuropil_F = gaussian_filter1d(neuropil, 10)
     F_F = gaussian_filter1d(F,10)
@@ -66,6 +68,7 @@ def detect_bad_neuropils(detected_roi,neuropil, F,iscell ,direction= None):
         else:
             pass
     return iscell, neuron_chosen
+
 def calculate_F0(F, fs, percentile, mode = 'sliding', win = 60, sig = 60):
     if mode == 'hamming':
         F0 = []
@@ -85,12 +88,12 @@ def calculate_F0(F, fs, percentile, mode = 'sliding', win = 60, sig = 60):
         F0 = filters.minimum_filter1d(F0, win * fs, mode='wrap')
         F0 = filters.maximum_filter1d(F0, win * fs, mode='wrap')
     return F0
+
 def deltaF_calculate(F, F0):
     normalized_F = np.copy(F)
     for i in range(0, np.size(F, 0)):
         normalized_F[i] = (F[i]-F0[i])/F0[i]
     return normalized_F
-
 
 def calculate_alpha (F, Fneu):
     Slope = []
@@ -124,7 +127,7 @@ def calculate_alpha (F, Fneu):
     alpha = np.mean(alpha)
     return alpha, remove
 
-def Save_mean_Image(Mean_image, save_dir):
+def save_mean_Image(Mean_image, save_dir):
     normalized_image = (Mean_image - Mean_image.min()) / (Mean_image.max() - Mean_image.min()) * 255
     normalized_image = normalized_image.astype(np.uint8)
     save_image_dir = os.path.join(save_dir, "Mean_image_grayscale.png")

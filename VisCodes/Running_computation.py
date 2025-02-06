@@ -19,7 +19,7 @@ def load_and_data_extraction(base_path):
         # Extract relevant data from metadata
         radius = data['rotating-disk']['radius-position-on-disk-cm']
         value_per_rotation = data['rotating-disk']['roto-encoder-value-per-rotation']
-        Frequency = data['NIdaq-acquisition-frequency']
+        acq_freq = data['NIdaq-acquisition-frequency']
     else:
         raise Exception("No JSON metadata file exists in this directory")
 
@@ -32,8 +32,7 @@ def load_and_data_extraction(base_path):
     else:
         raise Exception("No NIdaq.npy file exists in this directory")
 
-    return binary_signal, radius, value_per_rotation, Frequency
-
+    return binary_signal, radius, value_per_rotation, acq_freq
 
 def process_binary_signal(binary_signal):
     A = binary_signal % 2
@@ -74,15 +73,15 @@ def compute_position_from_binary_signals(A, B):
 
     return np.cumsum(np.concatenate([[0], Delta_position]))
 
-def get_alignment_index(Flourscnce_time,original_signal, original_freq):
+def get_alignment_index(F_time_stamps, original_signal, original_freq):
     tlim_photodiode = np.linspace(1000, len(original_signal),len(original_signal) - 1000)
     original_signal = original_signal[1000:]
     last_photodiode_stamp = tlim_photodiode[-1]
-    Flourscnce_time2 = Flourscnce_time * original_freq
+    Flourscnce_time2 = F_time_stamps * original_freq
     index_flour = np.where(Flourscnce_time2 >= last_photodiode_stamp)[0][0]
-    index_photodiod = np.where(tlim_photodiode >= Flourscnce_time[index_flour - 1] * original_freq)[0][0]
+    index_photodiod = np.where(tlim_photodiode >= F_time_stamps[index_flour - 1] * original_freq)[0][0]
     original_signal = original_signal[:index_photodiod - 1]
-    Interpolate_time = Flourscnce_time[:index_flour - 1]
+    Interpolate_time = F_time_stamps[:index_flour - 1]
     last_Flourscnce_index = index_flour - 1
     return Interpolate_time, last_Flourscnce_index, original_signal
 
@@ -122,7 +121,7 @@ def resample_running_signal(original_signal,
 
     return new_signal
 
-def compute_speed(base_path,new_freq,Flourscnce_time = None, position_smoothing = 10e-3, #s
+def compute_speed(base_path, new_freq, F_time_stamps=None, position_smoothing=10e-3, #s
                    with_raw_position=False):
     
     binary_signal, radius_position_on_disk, rotoencoder_value_per_rotation, acq_freq = load_and_data_extraction(base_path)
@@ -139,7 +138,7 @@ def compute_speed(base_path,new_freq,Flourscnce_time = None, position_smoothing 
 
     speed *= acq_freq
 
-    Interpolate_time, last_Flourscnce_index, speed = get_alignment_index(Flourscnce_time, speed, acq_freq)
+    Interpolate_time, last_Flourscnce_index, speed = get_alignment_index(F_time_stamps, speed, acq_freq)
 
     #sub sampling and filtering speed
     speed = resample_running_signal(speed, Interpolate_time,
