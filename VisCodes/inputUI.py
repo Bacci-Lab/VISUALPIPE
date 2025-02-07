@@ -15,13 +15,12 @@ class InputWindow(QtWidgets.QMainWindow):
     def get_inputs(self):
         """Retrieve user inputs from the first GUI."""
         return {
-            "base_path": self.ui.lineEdit_data_directory.text(),
-            "save_dir": self.ui.lineEdit_save_directory.text(),
-            "neuropil_impact_factor": self.ui.lineEdit_Neuropil_IF.text(),
-            "F0_method": self.ui.comboBox_F0_method.currentText(),
-            "neuron_type": self.ui.comboBox_neural_type.currentText(),
-            "starting_delay_2p": self.ui.lineEdit_starting_delay.text(),
-            "Photon_fre": self.ui.lineEdit_Fre.text(),
+            "base_path": self.ui.data_directory,
+            "save_dir": self.ui.save_directory,
+            "neuropil_impact_factor": self.ui.neuropil_if,
+            "F0_method": self.ui.f0_method,
+            "neuron_type": self.ui.neural_type,
+            "starting_delay_2p": self.ui.starting_delay,
             "protocol_ids": self.ui.protocol_numbers if hasattr(self.ui, 'protocol_numbers') else [],
             "protocol_names": self.ui.protocol_names if hasattr(self.ui, 'protocol_names') else [],
         }
@@ -75,10 +74,10 @@ class Ui_MainWindow(object):
         self.comboBox_F0_method = self.create_combo_box(["sliding", "Hamming"], self.first_grid, 4, 1)
         self.label_4 = self.create_label("F0 method", self.first_grid, 3, 1)
 
-        self.label_2p_fr = self.create_label("2 photon Frequency", self.first_grid, 0, 0)
+        """ self.label_2p_fr = self.create_label("2 photon Frequency", self.first_grid, 0, 0)
         self.lineEdit_Fre = self.create_line_edit(self.first_grid, 0, 1)
         self.lineEdit_Fre.setValidator(QIntValidator())
-        self.lineEdit_Fre.setText("29.7597")
+        self.lineEdit_Fre.setText("29.7597") """
 
         self.label_2p_delay = self.create_label("2 photon starting delay(ms)", self.first_grid, 1, 0)
         self.lineEdit_starting_delay = self.create_line_edit(self.first_grid, 1, 1)
@@ -110,7 +109,7 @@ class Ui_MainWindow(object):
         self.neural_type = str(self.comboBox_neural_type.currentText())
         self.f0_method = str(self.comboBox_F0_method.currentText())
 
-        self.photon_frequency = float(self.lineEdit_Fre.text())
+        #self.photon_frequency = float(self.lineEdit_Fre.text())
         self.starting_delay = float(self.lineEdit_starting_delay.text())
         self.neuropil_if = float(self.lineEdit_Neuropil_IF.text())
         self.data_directory = str(self.lineEdit_data_directory.text())

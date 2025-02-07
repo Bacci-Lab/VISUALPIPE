@@ -29,7 +29,6 @@ neuropil_impact_factor = float(inputs["neuropil_impact_factor"])
 F0_method = inputs["F0_method"]
 neuron_type = inputs["neuron_type"]
 starting_delay_2p = float(inputs["starting_delay_2p"])
-freq_2p = round(float(inputs["Photon_fre"]))
 
 # Use inputs to process data
 num_samples = 1000
@@ -48,6 +47,7 @@ raw_F, raw_Fneu, iscell, stat, mean_image = Ca_imaging.load_Suite2p(base_path)
 Ca_imaging.save_mean_Image(mean_image, save_dir)
 xml = Ca_imaging.load_xml(base_path)
 F_time_stamp = xml['Green']['relativeTime']
+freq_2p = round(1 / float(xml['settings']['framePeriod']))
 F_time_stamp_updated = F_time_stamp + starting_delay_2p
 
 ##---------------------------------- Load Camera data ----------------------------------
