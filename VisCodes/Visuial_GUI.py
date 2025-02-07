@@ -132,14 +132,14 @@ class CustomGraphicsView_protocol(QGraphicsView):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
+    def __init__(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus, red_frame_path, save_dir):
         super().__init__()
         self.All_protocols = All_protocols
         self.Chosen_Protocol = Chosen_Protocol
         self.setupFirstTab(cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode,stimulus)
-        self.setupSecondTab()
+        self.setupSecondTab(red_frame_path, save_dir)
         Green_Cell = Chosen_Protocol
-        self.SetUpThirdTab(cell_info, Green_Cell)
+        self.SetUpThirdTab(cell_info, Green_Cell, red_frame_path)
         self.F = F
         self.Time = Time
         self.Run = Run
@@ -212,7 +212,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
         self.setGeometry(100, 100, 1500, 641)
 
-    def setupSecondTab(self):
+    def setupSecondTab(self, red_frame_path, save_dir):
         """Set up the second (Red Image Adjustment) tab."""
         layout = QtWidgets.QVBoxLayout(self.second_tab)
 
@@ -223,21 +223,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui_red_image_adjustment = Red_IMAGE_Adgustment()
 
         # Replace with the appropriate paths or parameters you need
-        SavePath = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
-        red_frame_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
+        #SavePath = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
+        #red_frame_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
 
         # Set up the UI in the QMainWindow
-        self.ui_red_image_adjustment.setupUi(self.red_image_adjustment_window, SavePath, red_frame_path)
+        self.ui_red_image_adjustment.setupUi(self.red_image_adjustment_window, save_dir, red_frame_path)
 
         # Embed the QMainWindow into the second tab by adding it as a widget
         layout.addWidget(self.red_image_adjustment_window.centralWidget())
 
-    def SetUpThirdTab(self, cell_info, Green_Cell):
-        background_image_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59\red.tif"
+    def SetUpThirdTab(self, cell_info, Green_Cell, redtif_path):
+        #background_image_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
         layout_third = QtWidgets.QVBoxLayout(self.third_tab)
         self.Sellect_cell_window = QtWidgets.QMainWindow()
 
-        self.select_cell_ui = SelectCell(cell_info, Green_Cell, background_image_path)
+        self.select_cell_ui = SelectCell(cell_info, Green_Cell, redtif_path + "/red.tif")
 
         # Add SelectCell's central widget to the third tab layout
         layout_third.addWidget(self.select_cell_ui.centralWidget())
