@@ -118,7 +118,7 @@ if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
         chosen_protocol = protocol_df.index[protocol]
         protocol_duration = protocol_df['duration'][protocol]
         protocol_name = protocol_df['name'][protocol]
-        protocol_validity_i = Photodiode.average_image(dF, protocol_id,chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
+        protocol_validity_i = Photodiode.average_image(dF, visual_stim['protocol_id'],chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
         protocol_validity.append(protocol_validity_i)
     np.savez(os.path.join(base_path, "protocol_validity.npz"), **{key: value for d in protocol_validity for key, value in d.items()})
     print(protocol_validity)
@@ -139,7 +139,7 @@ speed_corr = [float(value) for value in speed_corr]
 protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
 loaded_data = [{key: protocol_validity_npz[key] for key in protocol_validity_npz}]
 for d in loaded_data:
-    Green_Cell = d['static patch']
+    Green_Cell = d['static-patch']
 computed_F = General_functions.normalize_time_series(computed_F, lower=0, upper=5)
 speedAndTimeSt = (speed_time_stamps, speed)
 Psignal = General_functions.scale_trace(Psignal)
