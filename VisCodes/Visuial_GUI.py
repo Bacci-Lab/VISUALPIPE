@@ -9,12 +9,13 @@ from matplotlib.figure import Figure
 from matplotlib import cm, colors
 import numpy as np
 from Time_series_GUI import Ui_MainWindow as TimeseriesUI  # Import your previous class
+import os
 # Add the previous code tab
 
 
 class CustomGraphicsView_red(QGraphicsView):
     objectClicked = pyqtSignal(int)
-    def __init__(self, cell_info, Chosen_Protocol,All_protocols, background_image_path,
+    def __init__(self, cell_info, Chosen_Protocol, All_protocols, background_image_path,
                  corr_running, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
         super().__init__()
         self.corr_running = corr_running
@@ -79,7 +80,7 @@ class CustomGraphicsView_red(QGraphicsView):
 class CustomGraphicsView_protocol(QGraphicsView):
     objectClicked = pyqtSignal(int)
 
-    def __init__(self, cell_info, Chosen_Protocol,All_protocols, background_image_path=None):
+    def __init__(self, cell_info, Chosen_Protocol, All_protocols, background_image_path=None):
         super().__init__()
         self.setScene(QGraphicsScene())
         self.Chosen_Protocol = Chosen_Protocol
@@ -132,32 +133,87 @@ class CustomGraphicsView_protocol(QGraphicsView):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus, red_frame_path, save_dir):
+    def __init__(self, cell_info, protocol_validity_npz, corr_running, F, Time, Run, FaceMotion, Pupil, Photodiode, stimulus, red_frame_path, save_dir):
         super().__init__()
-        self.All_protocols = All_protocols
-        self.Chosen_Protocol = Chosen_Protocol
-        self.setupFirstTab(cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode,stimulus)
-        self.setupSecondTab(red_frame_path, save_dir)
-        Green_Cell = Chosen_Protocol
-        self.SetUpThirdTab(cell_info, Green_Cell, red_frame_path)
-        self.F = F
+        self.protocolValidity = protocol_validity_npz
+        self.stimuliNames = protocol_validity_npz.files
+        self.selectedProtocol = protocol_validity_npz[self.stimuliNames[0]]
+        self.background_image_path = os.path.join(save_dir, "Mean_image_grayscale.png")
+        self.computed_F = F
         self.Time = Time
         self.Run = Run
         self.FaceMotion = FaceMotion
         self.Pupil = Pupil
         self.Photodiode = Photodiode
         self.stimulus = stimulus
+        
+        self.setupFirstTab(cell_info, corr_running)
+        self.setupSecondTab(red_frame_path, save_dir)
+        Green_Cell = protocol_validity_npz["static-patch"]
+        self.SetUpThirdTab(cell_info, Green_Cell, red_frame_path)
 
-    def setupFirstTab(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
-        self.setupMainWindow(F, Time, Run,FaceMotion, Pupil, Photodiode,stimulus)
+    def setupMainWindow(self):
+        """Set up main window properties and the tab widget."""
+        # Initialize the tab widget
+        self.tabWidget = QtWidgets.QTabWidget(self)
+        self.setCentralWidget(self.tabWidget)
+
+        # Create tabs
+        self.first_tab = QtWidgets.QWidget()
+        self.tabWidget.addTab(self.first_tab, "Main GUI")
+
+        self.second_tab = QtWidgets.QWidget()
+        self.tabWidget.addTab(self.second_tab, "Red Image adjustment")
+
+        self.third_tab = QtWidgets.QWidget()
+        self.tabWidget.addTab(self.third_tab, "Red cell control")
+
+        self.Data_visualisationTab()
+
+        # Set window properties
+        self.setWindowTitle("You can transfer masks between channels")
+        self.setStyleSheet("""
+            background-color: rgb(85, 85, 85);
+            gridline-color: rgb(213, 213, 213);
+            border-top-color: rgb(197, 197, 197);
+        """)
+        self.setGeometry(100, 100, 1500, 641)
+
+    def setupFirstTab(self, cell_info, corr_running):
+        self.setupMainWindow()
         self.setupLayouts()
-        self.setupFrame1(cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus)
-        self.setupFrame2(cell_info, Chosen_Protocol, background_image_path, All_protocols)
+        self.setupFrame1(cell_info, corr_running)
+        self.setupFrame2(cell_info)
         self.setupMenuBar()
         self.setup_buttons()
         self.retranslateUi()
+  
+    def setupSecondTab(self, red_frame_path, save_dir):
+        """Set up the second (Red Image Adjustment) tab."""
+        layout = QtWidgets.QVBoxLayout(self.second_tab)
 
-    def Data_visualisationTab(self, F,Time,Run, FaceMotion,Pupil,Photodiode, stimulus):
+        # Create a new QMainWindow instance for Red_IMAGE_Adgustment
+        self.red_image_adjustment_window = QtWidgets.QMainWindow()
+
+        # Create an instance of Red_IMAGE_Adgustment and set it up
+        self.ui_red_image_adjustment = Red_IMAGE_Adgustment()
+
+        # Set up the UI in the QMainWindow
+        self.ui_red_image_adjustment.setupUi(self.red_image_adjustment_window, save_dir, red_frame_path)
+
+        # Embed the QMainWindow into the second tab by adding it as a widget
+        layout.addWidget(self.red_image_adjustment_window.centralWidget())
+
+    def SetUpThirdTab(self, cell_info, Green_Cell, redtif_path):
+        layout_third = QtWidgets.QVBoxLayout(self.third_tab)
+        self.Sellect_cell_window = QtWidgets.QMainWindow()
+
+        self.select_cell_ui = SelectCell(cell_info, Green_Cell, redtif_path + "/red.tif")
+
+        # Add SelectCell's central widget to the third tab layout
+        layout_third.addWidget(self.select_cell_ui.centralWidget())
+    
+    def Data_visualisationTab(self):
         """
         Set up a new tab to include the previous GUI functionality.
 
@@ -177,72 +233,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Create a container widget for the previous code
         self.previous_code_window = QtWidgets.QMainWindow()
-        self.previous_ui.setupUi(self.previous_code_window, F,Time,Run, FaceMotion,Pupil,Photodiode, stimulus)
+        self.previous_ui.setupUi(self.previous_code_window, self.computed_F, self.Time, self.Run, self.FaceMotion, self.Pupil, self.Photodiode, self.stimulus)
 
         # Embed the previous code into the tab
         layout.addWidget(self.previous_code_window.centralWidget())
 
         # Add the tab to the tab widget
         self.tabWidget.addTab(self.previous_code_tab, "Data Visualisation")
-
-    def setupMainWindow(self, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
-        """Set up main window properties and the tab widget."""
-        # Initialize the tab widget
-        self.tabWidget = QtWidgets.QTabWidget(self)
-        self.setCentralWidget(self.tabWidget)
-
-        # Create tabs
-        self.first_tab = QtWidgets.QWidget()
-        self.tabWidget.addTab(self.first_tab, "Main GUI")
-
-        self.second_tab = QtWidgets.QWidget()
-        self.tabWidget.addTab(self.second_tab, "Red Image adjustment")
-
-        self.third_tab = QtWidgets.QWidget()
-        self.tabWidget.addTab(self.third_tab, "Red cell control")
-
-        self.Data_visualisationTab(F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus)
-
-        # Set window properties
-        self.setWindowTitle("You can transfer masks between channels")
-        self.setStyleSheet("""
-            background-color: rgb(85, 85, 85);
-            gridline-color: rgb(213, 213, 213);
-            border-top-color: rgb(197, 197, 197);
-        """)
-        self.setGeometry(100, 100, 1500, 641)
-
-    def setupSecondTab(self, red_frame_path, save_dir):
-        """Set up the second (Red Image Adjustment) tab."""
-        layout = QtWidgets.QVBoxLayout(self.second_tab)
-
-        # Create a new QMainWindow instance for Red_IMAGE_Adgustment
-        self.red_image_adjustment_window = QtWidgets.QMainWindow()
-
-        # Create an instance of Red_IMAGE_Adgustment and set it up
-        self.ui_red_image_adjustment = Red_IMAGE_Adgustment()
-
-        # Replace with the appropriate paths or parameters you need
-        #SavePath = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
-        #red_frame_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
-
-        # Set up the UI in the QMainWindow
-        self.ui_red_image_adjustment.setupUi(self.red_image_adjustment_window, save_dir, red_frame_path)
-
-        # Embed the QMainWindow into the second tab by adding it as a widget
-        layout.addWidget(self.red_image_adjustment_window.centralWidget())
-
-    def SetUpThirdTab(self, cell_info, Green_Cell, redtif_path):
-        #background_image_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
-        layout_third = QtWidgets.QVBoxLayout(self.third_tab)
-        self.Sellect_cell_window = QtWidgets.QMainWindow()
-
-        self.select_cell_ui = SelectCell(cell_info, Green_Cell, redtif_path + "/red.tif")
-
-        # Add SelectCell's central widget to the third tab layout
-        layout_third.addWidget(self.select_cell_ui.centralWidget())
-
-
+      
     def setupLayouts(self):
         """Set up primary layouts."""
         self.horizontalLayout_4 = QtWidgets.QHBoxLayout(self.first_tab)
@@ -253,8 +251,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.horizontalLayout_4.addLayout(self.horizontalLayout_5)
         self.horizontalLayout_4.addLayout(self.horizontalLayout_6)
 
-
-    def setupFrame1(self, cell_info, Chosen_Protocol, background_image_path, All_protocols, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
+    def setupFrame1(self, cell_info, corr_running):
         """Set up the first frame with red view."""
         self.frame = self.createFrame()
         self.verticalLayout_2 = self.createVerticalLayout(self.frame)
@@ -265,11 +262,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit_Red = self.createLineEdit( self.frame, True)
         self.verticalLayout_2.addWidget(self.lineEdit_Red)
 
-        self.Red_view = CustomGraphicsView_red(cell_info, Chosen_Protocol,All_protocols, background_image_path, corr_running,F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus)
+        self.Red_view = CustomGraphicsView_red(cell_info, self.selectedProtocol, self.protocolValidity, self.background_image_path, corr_running, self.computed_F, self.Time, self.Run, self.FaceMotion, self.Pupil, self.Photodiode, self.stimulus)
         self.verticalLayout_2.addWidget(self.Red_view)
         self.horizontalLayout_2.addWidget(self.frame)
 
-    def setupFrame2(self, cell_info, Chosen_Protocol, background_image_path, All_protocols):
+    def setupFrame2(self, cell_info):
 
         self.frame_2 = self.createFrame()
         self.verticalLayout = self.createVerticalLayout(self.frame_2)
@@ -280,7 +277,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit_protocol = self.createLineEdit(self.frame_2, True)
         self.verticalLayout.addWidget(self.lineEdit_protocol)
 
-        self.Protocol_view = CustomGraphicsView_protocol(cell_info, Chosen_Protocol,All_protocols, background_image_path)
+        self.Protocol_view = CustomGraphicsView_protocol(cell_info, self.selectedProtocol, self.protocolValidity, self.background_image_path)
         self.verticalLayout.addWidget(self.Protocol_view)
         self.horizontalLayout_5.addWidget(self.frame_2)
 
@@ -299,15 +296,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gridLayout = self.createGridlLayout(self.frame_setting)
 
         # Define common stimulus types
-        stimulus_types = [
-            "moving dots",
-            "random dots",
-            "static patch",
-            "looming stim",
-            "Natural Images 4 repeats",
-            "grey 20min",
-            "drifting gratings"
-        ]
+        stimulus_types = self.stimuliNames
 
         behavioral_types = [
             "Running Correlation",
@@ -345,6 +334,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Add the frame containing the grid layout to the main horizontal layout
         self.horizontalLayout_4.addWidget(self.frame_setting)
+
+    def setupMenuBar(self):
+        """Set up the menu bar and actions."""
+        self.menubar = QtWidgets.QMenuBar(self)
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 954, 21))
+        self.menubar.setObjectName("menubar")
+        self.menubar.setStyleSheet("color: white;")
+        self.setMenuBar(self.menubar)
+
+        self.menuOpen = QtWidgets.QMenu(self.menubar)
+        self.menuOpen.setObjectName("menuOpen")
+        self.menuOpen.setStyleSheet("""
+            QMenu {
+                background-color: rgb(200, 200, 200);
+                color: rgb(20, 20, 20);
+            }
+        """)
+
+        self.menubar.addAction(self.menuOpen.menuAction())
+        self.actionload_proccesd_file = QtWidgets.QAction(self)
+        self.actionload_proccesd_file.setObjectName("actionload_proccesd_file")
+        self.menuOpen.addAction(self.actionload_proccesd_file)
 
     def addColormapToLayout(self, grid_layout, colormap_name, min_val, max_val, row, col, colspan=1):
         """
@@ -423,6 +434,7 @@ class MainWindow(QtWidgets.QMainWindow):
         grid_layout.addWidget(combo_box, row + 1, col)
         # combo_box.currentIndexChanged.connect(lambda: self.SelectedItem(combo_box))
 
+    #Slots
     def SelectedItem(self, combo_box):
         """
         Slot to handle the current index change in the combo box.
@@ -433,37 +445,16 @@ class MainWindow(QtWidgets.QMainWindow):
         print(f"Selected item: {combo_box.currentText()}")
         protocol = combo_box.currentText()
 
-        # Check if All_protocols exists and process it
-        if hasattr(self, "All_protocols") and self.All_protocols:
-            for d in self.All_protocols:
-                if protocol in d:  # Ensure the key exists in the dictionary
-                    self.Chosen_Protocol = d[protocol]
-            self.Protocol_view.drawObjects(self.Chosen_Protocol)
+        # Check if protocolValidity exists and process it
+        if hasattr(self, "protocolValidity") and self.protocolValidity :
+            if protocol in self.stimuliNames:  # Ensure the key exists in the dictionary
+                    self.selectedProtocol = self.protocolValidity[protocol]
+            self.Protocol_view.drawObjects(self.selectedProtocol)
             # self.Red_view.drawObjects()  # Ensure this calls the correct instance
         else:
-            print("All_protocols is not set or empty.")
-    def setupMenuBar(self):
-        """Set up the menu bar and actions."""
-        self.menubar = QtWidgets.QMenuBar(self)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 954, 21))
-        self.menubar.setObjectName("menubar")
-        self.menubar.setStyleSheet("color: white;")
-        self.setMenuBar(self.menubar)
+            print("protocolValidity attr is not set or empty.")
 
-        self.menuOpen = QtWidgets.QMenu(self.menubar)
-        self.menuOpen.setObjectName("menuOpen")
-        self.menuOpen.setStyleSheet("""
-            QMenu {
-                background-color: rgb(200, 200, 200);
-                color: rgb(20, 20, 20);
-            }
-        """)
-
-        self.menubar.addAction(self.menuOpen.menuAction())
-        self.actionload_proccesd_file = QtWidgets.QAction(self)
-        self.actionload_proccesd_file.setObjectName("actionload_proccesd_file")
-        self.menuOpen.addAction(self.actionload_proccesd_file)
-
+    #Tool function for UI layouts and widgets
     def createFrame(self):
         """Create a styled frame."""
         frame = QtWidgets.QFrame(self.first_tab)
@@ -477,6 +468,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(parent)
         layout.setObjectName("verticalLayout")
         return layout
+    
     def createGridlLayout(self, parent):
         """Create a vertical layout."""
         layout = QtWidgets.QGridLayout(parent)
@@ -499,7 +491,7 @@ class MainWindow(QtWidgets.QMainWindow):
         line_edit.setEnabled(enabled)
         return line_edit
 
-
+    #Translate UI elements
     def retranslateUi(self):
         """Translate UI elements."""
         _translate = QtCore.QCoreApplication.translate

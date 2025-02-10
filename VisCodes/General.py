@@ -137,9 +137,6 @@ speed_corr = [float(value) for value in speed_corr]
 
 ###############################
 protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
-loaded_data = [{key: protocol_validity_npz[key] for key in protocol_validity_npz}]
-for d in loaded_data:
-    Green_Cell = d['static-patch']
 computed_F = General_functions.normalize_time_series(computed_F, lower=0, upper=5)
 speedAndTimeSt = (speed_time_stamps, speed)
 Psignal = General_functions.scale_trace(Psignal)
@@ -173,6 +170,6 @@ print("Face_time_spo ", len(fvideo_time_spont))
 background_image_path = os.path.join(base_path, "Mean_image_grayscale.png")
 
 #Second GUI
-main_window = MainWindow(stat, Green_Cell, background_image_path, loaded_data, speed_corr, computed_F, F_time_stamp_updated, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
+main_window = MainWindow(stat, protocol_validity_npz, speed_corr, computed_F, F_time_stamp_updated, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
 main_window.show()
 app.exec_()
