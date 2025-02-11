@@ -85,8 +85,8 @@ def calculate_F0(F, fs, percentile, mode = 'sliding', win = 60, sig = 60):
         F0 = np.array(F0)
     elif mode == 'sliding':
         F0 = filters.gaussian_filter(F, [0., sig])
-        F0 = filters.minimum_filter1d(F0, win * fs, mode='wrap')
-        F0 = filters.maximum_filter1d(F0, win * fs, mode='wrap')
+        F0 = filters.minimum_filter1d(F0, round(win * fs), mode='wrap')
+        F0 = filters.maximum_filter1d(F0, round(win * fs), mode='wrap')
     return F0
 
 def deltaF_calculate(F, F0):

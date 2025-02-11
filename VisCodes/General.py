@@ -47,7 +47,7 @@ raw_F, raw_Fneu, iscell, stat, mean_image = Ca_imaging.load_Suite2p(base_path)
 Ca_imaging.save_mean_Image(mean_image, save_dir)
 xml = Ca_imaging.load_xml(base_path)
 F_time_stamp = xml['Green']['relativeTime']
-freq_2p = round(1 / float(xml['settings']['framePeriod']))
+freq_2p = (len(F_time_stamp) - 1) / F_time_stamp[-1]
 F_time_stamp_updated = F_time_stamp + starting_delay_2p
 
 ##---------------------------------- Load Camera data ----------------------------------
