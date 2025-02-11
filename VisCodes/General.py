@@ -58,13 +58,14 @@ pupil = (faceitOutput['pupil_dilation'])
 facemotion = (faceitOutput['motion_energy'])
 print("len facemotion :", len(facemotion))
 ##---------------------------------- Load Speed ----------------------------------
-speed_time_stamps, speed, last_F_index = compute_speed(base_path, freq_2p, F_time_stamp_updated)
+speed, speed_time_stamps, last_F_index = compute_speed(base_path, freq_2p, F_time_stamp_updated)
 print("len speed", len(speed))
 
 ##---------------------------------- Cut F to align with speed ----------------------------------
-raw_F = raw_F[:, :last_F_index]
-raw_Fneu = raw_Fneu[:, :last_F_index]
-F_time_stamp_updated = F_time_stamp_updated[:last_F_index]
+raw_F = raw_F[:, :last_F_index+1]
+raw_Fneu = raw_Fneu[:, :last_F_index+1]
+F_time_stamp_updated = F_time_stamp_updated[:last_F_index+1]
+print("len raw_F", len(raw_F[0]))
 
 # ---------------------------Detect Neurons Among ROIs------------------
 _ , detected_roi = Ca_imaging.detect_cell(iscell, raw_F)

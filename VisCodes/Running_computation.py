@@ -1,9 +1,10 @@
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter1d
+from scipy.ndimage import gaussian_filter1d
 from scipy.interpolate import interp1d
 import os.path
 import json
 import matplotlib.pyplot as plt
+import Ca_imaging
 
 # TODO  This section of code is adapted from the physion Pipeline.
 # TODO  The purpose of this code is to process binary signals from a rotary encoder to compute the rotational position and speed over time
@@ -73,26 +74,20 @@ def compute_position_from_binary_signals(A, B):
 
     return np.cumsum(np.concatenate([[0], Delta_position]))
 
-def get_alignment_index(F_time_stamps, original_signal, original_freq):
-    tlim_photodiode = np.linspace(1000, len(original_signal),len(original_signal) - 1000)
-    original_signal = original_signal[1000:]
-    last_photodiode_stamp = tlim_photodiode[-1]
-    Flourscnce_time2 = F_time_stamps * original_freq
-    index_flour = np.where(Flourscnce_time2 >= last_photodiode_stamp)[0][0]
-    index_photodiod = np.where(tlim_photodiode >= F_time_stamps[index_flour - 1] * original_freq)[0][0]
-    original_signal = original_signal[:index_photodiod - 1]
-    Interpolate_time = F_time_stamps[:index_flour - 1]
-    last_Flourscnce_index = index_flour - 1
-    return Interpolate_time, last_Flourscnce_index, original_signal
+def get_alignment_index(F_time_stamps, speed, original_freq):
+    speedTimeStamps = np.arange(len(speed)) / original_freq + 1 / original_freq / 2 #shift from +dt/2 because we consider v(t_i + dt/2) = ( x(t_(i+1)) - x(t_i) ) / dt
+    lastFIdx = np.argmin(np.abs(F_time_stamps - speedTimeStamps[-1]))
+    timeReference = F_time_stamps[:lastFIdx+1]
+    return lastFIdx, timeReference, speedTimeStamps
 
 def resample_running_signal(original_signal,
-                    Interpolate_time,
-                    original_freq=1e4,
-                    new_freq=1e3,
-                    pre_smoothing=0,
-                    post_smoothing=0,
-                    verbose=False):
-
+                            t_sample,
+                            interpTime,
+                            original_freq=1e4,
+                            new_freq=1e3,
+                            pre_smoothing=0,
+                            post_smoothing=0,
+                            verbose=False):
 
     if verbose:
         print('resampling signal [...]')
@@ -104,15 +99,12 @@ def resample_running_signal(original_signal,
     else:
         signal = original_signal
 
-    t_sample = np.linspace(1000, len(original_signal)+1000, len(original_signal))/ original_freq
-
-
     if verbose:
         print(' - signal interpolation')
+    
     func = interp1d(t_sample[np.isfinite(signal)], signal[np.isfinite(signal)],
                     fill_value='extrapolate')
-
-    new_signal = func(Interpolate_time)
+    new_signal = func(interpTime)
 
     if (post_smoothing * new_freq) > 1:
         if verbose:
@@ -121,7 +113,7 @@ def resample_running_signal(original_signal,
 
     return new_signal
 
-def compute_speed(base_path, new_freq, F_time_stamps=None, position_smoothing=10e-3, #s
+def compute_speed(base_path, new_freq, F_time_stamps, position_smoothing=10e-3, #s
                    with_raw_position=False):
     
     binary_signal, radius_position_on_disk, rotoencoder_value_per_rotation, acq_freq = load_and_data_extraction(base_path)
@@ -138,17 +130,28 @@ def compute_speed(base_path, new_freq, F_time_stamps=None, position_smoothing=10
 
     speed *= acq_freq
 
-    Interpolate_time, last_Flourscnce_index, speed = get_alignment_index(F_time_stamps, speed, acq_freq)
+    lastFIdx, timeReference, speedTimeStamps = get_alignment_index(F_time_stamps, speed, acq_freq)
 
     #sub sampling and filtering speed
-    speed = resample_running_signal(speed, Interpolate_time,
+    speed = resample_running_signal(speed, speedTimeStamps,
+                                    timeReference,
                                     original_freq=acq_freq,
                                     new_freq = new_freq,
                                     pre_smoothing=0,
                                     post_smoothing = 2. / 50.,
-                                    verbose=True)
+                                    verbose=False)
 
     if with_raw_position:
-        return Interpolate_time, speed, position, last_Flourscnce_index
+        return speed, timeReference, lastFIdx, position
     else:
-        return Interpolate_time, speed, last_Flourscnce_index
+        return speed, timeReference, lastFIdx
+
+if __name__ == "__main__":
+    starting_delay_2p = 0.1
+    base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
+    xml = Ca_imaging.load_xml(base_path)
+    F_time_stamp = xml['Green']['relativeTime']
+    freq_2p = (len(F_time_stamp) - 1) / F_time_stamp[-1]
+    F_time_stamp_updated = F_time_stamp + starting_delay_2p
+    timeReference, speed, last_F_index = compute_speed(base_path, freq_2p, F_time_stamp_updated)
+    print(speed)
