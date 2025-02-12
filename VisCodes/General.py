@@ -29,9 +29,9 @@ neuropil_impact_factor = float(inputs["neuropil_impact_factor"])
 F0_method = inputs["F0_method"]
 neuron_type = inputs["neuron_type"]
 starting_delay_2p = float(inputs["starting_delay_2p"])
+num_samples = int(inputs["bootstrap_nb_samples"])
 
 # Use inputs to process data
-num_samples = 1000
 face_dir = os.path.join(base_path, "FaceIt")
 visual_stim_path = os.path.join(base_path, "visual-stim.npy")
 visual_stim = np.load(visual_stim_path, allow_pickle=True).item()

@@ -18,6 +18,7 @@ class InputWindow(QtWidgets.QMainWindow):
             "base_path": self.ui.data_directory,
             "save_dir": self.ui.save_directory,
             "neuropil_impact_factor": self.ui.neuropil_if,
+            "bootstrap_nb_samples" : self.ui.nb_samples,
             "F0_method": self.ui.f0_method,
             "neuron_type": self.ui.neural_type,
             "starting_delay_2p": self.ui.starting_delay,
@@ -68,26 +69,26 @@ class Ui_MainWindow(object):
     def setup_first_grid(self):
         self.first_grid = QGridLayout()
 
+        self.label_2p_delay = self.create_label("2 photon starting delay(ms)", self.first_grid, 0, 0)
+        self.lineEdit_starting_delay = self.create_line_edit(self.first_grid, 0, 1)
+        self.lineEdit_starting_delay.setValidator(QIntValidator())
+        self.lineEdit_starting_delay.setText("0.100")
+
+        self.label_5 = self.create_label("Neuropil IF", self.first_grid, 1, 0)
+        self.lineEdit_Neuropil_IF = self.create_line_edit(self.first_grid, 1, 1)
+        self.lineEdit_Neuropil_IF.setValidator(QIntValidator())
+        self.lineEdit_Neuropil_IF.setText("0.7")
+
+        self.label_num_samples = self.create_label("Boostrapping nb samples", self.first_grid, 2, 0)
+        self.lineEdit_num_samples = self.create_line_edit(self.first_grid, 2, 1)
+        self.lineEdit_num_samples.setValidator(QIntValidator())
+        self.lineEdit_num_samples.setText("1000")
+
         self.comboBox_neural_type = self.create_combo_box(["PYR", "Other"], self.first_grid, 4, 0)
         self.label_3 = self.create_label("Neural type", self.first_grid, 3, 0)
 
         self.comboBox_F0_method = self.create_combo_box(["sliding", "Hamming"], self.first_grid, 4, 1)
         self.label_4 = self.create_label("F0 method", self.first_grid, 3, 1)
-
-        """ self.label_2p_fr = self.create_label("2 photon Frequency", self.first_grid, 0, 0)
-        self.lineEdit_Fre = self.create_line_edit(self.first_grid, 0, 1)
-        self.lineEdit_Fre.setValidator(QIntValidator())
-        self.lineEdit_Fre.setText("29.7597") """
-
-        self.label_2p_delay = self.create_label("2 photon starting delay(ms)", self.first_grid, 1, 0)
-        self.lineEdit_starting_delay = self.create_line_edit(self.first_grid, 1, 1)
-        self.lineEdit_starting_delay.setValidator(QIntValidator())
-        self.lineEdit_starting_delay.setText("0.100")
-
-        self.label_5 = self.create_label("Neuropil IF", self.first_grid, 2, 0)
-        self.lineEdit_Neuropil_IF = self.create_line_edit(self.first_grid, 2, 1)
-        self.lineEdit_Neuropil_IF.setValidator(QIntValidator())
-        self.lineEdit_Neuropil_IF.setText("0.7")
 
     def setup_second_grid(self):
         self.second_grid = QGridLayout()
@@ -112,6 +113,7 @@ class Ui_MainWindow(object):
         #self.photon_frequency = float(self.lineEdit_Fre.text())
         self.starting_delay = float(self.lineEdit_starting_delay.text())
         self.neuropil_if = float(self.lineEdit_Neuropil_IF.text())
+        self.nb_samples = float(self.lineEdit_num_samples.text())
         self.data_directory = str(self.lineEdit_data_directory.text())
         self.save_directory = str(self.lineEdit_save_directory.text())
         
