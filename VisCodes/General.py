@@ -25,6 +25,8 @@ inputs = input_window.get_inputs()
 # Convert inputs
 base_path = inputs["base_path"]
 save_dir = inputs["save_dir"]
+if not os.path.exists(save_dir) :
+    os.makedirs(save_dir)
 neuropil_impact_factor = float(inputs["neuropil_impact_factor"])
 F0_method = inputs["F0_method"]
 neuron_type = inputs["neuron_type"]
