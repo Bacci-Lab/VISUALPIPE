@@ -4,6 +4,7 @@ import numpy as np
 import figures
 import General_functions
 from scipy.ndimage import filters, gaussian_filter1d
+import matplotlib.pyplot as plt
 
 def load_and_data_extraction(base_path):
     vis_stim_path = os.path.join(base_path, "visual-stim.npy")
@@ -25,7 +26,6 @@ def load_and_data_extraction(base_path):
         raise Exception("No JSON metadata file exists in this directory")
     return visual_stim, NIdaq, Acquisition_Frequency
 
-
 def visual_stim_extraction(visual_stim):
     visual_stim = visual_stim.item()
     time_duration = visual_stim['time_duration']
@@ -33,35 +33,47 @@ def visual_stim_extraction(visual_stim):
     time_start = visual_stim['time_start']
     return time_duration, protocol_id, time_start
 
-def realign_from_photodiode(base_path):
-    # Calculate threshold for photodiode activity
+def realign_from_photodiode(base_path, plot=False):
+    """
+    Adapted from yzerlaut : https://github.com/yzerlaut/physion/blob/main/src/physion/assembling/realign_from_photodiode.py
+    Calculate the real time stamps of each stimuli onset from the photodiode signal.
+    """
+    new_freq = 1000
     visual_stim, NIdaq, Acquisition_Frequency = load_and_data_extraction(base_path)
     Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
-                                                     original_freq=Acquisition_Frequency,
-                                                     pre_smoothing=2. / Acquisition_Frequency,
-                                                     new_freq=1000)
-    time_duration, protocol_id, time_start = visual_stim_extraction(visual_stim)
-
-    smooth_signal = np.diff(gaussian_filter1d(np.cumsum(Psignal),7))  # integral + smooth + derivative
-    smooth_signal[:1000], smooth_signal[-10:] = smooth_signal[1000], smooth_signal[-1000]  # to insure no problem at borders (of the derivative)\
+                                                    original_freq=Acquisition_Frequency,
+                                                    new_freq=new_freq)
+    _, _, time_start = visual_stim_extraction(visual_stim)
+    
     # compute signal boundaries to evaluate threshold crossing of photodiode signal
-    H, bins = np.histogram(smooth_signal, bins=100)
+    H, bins = np.histogram(Psignal, bins=100)
     baseline = bins[np.argmax(H) + 1]
-    #figures.Visualize_baseline(smooth_signal, baseline)
-    threshold = (np.max(smooth_signal) - baseline) / 4.  # reaching 25% of peak level
-    cond_thresh = (smooth_signal[1:] >= (baseline + threshold)) & (
-                smooth_signal[:-1] < (baseline + threshold))
-    true_indices = np.where(cond_thresh)[0]
-    true_indices = [x * (1/1000) for x in true_indices]
+    threshold = (np.max(Psignal) - baseline) / 3.  # reaching 1/3 of peak level
 
+    # extract time stamps where photodiode signal cross threshold ("peaks" time stamps)
+    cond_thresh = (Psignal[1:] >= (baseline + threshold)) & (Psignal[:-1] < (baseline + threshold))
+    peak_time_stamps = np.where(cond_thresh)[0] / new_freq
+
+    # from the peaks, select only those at the beginning of each stimuli (time-delay is around 0.3s)
     stim_Time_start_realigned = []
+    #dt_shift = []
     for value in time_start:
-        index = np.searchsorted(true_indices, value, side='right')
-        if index < len(true_indices):
-            stim_Time_start_realigned.append(true_indices[index])
+        index = np.argmin(np.abs(peak_time_stamps - value))
+        stim_Time_start_realigned.append(peak_time_stamps[index])
+        #dt_shift.append(np.abs(value - peak_time_stamps[index]))
     stim_Time_start_realigned = [float(val) for val in stim_Time_start_realigned]
-    return stim_Time_start_realigned, Psignal, Psignal_time
+    #print(np.mean(dt_shift), np.max(dt_shift), np.min(dt_shift))
 
+    if plot :
+        figures.Visualize_baseline(Psignal, baseline)
+
+        plt.plot(Psignal_time, Psignal, label='photodiode signal')
+        plt.scatter(stim_Time_start_realigned, np.ones(len(stim_Time_start_realigned))*(threshold+baseline), color='orange', marker='x', label='start of stimuli')
+        plt.scatter(peak_time_stamps, np.ones(len(peak_time_stamps))*(threshold+baseline), color='green', marker='.', label='peak detection')
+        plt.legend(loc="upper right")
+        plt.show()
+
+    return stim_Time_start_realigned, Psignal, Psignal_time
 
 def extract_visual_stim_items(visual_stim):
     visual_stim = visual_stim.item()
@@ -72,69 +84,26 @@ def extract_visual_stim_items(visual_stim):
     return time_duration, protocol_id, time_start, interstim
 
 def Find_F_stim_index(stim_Time_start_realigned, F_time_stamp_updated):
-    # find the stim time in Fluorescence time-scale
-    Flou_Time_start_realigned = []
-    F_stim_init_indexes = []
+    """
+    Find the stimuli time onsets in the fluorescence time-scale. 
+    The maximum time alignment error is half the calcium imaging period.
+    """
+    
+    stim_start_time_realign_F = []
+    stim_start_idx_realign_F = []
+    #align_error = []
+
     for value in stim_Time_start_realigned:
-        index = np.searchsorted(F_time_stamp_updated, value, side='right')
-        if index < len(F_time_stamp_updated):
-            F_stim_init_indexes.append(index)
-            Flou_Time_start_realigned.append(F_time_stamp_updated[index])
-    Flou_Time_start_realigned = [float(val) for val in Flou_Time_start_realigned]
-    F_stim_init_indexes = [int(val) for val in F_stim_init_indexes]
-    return Flou_Time_start_realigned, F_stim_init_indexes
+        index = np.argmin(np.abs(F_time_stamp_updated - value))
+        stim_start_idx_realign_F.append(index)
+        stim_start_time_realign_F.append(F_time_stamp_updated[index])
+        #align_error.append(np.abs(value - F_time_stamp_updated[index]))
+    
+    stim_start_time_realign_F = [float(val) for val in stim_start_time_realign_F]
+    stim_start_idx_realign_F = [int(val) for val in stim_start_idx_realign_F]
+    #print(np.mean(align_error), np.max(align_error), np.min(align_error))
+    return stim_start_time_realign_F, stim_start_idx_realign_F
 
-#################################
-# period_start = []
-# period_end = []
-# period_interval = []
-# for i in range(len(interstim)):
-#     if interstim[i]>=2:
-#         start = stim_Time_start_realigned[i]-1
-#     else:
-#         start = stim_Time_start_realigned[i] - interstim[i]/2
-#     if (i < len(interstim) - 1 and interstim[i+1] >= 2) or (i == len(interstim) - 1):
-#
-#         end = stim_Time_start_realigned[i] + time_duration[i] + 1
-#     else:
-#         end = stim_Time_start_realigned[i] + time_duration[i] + interstim[i]/2
-#     period_start.append(start)
-#     period_end.append(end)
-#     period_interval.append([period_start, period_end])
-#
-# color_map = {
-#     0: 'blue',
-#     1: 'red',
-#     2: 'green',
-#     3: 'yellow',
-#     4: 'purple',
-#     5: 'orange',
-#     6: 'gray'
-# }
-# Psignal_time = np.arange(0, len(Psignal)/1000, 0.001)
-# F_normalized = (F - np.min(F)) / (np.max(F) - np.min(F))
-# Psignal_normal = (Psignal - np.min(Psignal)) / (np.max(Psignal) - np.min(Psignal))
-#
-# fig2, ax2 = plt.subplots()
-# plt.plot(F_time_stamp_updated, F_normalized[5] )
-# plt.plot(Psignal_time, Psignal_normal/6)
-# for i in range(len(protocol_id)):
-#     if protocol_id[i] == 3:
-#         ax2.axvline(x=stim_Time_start_realigned[i], color='b', linestyle='--', alpha=0.7)
-#         ax2.axvline(x=stim_Time_start_realigned[i] + time_duration[i], color='black', linestyle='--', alpha=0.7)
-#         ax2.axvspan(period_start[i], period_end[i], color='gray', alpha=0.8)
-
-#plt.show()
-#
-# color_names = [color_map[value] for value in protocol_id]
-# fig, ax = plt.subplots()
-# ax.plot(F_time_stamp_updated, F[5])
-# for x in range(len(period_start)):
-#     ax.axvline(x=stim_Time_start_realigned[x], color='b', linestyle='--', alpha=0.7)
-#     ax.axvline(x=stim_Time_start_realigned[x] + time_duration[x], color='black', linestyle='--', alpha=0.7)
-#     ax.axvspan(period_start[x], period_end[x], color=color_names[x], alpha=0.8)
-# plt.show()
-######################################
 def get_base_line(F, F_stim_init_indexes):
     base_line = []
     for i in F_stim_init_indexes:
@@ -199,7 +168,6 @@ def average_image(
 
     return protocol_validity
 
-
 def get_spontaneous_F (F, protocol_ids,chosen_protocol, protocol_duration_s, F_stim_init_indexes,Photon_fre):
     protocol_duration = int(protocol_duration_s * Photon_fre)
     F_spontaneous = []
@@ -216,3 +184,59 @@ def get_spontaneous_F (F, protocol_ids,chosen_protocol, protocol_duration_s, F_s
         return F_spontaneous, start_spon_index, end_spon_index
     else:
         return F_spontaneous
+
+if __name__ == "__main__":
+    base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
+    stim_Time_start_realigned, Psignal, Psignal_time = realign_from_photodiode(base_path)
+
+#################################
+# period_start = []
+# period_end = []
+# period_interval = []
+# for i in range(len(interstim)):
+#     if interstim[i]>=2:
+#         start = stim_Time_start_realigned[i]-1
+#     else:
+#         start = stim_Time_start_realigned[i] - interstim[i]/2
+#     if (i < len(interstim) - 1 and interstim[i+1] >= 2) or (i == len(interstim) - 1):
+#
+#         end = stim_Time_start_realigned[i] + time_duration[i] + 1
+#     else:
+#         end = stim_Time_start_realigned[i] + time_duration[i] + interstim[i]/2
+#     period_start.append(start)
+#     period_end.append(end)
+#     period_interval.append([period_start, period_end])
+#
+# color_map = {
+#     0: 'blue',
+#     1: 'red',
+#     2: 'green',
+#     3: 'yellow',
+#     4: 'purple',
+#     5: 'orange',
+#     6: 'gray'
+# }
+# Psignal_time = np.arange(0, len(Psignal)/1000, 0.001)
+# F_normalized = (F - np.min(F)) / (np.max(F) - np.min(F))
+# Psignal_normal = (Psignal - np.min(Psignal)) / (np.max(Psignal) - np.min(Psignal))
+#
+# fig2, ax2 = plt.subplots()
+# plt.plot(F_time_stamp_updated, F_normalized[5] )
+# plt.plot(Psignal_time, Psignal_normal/6)
+# for i in range(len(protocol_id)):
+#     if protocol_id[i] == 3:
+#         ax2.axvline(x=stim_Time_start_realigned[i], color='b', linestyle='--', alpha=0.7)
+#         ax2.axvline(x=stim_Time_start_realigned[i] + time_duration[i], color='black', linestyle='--', alpha=0.7)
+#         ax2.axvspan(period_start[i], period_end[i], color='gray', alpha=0.8)
+
+#plt.show()
+#
+# color_names = [color_map[value] for value in protocol_id]
+# fig, ax = plt.subplots()
+# ax.plot(F_time_stamp_updated, F[5])
+# for x in range(len(period_start)):
+#     ax.axvline(x=stim_Time_start_realigned[x], color='b', linestyle='--', alpha=0.7)
+#     ax.axvline(x=stim_Time_start_realigned[x] + time_duration[x], color='black', linestyle='--', alpha=0.7)
+#     ax.axvspan(period_start[x], period_end[x], color=color_names[x], alpha=0.8)
+# plt.show()
+######################################

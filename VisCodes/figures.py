@@ -10,7 +10,7 @@ def Visualize_baseline(smooth_signal, baseline):
     plt.ylabel('Frequency')
     plt.title('Histogram of Smooth Signal with Baseline')
     plt.legend()
-    # plt.show()
+    plt.show()
 
 def Bootstrapping_fig(bootstrapped_data, real_stim_mean, protocol_name, p_value, Neuron_index,color_histo, save_dir):
     fig, ax = plt.subplots(figsize=(8, 6))
