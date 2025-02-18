@@ -81,3 +81,7 @@ def resample_signal(original_signal,
         new_signal = gaussian_filter1d(new_signal, int(post_smoothing * new_freq), mode='nearest')
 
     return new_t, new_signal
+
+def create_H5_dataset(group, variable, variable_name):
+    for name, value in zip(variable_name, variable):
+        group.create_dataset(name, data=value)

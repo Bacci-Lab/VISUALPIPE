@@ -11,6 +11,7 @@ import os
 from inputUI import InputWindow
 import matplotlib.pyplot as plt
 import pandas as pd
+import h5py
 
 app = QtWidgets.QApplication(sys.argv)
 
@@ -71,6 +72,7 @@ print("len raw_F", len(raw_F[0]))
 
 # ---------------------------Detect Neurons Among ROIs------------------
 _ , detected_roi = Ca_imaging.detect_cell(iscell, raw_F)
+print('Original number of neurons :', len(detected_roi))
 iscell, _ = Ca_imaging.detect_bad_neuropils(detected_roi,raw_Fneu, raw_F, iscell)
 raw_Fneu, kept2p_ROI = Ca_imaging.detect_cell(iscell, raw_Fneu)
 stat, _ = Ca_imaging.detect_cell(iscell, stat)
@@ -82,9 +84,11 @@ if neuron_type == "PYR":
     #-----------------Remove Neurons with negative slope---------------
     mask = np.ones(len(raw_F), dtype=bool)
     mask[alpha_remove]= False
+    kept_ROI_alpha = np.arange(len(raw_F))[mask]
     raw_F = raw_F[mask]
     raw_Fneu = raw_Fneu[mask]
     stat = stat[mask]
+else : kept_ROI_alpha = np.arange(len(raw_F))
 
 #-------------------------Calculation of F0 ----------------------
 computed_F = raw_F - (neuropil_impact_factor * raw_Fneu)
@@ -99,8 +103,9 @@ isvalid_F0[invalid_F0, 0] = 0
 computed_F, _ = Ca_imaging.detect_cell(isvalid_F0, computed_F)
 f0, _ = Ca_imaging.detect_cell(isvalid_F0, f0)
 raw_Fneu, _ = Ca_imaging.detect_cell(isvalid_F0, raw_Fneu)
-stat,_ = Ca_imaging.detect_cell(isvalid_F0, stat)
-dF = Ca_imaging.deltaF_calculate(computed_F, f0)
+stat, kept_ROI_F0 = Ca_imaging.detect_cell(isvalid_F0, stat)
+dFoF0 = Ca_imaging.deltaF_calculate(computed_F, f0)
+print('Number of remaining neurons :', len(kept_ROI_F0))
 
 #---------------------------------- Load photodiode data -----------------------------
 stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
@@ -115,36 +120,34 @@ stim_time_end = stim_time_end.tolist()
 stim_time_period = [stim_Time_start_realigned, stim_time_end]
 
 if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
-    #Photodiode.average_image(dF, protocol_id,3,5,'looming stim', F_stim_init_indexes, freq_2p, num_samples, save_dir)
     protocol_validity = []
     for protocol in range(len(protocol_df)):
         chosen_protocol = protocol_df.index[protocol]
         protocol_duration = protocol_df['duration'][protocol]
         protocol_name = protocol_df['name'][protocol]
-        protocol_validity_i = Photodiode.average_image(dF, visual_stim['protocol_id'],chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
+        protocol_validity_i = Photodiode.average_image(dFoF0, visual_stim['protocol_id'],chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
         protocol_validity.append(protocol_validity_i)
     np.savez(os.path.join(base_path, "protocol_validity.npz"), **{key: value for d in protocol_validity for key, value in d.items()})
     print(protocol_validity)
 
-F_spontaneous, start_spont_index, end_spont_index = Photodiode.get_spontaneous_F(computed_F, protocol_id, 5, 1200, F_stim_init_indexes, freq_2p)
+#----------------- Spontaneous behaviour -----------------
+id_spont = protocol_df[protocol_df['name'] == 'grey-20min'].index[0]
+duration_spont = protocol_df.iloc[id_spont]["duration"]
+F_spontaneous, start_spont_index, end_spont_index = Photodiode.get_spontaneous_F(computed_F, visual_stim['protocol_id'], id_spont, duration_spont, F_stim_init_indexes, freq_2p)
 time_start_spon_index = F_time_stamp_updated[start_spont_index]
 time_end_spon_index = F_time_stamp_updated[end_spont_index]
 
-########################
 fvideo_first_spont_index = np.argmin(np.abs(fvideo_time - time_start_spon_index))
 fvideo_last_spont_index = np.argmin(np.abs(fvideo_time - time_end_spon_index))
 
-#########################
 speed_corr = [pearsonr(speed[start_spont_index:end_spont_index], ROI)[0] for ROI in F_spontaneous]
 speed_corr = [float(value) for value in speed_corr]
 
-###############################
-protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
-computed_F = General_functions.normalize_time_series(computed_F, lower=0, upper=5)
-speedAndTimeSt = (speed_time_stamps, speed)
+computed_F_norm = General_functions.normalize_time_series(computed_F, lower=0, upper=5)
 Psignal = General_functions.scale_trace(Psignal)
 pupil = General_functions.scale_trace(pupil)
 facemotion = General_functions.scale_trace(facemotion)
+
 facemotion_spont = facemotion[fvideo_first_spont_index:fvideo_last_spont_index]
 fvideo_time_spont = fvideo_time[fvideo_first_spont_index:fvideo_last_spont_index]
 print("facemotion_spont size",len(facemotion_spont))
@@ -152,10 +155,10 @@ print("fvideo_time_spont ", fvideo_time_spont[:5])
 print("fvideo_time_spont ", fvideo_time_spont[-5:])
 
 #########################
-""" print("len corr_Face", len(Facemotion_spo))
-print("len speed[start_spon_index:end_spon_index] ", len(speed[start_spon_index:end_spon_index]))
-print(Facemotion_spo.shape, F_spontaneous[0].shape)
-corr_Face = [pearsonr(Facemotion_spo, ROI)[0] for ROI in F_spontaneous]
+""" print("len corr_Face", len(facemotion_spont))
+print("len speed[start_spont_index:end_spont_index] ", len(speed[start_spont_index:end_spont_index]))
+print(facemotion_spont.shape, F_spontaneous[0].shape)
+corr_Face = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous]
 corr_Face = [float(value) for value in corr_Face]
 plt.plot(corr_Face)
 plt.show() """
@@ -168,11 +171,32 @@ plt.show() """
 photodiode = (Psignal_time, Psignal)
 pupil = (fvideo_time, pupil)
 facemotion = (fvideo_time, facemotion)
+speedAndTimeSt = (speed_time_stamps, speed)
 print("len speed_time_stamps ", len(speed_time_stamps[start_spont_index: end_spont_index]))
 print("Face_time_spo ", len(fvideo_time_spont))
 background_image_path = os.path.join(base_path, "Mean_image_grayscale.png")
+protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
+
+# ------------------HDF5 files---------------
+H5_dir = os.path.join(save_dir, "postprocessing.h5")
+hf = h5py.File(H5_dir, 'w')
+behavioral_group = hf.create_group('Behavioral')
+correlation = behavioral_group.create_group("Correlation")
+caImg_group = hf.create_group('Ca_imaging')
+caImg_full_trace = caImg_group.create_group('full_trace')
+rois_group = hf.create_group("ROIs")
+
+General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil], ['Speed', 'FaceMotion', 'Pupil'])
+General_functions.create_H5_dataset(correlation, [speed_corr], ['speed_corr'])
+caImg_group.create_dataset('Time', data=F_time_stamp_updated)
+General_functions.create_H5_dataset(caImg_full_trace, [raw_F, raw_Fneu, computed_F, f0, dFoF0], 
+                                    ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
+General_functions.create_H5_dataset(rois_group, [kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
+                                    ['1_neuropil', '2_alpha', '3_F0'])
+
+hf.close()
 
 #Second GUI
-main_window = MainWindow(stat, protocol_validity_npz, speed_corr, computed_F, F_time_stamp_updated, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
+main_window = MainWindow(stat, protocol_validity_npz, speed_corr, computed_F_norm, F_time_stamp_updated, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
 main_window.show()
 app.exec_()
