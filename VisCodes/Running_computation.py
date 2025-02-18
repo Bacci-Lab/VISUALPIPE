@@ -4,7 +4,6 @@ from scipy.interpolate import interp1d
 import os.path
 import json
 import matplotlib.pyplot as plt
-import Ca_imaging
 
 # TODO  This section of code is adapted from the physion Pipeline.
 # TODO  The purpose of this code is to process binary signals from a rotary encoder to compute the rotational position and speed over time
@@ -147,11 +146,10 @@ def compute_speed(base_path, new_freq, F_time_stamps, position_smoothing=10e-3, 
         return speed, timeReference, lastFIdx
 
 if __name__ == "__main__":
+    import Ca_imaging
+    
     starting_delay_2p = 0.1
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
-    xml = Ca_imaging.load_xml(base_path)
-    F_time_stamp = xml['Green']['relativeTime']
-    freq_2p = (len(F_time_stamp) - 1) / F_time_stamp[-1]
-    F_time_stamp_updated = F_time_stamp + starting_delay_2p
-    timeReference, speed, last_F_index = compute_speed(base_path, freq_2p, F_time_stamp_updated)
+    ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=starting_delay_2p)
+    timeReference, speed, last_F_index = compute_speed(base_path, ca_img.fs, ca_img.time_stamps)
     print(speed)

@@ -249,35 +249,6 @@ class Ui_MainWindow(object):
         layout.addWidget(canvas)  # Add the canvas to the layout
         graphics_view.setLayout(layout)
 
-
-def normalize_time_series(F, lower=0, upper=5):
-    """
-    Normalize each time series in F to the range [lower, upper].
-
-    Args:
-        F (numpy.ndarray): A 2D array where each row is a time series.
-        lower (float): The lower bound of the normalization range.
-        upper (float): The upper bound of the normalization range.
-
-    Returns:
-        numpy.ndarray: A normalized 2D array with values scaled to [lower, upper].
-    """
-    F_min = F.min(axis=1, keepdims=True)  # Min of each row
-    F_max = F.max(axis=1, keepdims=True)  # Max of each row
-
-    # Avoid division by zero for constant rows
-    range_values = np.where(F_max - F_min == 0, 1, F_max - F_min)
-
-    # Normalize to [0, 1]
-    F_normalized = (F - F_min) / range_values
-
-    # Scale to [lower, upper]
-    F_scaled = F_normalized * (upper - lower) + lower
-
-    return F_scaled
-
-
-
 if __name__ == "__main__":
     import sys
     import os
@@ -290,10 +261,7 @@ if __name__ == "__main__":
     # Generate some sample datasets
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
     starting_delay_2p = 0.1
-    xml = Ca_imaging.load_xml(base_path)
-    F_time_stamp = xml['Green']['relativeTime']
-    freq_2p = (len(F_time_stamp) - 1) / F_time_stamp[-1]
-    F_time_stamp_updated = F_time_stamp + starting_delay_2p
+    ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=starting_delay_2p)
 
     face_camera = np.load(os.path.join(base_path,"FaceCamera-summary.npy"), allow_pickle=True)
     fvideo_time = face_camera.item().get('times')
@@ -301,12 +269,9 @@ if __name__ == "__main__":
     pupil = (faceitOutput['pupil_dilation'])
     facemotion = (faceitOutput['motion_energy'])
 
-    speed, speed_time_stamps, last_F_index = Running_computation.compute_speed(base_path, freq_2p, F_time_stamp_updated)
+    speed, speed_time_stamps, last_F_index = Running_computation.compute_speed(base_path, ca_img.fs, ca_img.time_stamps)
     speed = (speed_time_stamps, speed)
-
-    f_npy = np.load(os.path.join(base_path, "TSeries-09032024-002/suite2p/plane0/F.npy"), allow_pickle=True)
-    raw_F = f_npy[:, :last_F_index+1]
-    F_time_stamp_updated = F_time_stamp_updated[:last_F_index+1]
+    ca_img.cut_frames(last_index=last_F_index)
 
     stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
     visual_stim_path = os.path.join(base_path, "visual-stim.npy")
@@ -314,7 +279,7 @@ if __name__ == "__main__":
     stim_time_durations = visual_stim['time_duration']
     stim_time_period = [stim_Time_start_realigned, stim_Time_start_realigned + stim_time_durations]
 
-    raw_F = normalize_time_series(raw_F, lower=0, upper=5)
+    raw_F = ca_img.normalize_time_series("raw_F", lower=0, upper=5)
     Psignal = General_functions.scale_trace(Psignal)
     pupil = General_functions.scale_trace(pupil)
     facemotion = General_functions.scale_trace(facemotion)
@@ -326,6 +291,6 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
-    ui.setupUi(MainWindow, raw_F, F_time_stamp_updated, speed, FaceMotion, Pupil, photodiode, stim_time_period)
+    ui.setupUi(MainWindow, raw_F, ca_img.time_stamps, speed, FaceMotion, Pupil, photodiode, stim_time_period)
     MainWindow.show()
     sys.exit(app.exec_())

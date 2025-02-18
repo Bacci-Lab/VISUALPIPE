@@ -1,5 +1,5 @@
 from Running_computation import compute_speed
-import Ca_imaging
+from Ca_imaging import CaImagingDataManager
 import numpy as np
 from scipy.stats import pearsonr
 import sys
@@ -45,76 +45,51 @@ protocol_df = pd.DataFrame({"id" : protocol_id, "name" : protocol_name})
 protocol_duration = pd.DataFrame({ "id" : visual_stim['protocol_id'], "duration" : visual_stim['time_duration']}).groupby(by="id").mean()
 protocol_df = protocol_df.join(protocol_duration, on="id", how="inner").set_index("id")
 
-##---------------------------------- Load Ca-Imaging data ----------------------
-raw_F, raw_Fneu, iscell, stat, mean_image = Ca_imaging.load_Suite2p(base_path)
-Ca_imaging.save_mean_Image(mean_image, save_dir)
-xml = Ca_imaging.load_xml(base_path)
-F_time_stamp = xml['Green']['relativeTime']
-freq_2p = (len(F_time_stamp) - 1) / F_time_stamp[-1]
-F_time_stamp_updated = F_time_stamp + starting_delay_2p
+#---------------------------------- Load Ca-Imaging data ----------------------
+ca_img_dm = CaImagingDataManager(base_path, neuropil_impact_factor, F0_method, neuron_type, starting_delay_2p)
+ca_img_dm.save_mean_image(save_dir)
+detected_roi = ca_img_dm._list_ROIs_idx
+print('Original number of neurons :', len(detected_roi))
 
-##---------------------------------- Load Camera data ----------------------------------
+#---------------------------------- Load Camera data ----------------------------------
 face_camera = np.load(os.path.join(base_path,"FaceCamera-summary.npy"), allow_pickle=True)
 fvideo_time = face_camera.item().get('times')
 faceitOutput = np.load(os.path.join(face_dir, "FaceIt.npz"), allow_pickle=True)
 pupil = (faceitOutput['pupil_dilation'])
 facemotion = (faceitOutput['motion_energy'])
 print("len facemotion :", len(facemotion))
-##---------------------------------- Load Speed ----------------------------------
-speed, speed_time_stamps, last_F_index = compute_speed(base_path, freq_2p, F_time_stamp_updated)
-print("len speed", len(speed))
 
-##---------------------------------- Cut F to align with speed ----------------------------------
-raw_F = raw_F[:, :last_F_index+1]
-raw_Fneu = raw_Fneu[:, :last_F_index+1]
-F_time_stamp_updated = F_time_stamp_updated[:last_F_index+1]
-print("len raw_F", len(raw_F[0]))
+#---------------------------------- Compute speed ----------------------------------
+speed, speed_time_stamps, last_F_index = compute_speed(base_path, ca_img_dm.fs, ca_img_dm.time_stamps)
+ca_img_dm.cut_frames(last_index=last_F_index) #update metrics with new frames length
 
-# ---------------------------Detect Neurons Among ROIs------------------
-_ , detected_roi = Ca_imaging.detect_cell(iscell, raw_F)
-print('Original number of neurons :', len(detected_roi))
-iscell, _ = Ca_imaging.detect_bad_neuropils(detected_roi,raw_Fneu, raw_F, iscell)
-raw_Fneu, kept2p_ROI = Ca_imaging.detect_cell(iscell, raw_Fneu)
-stat, _ = Ca_imaging.detect_cell(iscell, stat)
-raw_F, _ = Ca_imaging.detect_cell(iscell, raw_F)
+#---------------------------------- Detect ROIs with bad neuropils ------------------
+ca_img_dm.detect_bad_neuropils()
+kept2p_ROI = ca_img_dm._list_ROIs_idx
+print('After removing bad neuropil neurons, nb of neurons :', len(kept2p_ROI))
 
-#------------------------------------Calculation alpha------------------
-if neuron_type == "PYR":
-    neuropil_impact_factor, alpha_remove = Ca_imaging.calculate_alpha(raw_F,raw_Fneu)
-    #-----------------Remove Neurons with negative slope---------------
-    mask = np.ones(len(raw_F), dtype=bool)
-    mask[alpha_remove]= False
-    kept_ROI_alpha = np.arange(len(raw_F))[mask]
-    raw_F = raw_F[mask]
-    raw_Fneu = raw_Fneu[mask]
-    stat = stat[mask]
-else : kept_ROI_alpha = np.arange(len(raw_F))
+#---------------------------------- Compute Fluorescence ------------------
+ca_img_dm.compute_F()
+kept_ROI_alpha = ca_img_dm._list_ROIs_idx
+print('Number of remaining neurons after alpha calculation :', len(kept_ROI_alpha))
 
-#-------------------------Calculation of F0 ----------------------
-computed_F = raw_F - (neuropil_impact_factor * raw_Fneu)
-percentile = 10
-f0 = Ca_imaging.calculate_F0(computed_F, freq_2p, percentile, mode= F0_method, win=60)
+#---------------------------------- Calculation of F0 ----------------------
+ca_img_dm.compute_F0(percentile= 10, win=60)
+kept_ROI_F0 = ca_img_dm._list_ROIs_idx
+print('Number of remaining neurons after F0 calculation  :', len(kept_ROI_F0))
 
-#-----------------Remove Neurons with F0 less than 1-----------------
-invalid_F0 = [i for i,val in enumerate(f0) if np.any(val < 1)]
-isvalid_F0 = np.ones((len(f0), 2))
-isvalid_F0[invalid_F0, 0] = 0
-
-computed_F, _ = Ca_imaging.detect_cell(isvalid_F0, computed_F)
-f0, _ = Ca_imaging.detect_cell(isvalid_F0, f0)
-raw_Fneu, _ = Ca_imaging.detect_cell(isvalid_F0, raw_Fneu)
-stat, kept_ROI_F0 = Ca_imaging.detect_cell(isvalid_F0, stat)
-dFoF0 = Ca_imaging.deltaF_calculate(computed_F, f0)
-print('Number of remaining neurons :', len(kept_ROI_F0))
+#---------------------------------- Calculation of dF over F0 ----------------------
+ca_img_dm.compute_dFoF0()
+computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=5)
 
 #---------------------------------- Load photodiode data -----------------------------
 stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
 
-###-------------------------Downsampling Photodiode for visualization-----------------
+#---------------------------------- Downsampling Photodiode for visualization-----------------
 #visual_stim, NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
 #stim_time_durations, protocol_id, stim_start_times, interstim_times = Photodiode.extract_visual_stim_items(visual_stim)
 stim_time_durations = visual_stim['time_duration']
-F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(stim_Time_start_realigned, F_time_stamp_updated)
+F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(stim_Time_start_realigned, ca_img_dm.time_stamps)
 stim_time_end = F_Time_start_realigned+ stim_time_durations
 stim_time_end = stim_time_end.tolist()
 stim_time_period = [stim_Time_start_realigned, stim_time_end]
@@ -125,7 +100,7 @@ if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
         chosen_protocol = protocol_df.index[protocol]
         protocol_duration = protocol_df['duration'][protocol]
         protocol_name = protocol_df['name'][protocol]
-        protocol_validity_i = Photodiode.average_image(dFoF0, visual_stim['protocol_id'],chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, freq_2p, num_samples, save_dir)
+        protocol_validity_i = Photodiode.average_image(ca_img_dm.dFoF0, visual_stim['protocol_id'],chosen_protocol,protocol_duration, protocol_name, F_stim_init_indexes, ca_img_dm.fs, num_samples, save_dir)
         protocol_validity.append(protocol_validity_i)
     np.savez(os.path.join(base_path, "protocol_validity.npz"), **{key: value for d in protocol_validity for key, value in d.items()})
     print(protocol_validity)
@@ -133,9 +108,9 @@ if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
 #----------------- Spontaneous behaviour -----------------
 id_spont = protocol_df[protocol_df['name'] == 'grey-20min'].index[0]
 duration_spont = protocol_df.iloc[id_spont]["duration"]
-F_spontaneous, start_spont_index, end_spont_index = Photodiode.get_spontaneous_F(computed_F, visual_stim['protocol_id'], id_spont, duration_spont, F_stim_init_indexes, freq_2p)
-time_start_spon_index = F_time_stamp_updated[start_spont_index]
-time_end_spon_index = F_time_stamp_updated[end_spont_index]
+F_spontaneous, start_spont_index, end_spont_index = Photodiode.get_spontaneous_F(ca_img_dm.fluorescence, visual_stim['protocol_id'], id_spont, duration_spont, F_stim_init_indexes, ca_img_dm.fs)
+time_start_spon_index = ca_img_dm.time_stamps[start_spont_index]
+time_end_spon_index = ca_img_dm.time_stamps[end_spont_index]
 
 fvideo_first_spont_index = np.argmin(np.abs(fvideo_time - time_start_spon_index))
 fvideo_last_spont_index = np.argmin(np.abs(fvideo_time - time_end_spon_index))
@@ -143,7 +118,6 @@ fvideo_last_spont_index = np.argmin(np.abs(fvideo_time - time_end_spon_index))
 speed_corr = [pearsonr(speed[start_spont_index:end_spont_index], ROI)[0] for ROI in F_spontaneous]
 speed_corr = [float(value) for value in speed_corr]
 
-computed_F_norm = General_functions.normalize_time_series(computed_F, lower=0, upper=5)
 Psignal = General_functions.scale_trace(Psignal)
 pupil = General_functions.scale_trace(pupil)
 facemotion = General_functions.scale_trace(facemotion)
@@ -188,8 +162,8 @@ rois_group = hf.create_group("ROIs")
 
 General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil], ['Speed', 'FaceMotion', 'Pupil'])
 General_functions.create_H5_dataset(correlation, [speed_corr], ['speed_corr'])
-caImg_group.create_dataset('Time', data=F_time_stamp_updated)
-General_functions.create_H5_dataset(caImg_full_trace, [raw_F, raw_Fneu, computed_F, f0, dFoF0], 
+caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
+General_functions.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
 General_functions.create_H5_dataset(rois_group, [kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
                                     ['1_neuropil', '2_alpha', '3_F0'])
@@ -197,6 +171,6 @@ General_functions.create_H5_dataset(rois_group, [kept2p_ROI, kept_ROI_alpha, kep
 hf.close()
 
 #Second GUI
-main_window = MainWindow(stat, protocol_validity_npz, speed_corr, computed_F_norm, F_time_stamp_updated, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
+main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
 main_window.show()
 app.exec_()
