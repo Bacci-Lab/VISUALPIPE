@@ -4,7 +4,6 @@ from PyQt5 import QtWidgets
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
         """
@@ -69,7 +68,7 @@ class Ui_MainWindow(object):
             lambda: self.plot_n_time_series(F, Time, self.graphicsView, stimulus)
         )
 
-    def plot_n_time_series(self, F, Time, graphics_view,stimulus):
+    def plot_n_time_series(self, F, Time, graphics_view, stimulus):
         """
         Plots multiple time series on the given graphics view.
 
@@ -99,9 +98,10 @@ class Ui_MainWindow(object):
                 y_offset = y + offset  # Add the offset to the y-values
                 ax.plot(Time, y_offset, color="green")  # Plot with the time array as x-axis
                 # Highlight specified intervals
-            if len(stimulus) == 2:  # Ensure stimulus contains two lists
-                for start, end in zip(stimulus[0], stimulus[1]):  # Pair start and end times
-                    ax.axvspan(start, end, color="white", alpha=0.3, zorder=0)
+            if self.checkboxstimulus.isChecked():
+                if len(stimulus) == 2:  # Ensure stimulus contains two lists
+                    for start, end in zip(stimulus[0], stimulus[1]):  # Pair start and end times
+                        ax.axvspan(start, end, color="white", alpha=0.3, zorder=0)
 
             self._plot_secondary_series(ax)
 
@@ -146,6 +146,7 @@ class Ui_MainWindow(object):
             secondary_data.append(("Pupil", self.Pupil))
         if self.checkboxPhotodiode.isChecked():
             secondary_data.append(("Photodiode", self.Photodiode))
+
 
         # Plot secondary datasets with offsets to avoid overlap
         for i, (label, (x, y)) in enumerate(secondary_data):
@@ -279,28 +280,52 @@ def normalize_time_series(F, lower=0, upper=5):
 
 if __name__ == "__main__":
     import sys
+    import os
+    import Photodiode
+    import numpy as np
+    import Running_computation
+    import Ca_imaging
+    import General_functions
 
     # Generate some sample datasets
-    F = np.load(r"Y:\raw-imaging\jo\VIP\VIP_CB1KO\621_female\TSeries-12152022-621screen-001\suite2p\plane0\F.npy", allow_pickle=True)
-    F = normalize_time_series(F, lower=0, upper=5)
-    Time = np.arange(len(F[0]))
-    Run = (Time, F[11])
-    FaceMotion = (Time, F[11])
-    Pupil= (Time, F[11])
-    Photodiode= (Time, F[11])
-    stimulus = [(6.072, 12.075000000000001, 17.041), (9.081238236, 14.096078934, 19.06924331)]
-    import numpy as np
+    base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
+    starting_delay_2p = 0.1
+    xml = Ca_imaging.load_xml(base_path)
+    F_time_stamp = xml['Green']['relativeTime']
+    freq_2p = (len(F_time_stamp) - 1) / F_time_stamp[-1]
+    F_time_stamp_updated = F_time_stamp + starting_delay_2p
 
-    # Generate a sine wave
-    x = np.linspace(50, 4050, 4000)  # X-axis from 50 to 4050 with 4000 points
-    y = np.sin(x * 2 * np.pi / 1000)  # Sine wave with a certain frequency
-    #sin = normalize_time_series(y, lower=0, upper=5)
-    sin = [x, y]
+    face_camera = np.load(os.path.join(base_path,"FaceCamera-summary.npy"), allow_pickle=True)
+    fvideo_time = face_camera.item().get('times')
+    faceitOutput = np.load(os.path.join(base_path, "FaceIt", "FaceIt.npz"), allow_pickle=True)
+    pupil = (faceitOutput['pupil_dilation'])
+    facemotion = (faceitOutput['motion_energy'])
 
+    speed, speed_time_stamps, last_F_index = Running_computation.compute_speed(base_path, freq_2p, F_time_stamp_updated)
+    speed = (speed_time_stamps, speed)
+
+    f_npy = np.load(os.path.join(base_path, "TSeries-09032024-002/suite2p/plane0/F.npy"), allow_pickle=True)
+    raw_F = f_npy[:, :last_F_index+1]
+    F_time_stamp_updated = F_time_stamp_updated[:last_F_index+1]
+
+    stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
+    visual_stim_path = os.path.join(base_path, "visual-stim.npy")
+    visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
+    stim_time_durations = visual_stim['time_duration']
+    stim_time_period = [stim_Time_start_realigned, stim_Time_start_realigned + stim_time_durations]
+
+    raw_F = normalize_time_series(raw_F, lower=0, upper=5)
+    Psignal = General_functions.scale_trace(Psignal)
+    pupil = General_functions.scale_trace(pupil)
+    facemotion = General_functions.scale_trace(facemotion)
+
+    FaceMotion = (fvideo_time, facemotion)
+    Pupil = (fvideo_time, pupil)
+    photodiode = (Psignal_time, Psignal)
 
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
-    ui.setupUi(MainWindow,  F, Time, Run,FaceMotion, Pupil, sin, stimulus)
+    ui.setupUi(MainWindow, raw_F, F_time_stamp_updated, speed, FaceMotion, Pupil, photodiode, stim_time_period)
     MainWindow.show()
     sys.exit(app.exec_())
