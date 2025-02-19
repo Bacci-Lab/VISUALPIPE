@@ -257,35 +257,32 @@ if __name__ == "__main__":
     import Running_computation
     import Ca_imaging
     import General_functions
+    import face_camera
 
     # Generate some sample datasets
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
     starting_delay_2p = 0.1
     ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=starting_delay_2p)
+    face_cam = face_camera.FaceCamDataManager(base_path)
 
-    face_camera = np.load(os.path.join(base_path,"FaceCamera-summary.npy"), allow_pickle=True)
-    fvideo_time = face_camera.item().get('times')
-    faceitOutput = np.load(os.path.join(base_path, "FaceIt", "FaceIt.npz"), allow_pickle=True)
-    pupil = (faceitOutput['pupil_dilation'])
-    facemotion = (faceitOutput['motion_energy'])
-
-    speed, speed_time_stamps, last_F_index = Running_computation.compute_speed(base_path, ca_img.fs, ca_img.time_stamps)
+    speed, speed_time_stamps = Running_computation.compute_speed(base_path)
+    speed_time_stamps, speed = General_functions.resample_signal(speed, 
+                                                                 t_sample=speed_time_stamps, 
+                                                                 new_freq=ca_img.fs,
+                                                                 post_smoothing=2./50.)
     speed = (speed_time_stamps, speed)
-    ca_img.cut_frames(last_index=last_F_index)
 
     stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
-    visual_stim_path = os.path.join(base_path, "visual-stim.npy")
-    visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
-    stim_time_durations = visual_stim['time_duration']
-    stim_time_period = [stim_Time_start_realigned, stim_Time_start_realigned + stim_time_durations]
+    visual_stim = np.load(os.path.join(base_path, "visual-stim.npy"), allow_pickle=True).item()
+    stim_time_period = [stim_Time_start_realigned, stim_Time_start_realigned + visual_stim['time_duration']]
 
     raw_F = ca_img.normalize_time_series("raw_F", lower=0, upper=5)
     Psignal = General_functions.scale_trace(Psignal)
-    pupil = General_functions.scale_trace(pupil)
-    facemotion = General_functions.scale_trace(facemotion)
+    pupil = General_functions.scale_trace(face_cam.pupil)
+    facemotion = General_functions.scale_trace(face_cam.facemotion)
 
-    FaceMotion = (fvideo_time, facemotion)
-    Pupil = (fvideo_time, pupil)
+    FaceMotion = (face_cam.time_stamps, facemotion)
+    Pupil = (face_cam.time_stamps, pupil)
     photodiode = (Psignal_time, Psignal)
 
     app = QtWidgets.QApplication(sys.argv)

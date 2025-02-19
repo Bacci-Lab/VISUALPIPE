@@ -112,8 +112,8 @@ def resample_running_signal(original_signal,
 
     return new_signal
 
-def compute_speed(base_path, new_freq, F_time_stamps, position_smoothing=10e-3, #s
-                   with_raw_position=False):
+def compute_speed(base_path, position_smoothing=10e-3, #s
+                  with_raw_position=False):
     
     binary_signal, radius_position_on_disk, rotoencoder_value_per_rotation, acq_freq = load_and_data_extraction(base_path)
     A, B = process_binary_signal(binary_signal)
@@ -129,7 +129,9 @@ def compute_speed(base_path, new_freq, F_time_stamps, position_smoothing=10e-3, 
 
     speed *= acq_freq
 
-    lastFIdx, timeReference, speedTimeStamps = get_alignment_index(F_time_stamps, speed, acq_freq)
+    speed_time_stamps = np.arange(len(speed)) / acq_freq + 1 / acq_freq / 2 #shift from +dt/2 because we consider v(t_i + dt/2) = ( x(t_(i+1)) - x(t_i) ) / dt
+
+    """ lastFIdx, timeReference, speedTimeStamps = get_alignment_index(F_time_stamps, speed, acq_freq)
 
     #sub sampling and filtering speed
     speed = resample_running_signal(speed, speedTimeStamps,
@@ -138,12 +140,12 @@ def compute_speed(base_path, new_freq, F_time_stamps, position_smoothing=10e-3, 
                                     new_freq = new_freq,
                                     pre_smoothing=0,
                                     post_smoothing = 2. / 50.,
-                                    verbose=False)
+                                    verbose=False) """
 
     if with_raw_position:
-        return speed, timeReference, lastFIdx, position
+        return speed, speed_time_stamps, position
     else:
-        return speed, timeReference, lastFIdx
+        return speed, speed_time_stamps
 
 if __name__ == "__main__":
     import Ca_imaging
@@ -151,5 +153,5 @@ if __name__ == "__main__":
     starting_delay_2p = 0.1
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
     ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=starting_delay_2p)
-    timeReference, speed, last_F_index = compute_speed(base_path, ca_img.fs, ca_img.time_stamps)
+    speed, speed_time_stamps = compute_speed(base_path)
     print(speed)

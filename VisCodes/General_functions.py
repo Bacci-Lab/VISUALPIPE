@@ -22,6 +22,7 @@ def resample_signal(original_signal,
                     pre_smoothing=0,
                     post_smoothing=0,
                     tlim=None,
+                    interp_time=None,
                     verbose=False):
     '''
     Author: Yann Zerlaut
@@ -45,9 +46,12 @@ def resample_signal(original_signal,
 
     func = interp1d(t_sample[np.isfinite(signal)], signal[np.isfinite(signal)],
                     fill_value='extrapolate')
-    if tlim is None:
-        tlim = [t_sample[0], t_sample[-1]]
-    new_t = np.arange(int((tlim[1] - tlim[0]) * new_freq)) / new_freq + tlim[0]
+    if interp_time is None :
+        if tlim is None :
+            tlim = [t_sample[0], t_sample[-1]]
+        new_t = np.arange(int((tlim[1] - tlim[0]) * new_freq)) / new_freq + tlim[0]
+    else : 
+        new_t = interp_time 
     new_signal = func(new_t)
 
     if (post_smoothing * new_freq) > 1:
@@ -55,7 +59,10 @@ def resample_signal(original_signal,
             print(' - gaussian smoothing - post')
         new_signal = gaussian_filter1d(new_signal, int(post_smoothing * new_freq), mode='nearest')
 
-    return new_t, new_signal
+    if interp_time is None :
+        return new_t, new_signal
+    else :
+        return new_signal
 
 def create_H5_dataset(group, variable, variable_name):
     for name, value in zip(variable_name, variable):
