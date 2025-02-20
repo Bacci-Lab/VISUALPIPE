@@ -129,33 +129,37 @@ if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
 #---------------------------------- Spontaneous behaviour ----------------------------------
 id_spont = protocol_df[protocol_df['name'] == 'grey-20min'].index[0]
 duration_spont = protocol_df.iloc[id_spont]["duration"]
-F_spontaneous, start_spont_index, end_spont_index = Photodiode.get_spontaneous_F(ca_img_dm.fluorescence, visual_stim['protocol_id'], id_spont, duration_spont, F_stim_init_indexes, ca_img_dm.fs)
-time_start_spon_index = ca_img_dm.time_stamps[start_spont_index]
-time_end_spon_index = ca_img_dm.time_stamps[end_spont_index]
+F_spontaneous, start_spont_index, end_spont_index = Photodiode.get_spontaneous_F(ca_img_dm.dFoF0, visual_stim['protocol_id'], id_spont, duration_spont, F_stim_init_indexes, ca_img_dm.fs)
 
-fvideo_first_spont_index = np.argmin(np.abs(new_time_stamps - time_start_spon_index))
-fvideo_last_spont_index = np.argmin(np.abs(new_time_stamps - time_end_spon_index))
-facemotion_spont = facemotion[fvideo_first_spont_index:fvideo_last_spont_index]
-new_time_stamps_spont = new_time_stamps[fvideo_first_spont_index:fvideo_last_spont_index]
+speed_spont = speed[start_spont_index:end_spont_index]
+facemotion_spont = facemotion[start_spont_index:end_spont_index]
+pupil_spont = pupil[start_spont_index:end_spont_index]
+time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
+print("Spontaneous activity time: from", time_stamps_spont[0], "to", time_stamps_spont[-1])
 
-speed_corr = [pearsonr(speed[start_spont_index:end_spont_index], ROI)[0] for ROI in F_spontaneous]
+""" ax1 = plt.subplot(311)
+ax1.plot(time_stamps_spont, speed_spont, color='goldenrod')
+ax1.set_title('speed')
+ax1.set_xticks([])
+ax2 = plt.subplot(312)
+ax2.plot(time_stamps_spont, facemotion_spont, color='gray')
+ax2.set_title('facemotion')
+ax2.set_xticks([])
+ax3 = plt.subplot(313)
+ax3.plot(time_stamps_spont, pupil_spont, color='black')
+ax3.set_title('pupil')
+ax3.set_xlabel('Time (s)')
+plt.show() """
+
+# Correlation with dFoF0
+speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous]
 speed_corr = [float(value) for value in speed_corr]
 
-print("facemotion_spont size", len(facemotion_spont))
-print("new_time_stamps_spont ", new_time_stamps_spont[:5])
-print("len speed_time_stamps ", len(speed_time_stamps[start_spont_index: end_spont_index]))
+facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous]
+facemotion_corr = [float(value) for value in facemotion_corr]
 
-#########################
-
-""" print("len speed[start_spont_index:end_spont_index] ", len(speed[start_spont_index:end_spont_index]))
-print(facemotion_spont.shape, F_spontaneous[0].shape)
-corr_Face = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous]
-corr_Face = [float(value) for value in corr_Face]
-plt.plot(corr_Face)
-plt.show() """
-
-""" plt.plot(new_time_stamps_spont, facemotion_spont)
-plt.show() """
+pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous]
+pupil_corr = [float(value) for value in pupil_corr]
 
 ################################
 
@@ -176,7 +180,7 @@ caImg_full_trace = caImg_group.create_group('full_trace')
 rois_group = hf.create_group("ROIs")
 
 General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil], ['Speed', 'FaceMotion', 'Pupil'])
-General_functions.create_H5_dataset(correlation, [speed_corr], ['speed_corr'])
+General_functions.create_H5_dataset(correlation, [speed_corr, facemotion_corr, pupil_corr], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
 General_functions.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
