@@ -177,6 +177,7 @@ behavioral_group = hf.create_group('Behavioral')
 correlation = behavioral_group.create_group("Correlation")
 caImg_group = hf.create_group('Ca_imaging')
 caImg_full_trace = caImg_group.create_group('full_trace')
+stimuli_group = hf.create_group("Stimuli")
 rois_group = hf.create_group("ROIs")
 
 General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil], ['Speed', 'FaceMotion', 'Pupil'])
@@ -186,6 +187,8 @@ General_functions.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_d
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
 General_functions.create_H5_dataset(rois_group, [kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
                                     ['1_neuropil', '2_alpha', '3_F0'])
+General_functions.create_H5_dataset(stimuli_group, [stim_Time_start_realigned, F_Time_start_realigned, F_stim_init_indexes], 
+                                    ['time_onset', 'time_onset_caimg_timescale', 'idx_onset_caimg_timescale'])
 
 hf.close()
 
