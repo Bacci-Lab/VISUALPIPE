@@ -185,10 +185,10 @@ General_functions.create_H5_dataset(correlation, [speed_corr, facemotion_corr, p
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
 General_functions.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
-General_functions.create_H5_dataset(rois_group, [kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
-                                    ['1_neuropil', '2_alpha', '3_F0'])
 General_functions.create_H5_dataset(stimuli_group, [stim_Time_start_realigned, F_Time_start_realigned, F_stim_init_indexes], 
                                     ['time_onset', 'time_onset_caimg_timescale', 'idx_onset_caimg_timescale'])
+General_functions.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
+                                    ['0_original', '1_neuropil', '2_alpha', '3_F0'])
 
 hf.close()
 
