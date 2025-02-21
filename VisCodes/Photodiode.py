@@ -7,81 +7,22 @@ from scipy.ndimage import filters, gaussian_filter1d
 import matplotlib.pyplot as plt
 
 def load_and_data_extraction(base_path):
-    vis_stim_path = os.path.join(base_path, "visual-stim.npy")
+
     NIdaq_path = os.path.join(base_path, "NIdaq.npy")
-    if os.path.exists(vis_stim_path):
-        visual_stim = np.load(vis_stim_path, allow_pickle=True)
-    else:
-        raise Exception("No visual-stim.npy file exists in this directory")
     if os.path.exists(NIdaq_path):
         NIdaq = np.load(NIdaq_path, allow_pickle=True).item()
     else:
         raise Exception("No NIdaq.npy file exists in this directory")
+    
     metadata_path = os.path.join(base_path, "metadata.json")
     if os.path.exists(metadata_path):
         with open(metadata_path, 'r') as file:
             data = json.load(file)
-        Acquisition_Frequency = data['NIdaq-acquisition-frequency']
+            Acquisition_Frequency = data['NIdaq-acquisition-frequency']
     else:
         raise Exception("No JSON metadata file exists in this directory")
-    return visual_stim, NIdaq, Acquisition_Frequency
-
-def visual_stim_extraction(visual_stim):
-    visual_stim = visual_stim.item()
-    time_duration = visual_stim['time_duration']
-    protocol_id = visual_stim['protocol_id']
-    time_start = visual_stim['time_start']
-    return time_duration, protocol_id, time_start
-
-def realign_from_photodiode(base_path, plot=False):
-    """
-    Adapted from yzerlaut : https://github.com/yzerlaut/physion/blob/main/src/physion/assembling/realign_from_photodiode.py
-    Calculate the real time stamps of each stimuli onset from the photodiode signal.
-    """
-    new_freq = 1000
-    visual_stim, NIdaq, Acquisition_Frequency = load_and_data_extraction(base_path)
-    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
-                                                    original_freq=Acquisition_Frequency,
-                                                    new_freq=new_freq)
-    _, _, time_start = visual_stim_extraction(visual_stim)
     
-    # compute signal boundaries to evaluate threshold crossing of photodiode signal
-    H, bins = np.histogram(Psignal, bins=100)
-    baseline = bins[np.argmax(H) + 1]
-    threshold = (np.max(Psignal) - baseline) / 3.  # reaching 1/3 of peak level
-
-    # extract time stamps where photodiode signal cross threshold ("peaks" time stamps)
-    cond_thresh = (Psignal[1:] >= (baseline + threshold)) & (Psignal[:-1] < (baseline + threshold))
-    peak_time_stamps = np.where(cond_thresh)[0] / new_freq
-
-    # from the peaks, select only those at the beginning of each stimuli (time-delay is around 0.3s)
-    stim_Time_start_realigned = []
-    #dt_shift = []
-    for value in time_start:
-        index = np.argmin(np.abs(peak_time_stamps - value))
-        stim_Time_start_realigned.append(peak_time_stamps[index])
-        #dt_shift.append(np.abs(value - peak_time_stamps[index]))
-    stim_Time_start_realigned = [float(val) for val in stim_Time_start_realigned]
-    #print(np.mean(dt_shift), np.max(dt_shift), np.min(dt_shift))
-
-    if plot :
-        figures.Visualize_baseline(Psignal, baseline)
-
-        plt.plot(Psignal_time, Psignal, label='photodiode signal')
-        plt.scatter(stim_Time_start_realigned, np.ones(len(stim_Time_start_realigned))*(threshold+baseline), color='orange', marker='x', label='start of stimuli')
-        plt.scatter(peak_time_stamps, np.ones(len(peak_time_stamps))*(threshold+baseline), color='green', marker='.', label='peak detection')
-        plt.legend(loc="upper right")
-        plt.show()
-
-    return stim_Time_start_realigned, Psignal, Psignal_time
-
-def extract_visual_stim_items(visual_stim):
-    visual_stim = visual_stim.item()
-    time_duration = visual_stim['time_duration']
-    protocol_id = visual_stim['protocol_id']
-    time_start = visual_stim['time_start']
-    interstim = visual_stim['interstim']
-    return time_duration, protocol_id, time_start, interstim
+    return NIdaq, Acquisition_Frequency
 
 def Find_F_stim_index(stim_Time_start_realigned, F_time_stamp_updated):
     """
@@ -119,7 +60,7 @@ def average_image(
     """
     Analyze neurons for the given protocol and determine valid neurons.
     """
-    print(protocol_name)
+    print(protocol_name, chosen_protocol, protocol_duration_s)
     protocol_duration = int(protocol_duration_s * Photon_fre)
     Valid_Neuron = np.zeros(len(F))
     protocol_validity = None  # Initialize protocol_validity
@@ -142,8 +83,8 @@ def average_image(
 
         # Calculate p-value
         twenty_perc_F_stim = np.percentile(F_stim, 80)
-        print("twenty_perc_F_stim",twenty_perc_F_stim)
         p_value = np.sum(fith_bootstraping_base >= twenty_perc_F_stim) / num_samples
+        #print("twenty_perc_F_stim",twenty_perc_F_stim)
 
         # Check if neuron is valid
         if p_value <= 0.05:
@@ -168,26 +109,13 @@ def average_image(
 
     return protocol_validity
 
-def get_spontaneous_F (F, protocol_ids,chosen_protocol, protocol_duration_s, F_stim_init_indexes,Photon_fre):
-    protocol_duration = int(protocol_duration_s * Photon_fre)
-    F_spontaneous = []
-    for Neuron_index in range(len(F)):
-        test_F = F[Neuron_index]
-        for i in range(len(protocol_ids)):
-            if protocol_ids[i] == chosen_protocol:
-                start_spon_index = int(F_stim_init_indexes[i])
-                # F_specific_protocol_i = test_F[start_spon_index-29:start_spon_index + protocol_duration + 29]
-                F_spontaneous_i = test_F[start_spon_index: start_spon_index + protocol_duration]
-                F_spontaneous.append(F_spontaneous_i)
-    if "start_spon_index" in locals():
-        end_spon_index = start_spon_index + protocol_duration
-        return F_spontaneous, start_spon_index, end_spon_index
-    else:
-        return F_spontaneous
-
 if __name__ == "__main__":
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
-    stim_Time_start_realigned, Psignal, Psignal_time = realign_from_photodiode(base_path)
+    NIdaq, acq_freq = load_and_data_extraction(base_path)
+    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0], original_freq=acq_freq, new_freq=1000)
+
+    plt.plot(Psignal_time, Psignal)
+    plt.show()
 
 #################################
 # period_start = []

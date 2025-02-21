@@ -258,13 +258,14 @@ if __name__ == "__main__":
     import Ca_imaging
     import General_functions
     import face_camera
+    from visual_stim import VisualStim
 
     # Generate some sample datasets
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
-    starting_delay_2p = 0.1
-    ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=starting_delay_2p)
-    face_cam = face_camera.FaceCamDataManager(base_path)
 
+    ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=0.1)
+    face_cam = face_camera.FaceCamDataManager(base_path)
+    
     speed, speed_time_stamps = Running_computation.compute_speed(base_path)
     speed_time_stamps, speed = General_functions.resample_signal(speed, 
                                                                  t_sample=speed_time_stamps, 
@@ -272,9 +273,16 @@ if __name__ == "__main__":
                                                                  post_smoothing=2./50.)
     speed = (speed_time_stamps, speed)
 
-    stim_Time_start_realigned, Psignal, Psignal_time = Photodiode.realign_from_photodiode(base_path)
-    visual_stim = np.load(os.path.join(base_path, "visual-stim.npy"), allow_pickle=True).item()
-    stim_time_period = [stim_Time_start_realigned, stim_Time_start_realigned + visual_stim['time_duration']]
+    visual_stim = VisualStim(base_path)
+    NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
+    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
+                                                          original_freq=acq_freq,
+                                                          new_freq=1000)
+    visual_stim.realign_from_photodiode(Psignal_time, Psignal)
+    stim_time_period = [visual_stim.real_time_onset, visual_stim.real_time_onset + visual_stim.duration]
+    print(len(stim_time_period))
+    print(len(stim_time_period[0]))
+    print(len(stim_time_period[1]))
 
     raw_F = ca_img.normalize_time_series("raw_F", lower=0, upper=5)
     Psignal = General_functions.scale_trace(Psignal)

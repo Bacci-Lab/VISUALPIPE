@@ -1,0 +1,147 @@
+import os
+import pandas as pd
+import numpy as np
+import json
+import matplotlib.pyplot as plt
+import figures
+
+class VisualStim(object):
+    
+    def __init__(self, base_path):
+        visual_stim = self.load_visual_stim(base_path)
+        self.order: list = list(visual_stim['protocol_id'])
+        self.duration = visual_stim['time_duration']
+        self.interstim = visual_stim['interstim']
+        self.time_onset = visual_stim['time_start']
+
+        self.protocol_ids: list = []
+        self.protocol_names: list = []
+        self.protocol_df: pd.DataFrame = None
+        self.real_time_onset: list = None
+        self.dt_shift: list = None
+
+        self.get_protocol(base_path)
+        self.build_df()
+
+    def load_visual_stim(self, base_path):
+        visual_stim_path = os.path.join(base_path, "visual-stim.npy")
+        if os.path.exists(visual_stim_path):
+            visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
+        else:
+            raise Exception("No visual-stim.npy file exists in this directory")
+        return visual_stim
+
+    def get_protocol(self, base_path):
+        # Load the JSON data
+        protocol_path = os.path.join(base_path, "protocol.json")
+        try :
+            with open(protocol_path, "r", encoding="utf-8") as file:
+                data = json.load(file)
+        except :
+            raise Exception("No protocol.json file exists in this directory")
+        
+        for key, value in data.items():
+            if key.startswith("Protocol-"):
+                # Extract the protocol number
+                self.protocol_number = int(key.split("-")[1])-1
+                self.protocol_ids.append(self.protocol_number)
+                self.protocol_name = value.split("/")[-1].replace(".json", "")
+                self.protocol_names.append(self.protocol_name)
+
+    def build_df(self) :
+        protocol_df = pd.DataFrame({"id" : self.protocol_ids, "name" : self.protocol_names})
+        protocol_duration = pd.DataFrame({ "id" : self.order, "duration" : self.duration}).groupby(by="id").mean()
+        self.protocol_df = protocol_df.join(protocol_duration, on="id", how="inner").set_index("id")
+
+    def realign_from_photodiode(self, Psignal_time, Psignal, plot=False):
+        """
+        Adapted from yzerlaut : https://github.com/yzerlaut/physion/blob/main/src/physion/assembling/realign_from_photodiode.py
+        Calculate the real time stamps of each stimuli onset from the photodiode signal.
+        """
+        acq_freq_photodiode = 1. / (Psignal_time[1] - Psignal_time[0])
+
+        # compute signal boundaries to evaluate threshold crossing of photodiode signal
+        H, bins = np.histogram(Psignal, bins=100)
+        baseline = bins[np.argmax(H) + 1]
+        threshold = (np.max(Psignal) - baseline) / 3.  # reaching 1/3 of peak level
+
+        # extract time stamps where photodiode signal cross threshold ("peaks" time stamps)
+        cond_thresh = (Psignal[1:] >= (baseline + threshold)) & (Psignal[:-1] < (baseline + threshold))
+        peak_time_stamps = np.where(cond_thresh)[0] / acq_freq_photodiode
+
+        # from the peaks, select only those at the beginning of each stimuli (time-delay is around 0.3s)
+        stim_Time_start_realigned = []
+        dt_shift = []
+        for value in self.time_onset:
+            index = np.argmin(np.abs(peak_time_stamps - value))
+            stim_Time_start_realigned.append(peak_time_stamps[index])
+            dt_shift.append(np.abs(value - peak_time_stamps[index]))
+        stim_Time_start_realigned = [float(val) for val in stim_Time_start_realigned]
+        
+        self.real_time_onset = stim_Time_start_realigned
+        self.dt_shift = dt_shift
+        #print(np.mean(dt_shift), np.max(dt_shift), np.min(dt_shift))
+
+        if plot :
+            figures.Visualize_baseline(Psignal, baseline)
+
+            plt.plot(Psignal_time, Psignal, label='photodiode signal')
+            plt.scatter(stim_Time_start_realigned, np.ones(len(stim_Time_start_realigned))*(threshold+baseline), color='orange', marker='x', label='start of stimuli')
+            plt.scatter(peak_time_stamps, np.ones(len(peak_time_stamps))*(threshold+baseline), color='green', marker='.', label='peak detection')
+            plt.legend(loc="upper right")
+            plt.show()
+
+    def get_protocol_onset_index(self, chosen_protocol, F_stim_init_indexes, freq, tseries=None):
+        """
+        Get the start and end index of chosen protocol in a list.
+        """
+        protocol_duration = self.protocol_df['duration'][chosen_protocol]
+        protocol_nb_frames = int(protocol_duration * freq)
+        nb_stimuli = self.order.count(chosen_protocol)
+        
+        if nb_stimuli > 0 :
+            if tseries is not None :
+                var_protocol = np.ones((len(tseries), nb_stimuli, protocol_nb_frames))
+            idx_lim_protocol = []
+            stim = 0
+
+            for i in range(len(self.order)):
+                
+                if self.order[i] == chosen_protocol:
+                    start_spon_index = int(F_stim_init_indexes[i])
+                    idx_lim_protocol.append([start_spon_index, start_spon_index + protocol_nb_frames])
+                    
+                    if tseries is not None :
+                        for neuron in range(len(tseries)):
+                            F_spontaneous_i = tseries[neuron, start_spon_index: start_spon_index + protocol_nb_frames]
+                            var_protocol[neuron][stim] = F_spontaneous_i
+                        stim += 1
+        
+        else :
+            raise Exception("0 stimuli of the chosen protocol has been found")
+        
+        if tseries is not None :
+            return idx_lim_protocol, var_protocol
+        else : 
+            return idx_lim_protocol
+        
+if __name__ == "__main__":
+    import Photodiode
+    import General_functions
+    import Ca_imaging
+
+    base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
+
+    visual_stim = VisualStim(base_path)
+    NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
+    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
+                                                              original_freq=acq_freq,
+                                                              new_freq=1000)
+    visual_stim.realign_from_photodiode(Psignal_time, Psignal)
+
+    ca_img_dm = Ca_imaging.CaImagingDataManager(base_path)
+    F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(visual_stim.real_time_onset, ca_img_dm.time_stamps)
+    idx_lim_protocol, F_spontaneous = visual_stim.get_protocol_onset_index(5, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.raw_F)
+
+    print(len(idx_lim_protocol))
+    print(F_spontaneous.shape)
