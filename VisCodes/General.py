@@ -194,6 +194,6 @@ General_functions.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_
 hf.close()
 
 #---------------------------------- Second GUI ----------------------------------
-main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
+main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
 main_window.show()
 app.exec_()

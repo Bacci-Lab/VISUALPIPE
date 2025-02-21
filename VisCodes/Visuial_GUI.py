@@ -16,9 +16,11 @@ import os
 class CustomGraphicsView_red(QGraphicsView):
     objectClicked = pyqtSignal(int)
     def __init__(self, cell_info, Chosen_Protocol, All_protocols, background_image_path,
-                 corr_running, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
+                 corr_running, facemotion_corr, pupil_corr, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
         super().__init__()
         self.corr_running = corr_running
+        self.facemotion_corr = facemotion_corr
+        self.pupil_corr = pupil_corr
         self.setScene(QGraphicsScene())
         self.Chosen_Protocol = Chosen_Protocol
         self.All_protocols = All_protocols
@@ -44,13 +46,19 @@ class CustomGraphicsView_red(QGraphicsView):
                 print("Failed to load background image:", self.background_image_path)
         self.drawObjects()
 
-
-    def drawObjects(self):
+    def drawObjects(self, behavioral_corr:str="speed"):
 
         scene = self.scene()
 
+        if behavioral_corr == "speed":
+            var_scale = self.corr_running
+        elif behavioral_corr == "facemotion":
+            var_scale = self.facemotion_corr
+        elif behavioral_corr == "pupil":
+            var_scale = self.pupil_corr
+
         # Normalize the values to [0, 1] for colormap
-        norm = colors.Normalize(vmin=min(self.corr_running), vmax=max(self.corr_running))
+        norm = colors.Normalize(vmin=min(var_scale), vmax=max(var_scale))
 
         # Choose a colormap (e.g., "viridis")
         colormap = cm.get_cmap('viridis')
@@ -58,7 +66,7 @@ class CustomGraphicsView_red(QGraphicsView):
         # Iterate through cells and draw them with color-mapped values
         for i, cell in enumerate(self.cell_info):
             # Get RGBA color from colormap
-            rgba = colormap(norm(self.corr_running[i]))
+            rgba = colormap(norm(var_scale[i]))
             # Convert RGBA to QColor
             color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], rgba[3])
 
@@ -133,7 +141,7 @@ class CustomGraphicsView_protocol(QGraphicsView):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, cell_info, protocol_validity_npz, corr_running, F, Time, Run, FaceMotion, Pupil, Photodiode, stimulus, red_frame_path, save_dir):
+    def __init__(self, cell_info, protocol_validity_npz, corr_running, facemotion_corr, pupil_corr, F, Time, Run, FaceMotion, Pupil, Photodiode, stimulus, red_frame_path, save_dir):
         super().__init__()
         self.protocolValidity = protocol_validity_npz
         self.stimuliNames = protocol_validity_npz.files
@@ -147,7 +155,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.Photodiode = Photodiode
         self.stimulus = stimulus
         
-        self.setupFirstTab(cell_info, corr_running)
+        self.setupFirstTab(cell_info, corr_running, facemotion_corr, pupil_corr)
         self.setupSecondTab(red_frame_path, save_dir)
         Green_Cell = protocol_validity_npz["static-patch"]
         self.SetUpThirdTab(cell_info, Green_Cell, red_frame_path)
@@ -179,10 +187,10 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
         self.setGeometry(100, 100, 1500, 641)
 
-    def setupFirstTab(self, cell_info, corr_running):
+    def setupFirstTab(self, cell_info, corr_running, facemotion_corr, pupil_corr):
         self.setupMainWindow()
         self.setupLayouts()
-        self.setupFrame1(cell_info, corr_running)
+        self.setupFrame1(cell_info, corr_running, facemotion_corr, pupil_corr)
         self.setupFrame2(cell_info)
         self.setupMenuBar()
         self.setup_buttons()
@@ -251,7 +259,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.horizontalLayout_4.addLayout(self.horizontalLayout_5)
         self.horizontalLayout_4.addLayout(self.horizontalLayout_6)
 
-    def setupFrame1(self, cell_info, corr_running):
+    def setupFrame1(self, cell_info, corr_running, facemotion_corr, pupil_corr):
         """Set up the first frame with red view."""
         self.frame = self.createFrame()
         self.verticalLayout_2 = self.createVerticalLayout(self.frame)
@@ -262,7 +270,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit_Red = self.createLineEdit( self.frame, True)
         self.verticalLayout_2.addWidget(self.lineEdit_Red)
 
-        self.Red_view = CustomGraphicsView_red(cell_info, self.selectedProtocol, self.protocolValidity, self.background_image_path, corr_running, self.computed_F, self.Time, self.Run, self.FaceMotion, self.Pupil, self.Photodiode, self.stimulus)
+        self.Red_view = CustomGraphicsView_red(cell_info, self.selectedProtocol, self.protocolValidity, self.background_image_path, corr_running, facemotion_corr, pupil_corr, self.computed_F, self.Time, self.Run, self.FaceMotion, self.Pupil, self.Photodiode, self.stimulus)
         self.verticalLayout_2.addWidget(self.Red_view)
         self.horizontalLayout_2.addWidget(self.frame)
 
@@ -410,7 +418,7 @@ class MainWindow(QtWidgets.QMainWindow):
         combo_box.addItems(combo_box_items)
         combo_box.setStyleSheet("color: white; ")
         grid_layout.addWidget(combo_box, row + 1, col)
-        combo_box.currentIndexChanged.connect(lambda: self.SelectedItem(combo_box))
+        combo_box.currentIndexChanged.connect(lambda: self.change_protocol(combo_box))
 
     def addStimulusSelector_behavioral(self, grid_layout, label_text, combo_box_items, row, col):
         """
@@ -432,10 +440,10 @@ class MainWindow(QtWidgets.QMainWindow):
         combo_box.addItems(combo_box_items)
         combo_box.setStyleSheet("color: white; ")
         grid_layout.addWidget(combo_box, row + 1, col)
-        # combo_box.currentIndexChanged.connect(lambda: self.SelectedItem(combo_box))
+        combo_box.currentIndexChanged.connect(lambda: self.change_correlation(combo_box))
 
     #Slots
-    def SelectedItem(self, combo_box):
+    def change_protocol(self, combo_box):
         """
         Slot to handle the current index change in the combo box.
 
@@ -450,9 +458,19 @@ class MainWindow(QtWidgets.QMainWindow):
             if protocol in self.stimuliNames:  # Ensure the key exists in the dictionary
                     self.selectedProtocol = self.protocolValidity[protocol]
             self.Protocol_view.drawObjects(self.selectedProtocol)
-            # self.Red_view.drawObjects()  # Ensure this calls the correct instance
         else:
             print("protocolValidity attr is not set or empty.")
+
+    def change_correlation(self, combo_box):
+        corr = combo_box.currentText()
+        if corr == "Running Correlation":
+            self.Red_view.drawObjects("speed")
+        elif corr == "whisking Correlation":
+            self.Red_view.drawObjects("facemotion")
+        elif corr == "Pupil dilation Correlation":
+            self.Red_view.drawObjects("pupil")
+        else :
+            raise Exception("Text doesn't match with combo box.")
 
     #Tool function for UI layouts and widgets
     def createFrame(self):
