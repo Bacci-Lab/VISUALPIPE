@@ -14,6 +14,7 @@ from inputUI import InputWindow
 import matplotlib.pyplot as plt
 import pandas as pd
 import h5py
+import pickle
 
 app = QtWidgets.QApplication(sys.argv)
 
@@ -181,7 +182,7 @@ caImg_full_trace = caImg_group.create_group('full_trace')
 stimuli_group = hf.create_group("Stimuli")
 rois_group = hf.create_group("ROIs")
 
-General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil], ['Speed', 'FaceMotion', 'Pupil'])
+General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
 General_functions.create_H5_dataset(correlation, [speed_corr, facemotion_corr, pupil_corr], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
 General_functions.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
@@ -192,6 +193,10 @@ General_functions.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_
                                     ['0_original', '1_neuropil', '2_alpha', '3_F0'])
 
 hf.close()
+
+#---------------------------------- Outputs ----------------------------------
+with open(os.path.join(save_dir, 'ca_img_obj.pkl'), 'wb') as outp:
+    pickle.dump(ca_img_dm, outp, pickle.HIGHEST_PROTOCOL)
 
 #---------------------------------- Second GUI ----------------------------------
 main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
