@@ -15,25 +15,17 @@ import os
 
 class CustomGraphicsView_red(QGraphicsView):
     objectClicked = pyqtSignal(int)
-    def __init__(self, cell_info, Chosen_Protocol, All_protocols, background_image_path,
-                 corr_running, facemotion_corr, pupil_corr, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
+
+    def __init__(self, cell_info, corr_running, facemotion_corr, pupil_corr, background_image_path=None):
         super().__init__()
         self.corr_running = corr_running
         self.facemotion_corr = facemotion_corr
         self.pupil_corr = pupil_corr
-        self.setScene(QGraphicsScene())
-        self.Chosen_Protocol = Chosen_Protocol
-        self.All_protocols = All_protocols
         self.cell_info = cell_info
         self.background_image_path = background_image_path
+        self.setScene(QGraphicsScene())
         self.setBackgroundImage()
         self.drawObjects()
-        self.F = F
-        self.Time = Time
-        self.Run = Run
-        self.FaceMotion = FaceMotion
-        self.Pupil = Pupil
-        self.Photodiode = Photodiode
 
     def setBackgroundImage(self):
         if self.background_image_path:
@@ -58,10 +50,11 @@ class CustomGraphicsView_red(QGraphicsView):
             var_scale = self.pupil_corr
 
         # Normalize the values to [0, 1] for colormap
-        norm = colors.Normalize(vmin=min(var_scale), vmax=max(var_scale))
+        #norm = colors.Normalize(vmin=min(var_scale), vmax=max(var_scale))
+        norm = colors.Normalize(vmin=-1, vmax=1)
 
         # Choose a colormap (e.g., "viridis")
-        colormap = cm.get_cmap('viridis')
+        colormap = cm.get_cmap('RdBu_r')
 
         # Iterate through cells and draw them with color-mapped values
         for i, cell in enumerate(self.cell_info):
@@ -84,11 +77,10 @@ class CustomGraphicsView_red(QGraphicsView):
                 return
         super().mousePressEvent(event)
 
-
 class CustomGraphicsView_protocol(QGraphicsView):
     objectClicked = pyqtSignal(int)
 
-    def __init__(self, cell_info, Chosen_Protocol, All_protocols, background_image_path=None):
+    def __init__(self, cell_info, Chosen_Protocol, background_image_path=None):
         super().__init__()
         self.setScene(QGraphicsScene())
         self.Chosen_Protocol = Chosen_Protocol
@@ -138,7 +130,6 @@ class CustomGraphicsView_protocol(QGraphicsView):
                 self.objectClicked.emit(object_index)
                 return
         super().mousePressEvent(event)
-
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, cell_info, protocol_validity_npz, corr_running, facemotion_corr, pupil_corr, F, Time, Run, FaceMotion, Pupil, Photodiode, stimulus, red_frame_path, save_dir):
@@ -270,7 +261,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit_Red = self.createLineEdit( self.frame, True)
         self.verticalLayout_2.addWidget(self.lineEdit_Red)
 
-        self.Red_view = CustomGraphicsView_red(cell_info, self.selectedProtocol, self.protocolValidity, self.background_image_path, corr_running, facemotion_corr, pupil_corr, self.computed_F, self.Time, self.Run, self.FaceMotion, self.Pupil, self.Photodiode, self.stimulus)
+        self.Red_view = CustomGraphicsView_red(cell_info, corr_running, facemotion_corr, pupil_corr, self.background_image_path)
         self.verticalLayout_2.addWidget(self.Red_view)
         self.horizontalLayout_2.addWidget(self.frame)
 
@@ -285,7 +276,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit_protocol = self.createLineEdit(self.frame_2, True)
         self.verticalLayout.addWidget(self.lineEdit_protocol)
 
-        self.Protocol_view = CustomGraphicsView_protocol(cell_info, self.selectedProtocol, self.protocolValidity, self.background_image_path)
+        self.Protocol_view = CustomGraphicsView_protocol(cell_info, self.selectedProtocol, self.background_image_path)
         self.verticalLayout.addWidget(self.Protocol_view)
         self.horizontalLayout_5.addWidget(self.frame_2)
 
@@ -332,9 +323,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.addColormapToLayout(
             grid_layout=self.gridLayout,
-            colormap_name="viridis",
-            min_val=min(self.Red_view.corr_running),
-            max_val=max(self.Red_view.corr_running),
+            colormap_name="RdBu_r",
+            #min_val=min(self.Red_view.corr_running),
+            #max_val=max(self.Red_view.corr_running),
+            min_val=-1,
+            max_val=1,
             row=2,
             col=0,
             colspan=1
@@ -380,7 +373,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         # Create a Matplotlib figure and axis
         fig = Figure(figsize=(1, 0.05))  # Reduce the height here
-        ax = fig.add_axes([0.05, 0.7, 0.9, 0.1])
+        ax = fig.add_axes([0.05, 0.5, 0.9, 0.05])
         fig.patch.set_alpha(0)
 
         # Create the colormap
@@ -521,3 +514,46 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit_protocol.setText(_translate("MainWindow",""))
         self.actionload_proccesd_file.setText(_translate("MainWindow", "load proccesd file"))
 
+if __name__ == "__main__":
+    import sys
+    import easygui
+    import h5py
+    import pickle
+
+    #base_path = easygui.diropenbox(title='Select folder containing data')
+    base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
+    save_dir = os.path.join(base_path, "output")
+
+    # Load protocol validity
+    protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
+    
+    # Load HDF5 file data
+    with h5py.File(os.path.join(save_dir, "postprocessing.h5"), "r") as f:
+
+        speed_corr = f['Behavioral']['Correlation']['speed_corr'][()]
+        facemotion_corr = f['Behavioral']['Correlation']['facemotion_corr'][()]
+        pupil_corr = f['Behavioral']['Correlation']['pupil_corr'][()]
+
+        speed = f['Behavioral']['Speed'][()]
+        facemotion = f['Behavioral']['FaceMotion'][()]
+        pupil = f['Behavioral']['Pupil'][()]
+        photodiode = f['Behavioral']['Photodiode'][()]
+
+        time_onset = f['Stimuli']['time_onset'][()]
+
+    # Load visual stimuli data
+    visual_stim_path = os.path.join(base_path, "visual-stim.npy")
+    visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
+    duration = visual_stim['time_duration']
+    stim_time_period = [time_onset, list(time_onset + duration)]
+
+    # Load Calcium imaging object
+    with open(os.path.join(save_dir, 'ca_img_obj.pkl'), 'rb') as inp:
+        ca_img_dm = pickle.load(inp)
+    computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=5)
+
+    # Launch App
+    app = QtWidgets.QApplication(sys.argv)
+    main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speed, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
+    main_window.show()
+    app.exec_()
