@@ -6,7 +6,7 @@ from red_Image_GUI import Red_IMAGE_Adgustment, SelectCell
 from PyQt5.QtGui import QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib import cm, colors
+from matplotlib import cm, colors, colormaps
 import numpy as np
 from Time_series_GUI import Ui_MainWindow as TimeseriesUI  # Import your previous class
 import os
@@ -54,7 +54,7 @@ class CustomGraphicsView_red(QGraphicsView):
         norm = colors.Normalize(vmin=-1, vmax=1)
 
         # Choose a colormap (e.g., "viridis")
-        colormap = cm.get_cmap('RdBu_r')
+        colormap = colormaps['RdBu_r']
 
         # Iterate through cells and draw them with color-mapped values
         for i, cell in enumerate(self.cell_info):
@@ -377,7 +377,7 @@ class MainWindow(QtWidgets.QMainWindow):
         fig.patch.set_alpha(0)
 
         # Create the colormap
-        colormap = cm.get_cmap(colormap_name)
+        colormap = colormaps['RdBu_r']
         norm = colors.Normalize(vmin=min_val, vmax=max_val)
         colorbar = cm.ScalarMappable(norm=norm, cmap=colormap)
 
