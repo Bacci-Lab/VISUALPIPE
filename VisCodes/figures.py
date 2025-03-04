@@ -82,7 +82,7 @@ def stim_period(protocol_duration_s,Photon_fre, mean_F_specific_protocol,std_F_s
     fig_name = " test Neuron " + str(Neuron_index)
     ax.margins(x=0)
     ax.set_xlabel("Time(s)")
-    ax.set_ylabel("raw F")
+    ax.set_ylabel(r"$\Delta$F/$F_0$")
     ax.set_title(protocol_name + '\n' + fig_name)
     ax.legend(bbox_to_anchor=(0, 1), loc='upper left', frameon=False)
     save_direction1 = os.path.join(save_dir, protocol_name)
