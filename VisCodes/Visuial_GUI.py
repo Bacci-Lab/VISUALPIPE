@@ -21,6 +21,7 @@ class CustomGraphicsView_red(QGraphicsView):
         self.corr_running = corr_running
         self.facemotion_corr = facemotion_corr
         self.pupil_corr = pupil_corr
+        self.cmap_extremum = 1
         self.cell_info = cell_info
         self.background_image_path = background_image_path
         self.setScene(QGraphicsScene())
@@ -50,8 +51,12 @@ class CustomGraphicsView_red(QGraphicsView):
             var_scale = self.pupil_corr
 
         # Normalize the values to [0, 1] for colormap
-        #norm = colors.Normalize(vmin=min(var_scale), vmax=max(var_scale))
-        norm = colors.Normalize(vmin=-1, vmax=1)
+        if np.abs(min(var_scale)) < np.abs(max(var_scale)) :
+            self.cmap_extremum = np.abs(round(max(var_scale)* 100) /100)
+        else :
+            self.cmap_extremum = np.abs(round(min(var_scale)* 100) /100)
+        norm = colors.Normalize(vmin=-self.cmap_extremum, vmax=self.cmap_extremum)
+        #norm = colors.Normalize(vmin=-1, vmax=1)
 
         # Choose a colormap (e.g., "viridis")
         colormap = colormaps['RdBu_r']
@@ -324,12 +329,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addColormapToLayout(
             grid_layout=self.gridLayout,
             colormap_name="RdBu_r",
-            #min_val=min(self.Red_view.corr_running),
-            #max_val=max(self.Red_view.corr_running),
-            min_val=-1,
-            max_val=1,
+            min_val=-self.Red_view.cmap_extremum,
+            max_val=self.Red_view.cmap_extremum,
             row=2,
-            col=0,
+            col=1,
             colspan=1
         )
 
@@ -373,17 +376,18 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         # Create a Matplotlib figure and axis
         fig = Figure(figsize=(1, 0.05))  # Reduce the height here
-        ax = fig.add_axes([0.05, 0.5, 0.9, 0.05])
+        ax = fig.add_axes([0.25, 0.15, 0.075, 0.7])
         fig.patch.set_alpha(0)
 
         # Create the colormap
-        colormap = colormaps['RdBu_r']
+        colormap = colormaps[colormap_name]
         norm = colors.Normalize(vmin=min_val, vmax=max_val)
         colorbar = cm.ScalarMappable(norm=norm, cmap=colormap)
 
         # Add the colorbar to the axis
-        fig.colorbar(colorbar, cax=ax, orientation="horizontal")
-        ax.set_title("Correlation", fontsize=7, color="white")
+        cbar = fig.colorbar(colorbar, cax=ax, orientation="vertical")
+        cbar.set_ticks([-max_val, -max_val/2, 0, max_val/2, max_val])
+        #ax.set_title("Correlation", fontsize=8, color="white")
 
         # Create a canvas for the Matplotlib figure
         canvas = FigureCanvas(fig)
@@ -464,6 +468,15 @@ class MainWindow(QtWidgets.QMainWindow):
             self.Red_view.drawObjects("pupil")
         else :
             raise Exception("Text doesn't match with combo box.")
+        self.addColormapToLayout(
+            grid_layout=self.gridLayout,
+            colormap_name="RdBu_r",
+            min_val=-self.Red_view.cmap_extremum,
+            max_val=self.Red_view.cmap_extremum,
+            row=2,
+            col=1,
+            colspan=1
+        )
 
     #Tool function for UI layouts and widgets
     def createFrame(self):
