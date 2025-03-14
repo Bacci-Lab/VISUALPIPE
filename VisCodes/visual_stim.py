@@ -40,13 +40,21 @@ class VisualStim(object):
         except :
             raise Exception("No protocol.json file exists in this directory")
         
-        for key, value in data.items():
-            if key.startswith("Protocol-"):
-                # Extract the protocol number
-                self.protocol_number = int(key.split("-")[1])-1
-                self.protocol_ids.append(self.protocol_number)
-                self.protocol_name = value.split("/")[-1].replace(".json", "")
-                self.protocol_names.append(self.protocol_name)
+        if data["Presentation"] == "multiprotocol" :
+            for key, value in data.items():
+                if key.startswith("Protocol-"):
+                    # Extract the protocol number
+                    protocol_number = int(key.split("-")[1])-1
+                    if protocol_number not in self.protocol_ids :
+                        self.protocol_ids.append(protocol_number)
+                        protocol_name = value.split("/")[-1].replace(".json", "")
+                        self.protocol_names.append(protocol_name)
+
+        elif data["Presentation"] == "Stimuli-Sequence" :
+            self.protocol_ids.append(0)
+            self.protocol_names.append(data["Stimulus"])
+        else :
+            print(f"Protocol is neither multiprotocol or stimuli sequence: {data["Presentation"]}")
 
     def build_df(self) :
         protocol_df = pd.DataFrame({"id" : self.protocol_ids, "name" : self.protocol_names})

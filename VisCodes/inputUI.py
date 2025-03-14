@@ -173,23 +173,31 @@ class Ui_MainWindow(object):
         # Load the JSON data
         with open(protocol_path, "r", encoding="utf-8") as file:
             data = json.load(file)
-
-        self.protocol_numbers = []
-        self.protocol_names = []
+        
         self.protocol_items = []
-        for key, value in data.items():
-            if key.startswith("Protocol-"):
-                # Extract the protocol number
-                self.protocol_number = int(key.split("-")[1])-1
-                self.protocol_numbers.append(self.protocol_number)
-                self.protocol_name = value.split("/")[-1].replace(".json", "")
-                self.protocol_names.append(self.protocol_name)
-                self.protocol_items.append(f"{self.protocol_number}: {self.protocol_name}")
 
-            # Display the protocols in the QListView
-            model = QStringListModel()
-            model.setStringList(self.protocol_items)
-            self.listView.setModel(model)
+        if data["Presentation"] == "multiprotocol" :
+            self.protocol_numbers = []
+            self.protocol_names = []
+            for key, value in data.items():
+                if key.startswith("Protocol-"):
+                    # Extract the protocol number
+                    self.protocol_number = int(key.split("-")[1])-1
+                    if self.protocol_number not in self.protocol_numbers :
+                        self.protocol_numbers.append(self.protocol_number)
+                        self.protocol_name = value.split("/")[-1].replace(".json", "")
+                        self.protocol_names.append(self.protocol_name)
+                        self.protocol_items.append(f"{self.protocol_number}: {self.protocol_name}")
+
+        elif data["Presentation"] == "Stimuli-Sequence" :
+            self.protocol_items.append(f"{0}: {data["Stimulus"]}")
+        else :
+            print(f"Protocol is neither multiprotocol or stimuli sequence: {data["Presentation"]}")
+
+        # Display the protocols in the QListView
+        model = QStringListModel()
+        model.setStringList(self.protocol_items)
+        self.listView.setModel(model)
 
         self.statusbar.showMessage('Protocol was loaded', 5000)
         self.protocolLoaded = True
