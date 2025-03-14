@@ -129,40 +129,45 @@ if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
     print(protocol_validity)
 
 #---------------------------------- Spontaneous behaviour ----------------------------------
-id_spont = protocol_df[protocol_df['name'] == 'grey-20min'].index[0]
-duration_spont = protocol_df.iloc[id_spont]["duration"]
-idx_lim_protocol, F_spontaneous = visual_stim.get_protocol_onset_index(id_spont, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.dFoF0)
-[start_spont_index, end_spont_index] = idx_lim_protocol[0]
+if 'grey-20min' in visual_stim.protocol_names :
+    id_spont = protocol_df[protocol_df['name'] == 'grey-20min'].index[0]
+    duration_spont = protocol_df.iloc[id_spont]["duration"]
+    idx_lim_protocol, F_spontaneous = visual_stim.get_protocol_onset_index(id_spont, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.dFoF0)
+    [start_spont_index, end_spont_index] = idx_lim_protocol[0]
 
-speed_spont = speed[start_spont_index:end_spont_index]
-facemotion_spont = facemotion[start_spont_index:end_spont_index]
-pupil_spont = pupil[start_spont_index:end_spont_index]
-time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
-print("Spontaneous activity time: from", time_stamps_spont[0], "to", time_stamps_spont[-1])
+    speed_spont = speed[start_spont_index:end_spont_index]
+    facemotion_spont = facemotion[start_spont_index:end_spont_index]
+    pupil_spont = pupil[start_spont_index:end_spont_index]
+    time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
+    print("Spontaneous activity time: from", time_stamps_spont[0], "to", time_stamps_spont[-1])
 
-""" ax1 = plt.subplot(311)
-ax1.plot(time_stamps_spont, speed_spont, color='goldenrod')
-ax1.set_title('speed')
-ax1.set_xticks([])
-ax2 = plt.subplot(312)
-ax2.plot(time_stamps_spont, facemotion_spont, color='gray')
-ax2.set_title('facemotion')
-ax2.set_xticks([])
-ax3 = plt.subplot(313)
-ax3.plot(time_stamps_spont, pupil_spont, color='black')
-ax3.set_title('pupil')
-ax3.set_xlabel('Time (s)')
-plt.show() """
+    """ ax1 = plt.subplot(311)
+    ax1.plot(time_stamps_spont, speed_spont, color='goldenrod')
+    ax1.set_title('speed')
+    ax1.set_xticks([])
+    ax2 = plt.subplot(312)
+    ax2.plot(time_stamps_spont, facemotion_spont, color='gray')
+    ax2.set_title('facemotion')
+    ax2.set_xticks([])
+    ax3 = plt.subplot(313)
+    ax3.plot(time_stamps_spont, pupil_spont, color='black')
+    ax3.set_title('pupil')
+    ax3.set_xlabel('Time (s)')
+    plt.show() """
 
-# Correlation with dFoF0
-speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
-speed_corr = [float(value) for value in speed_corr]
+    # Correlation with dFoF0
+    speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
+    speed_corr = [float(value) for value in speed_corr]
 
-facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
-facemotion_corr = [float(value) for value in facemotion_corr]
+    facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
+    facemotion_corr = [float(value) for value in facemotion_corr]
 
-pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
-pupil_corr = [float(value) for value in pupil_corr]
+    pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
+    pupil_corr = [float(value) for value in pupil_corr]
+
+else : 
+    nb_rois = len(ca_img_dm.dFoF0)
+    speed_corr, facemotion_corr, pupil_corr = list(np.zeros(nb_rois)), list(np.zeros(nb_rois)), list(np.zeros(nb_rois))
 
 ################################
 
@@ -184,7 +189,8 @@ stimuli_group = hf.create_group("Stimuli")
 rois_group = hf.create_group("ROIs")
 
 General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
-General_functions.create_H5_dataset(correlation, [speed_corr, facemotion_corr, pupil_corr], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
+if 'grey-20min' in visual_stim.protocol_names :
+    General_functions.create_H5_dataset(correlation, [speed_corr, facemotion_corr, pupil_corr], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
 General_functions.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
