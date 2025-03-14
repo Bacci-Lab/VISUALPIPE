@@ -5,6 +5,13 @@ import figures
 import General_functions
 from scipy.ndimage import filters, gaussian_filter1d
 import matplotlib.pyplot as plt
+import datetime
+
+def get_timestamp_start(base_path) :
+    NIdaq_path = os.path.join(base_path, "NIdaq.start.npy")
+    if os.path.exists(NIdaq_path):
+        NIdaq = np.load(NIdaq_path, allow_pickle=True)
+    return datetime.datetime.fromtimestamp(NIdaq[0])
 
 def load_and_data_extraction(base_path):
 

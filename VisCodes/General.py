@@ -46,7 +46,8 @@ detected_roi = ca_img_dm._list_ROIs_idx
 print('Original number of neurons :', len(detected_roi))
 
 #---------------------------------- Load Camera data ----------------------------------
-face_cam_dm = FaceCamDataManager(base_path)
+timestamp_start = Photodiode.get_timestamp_start(base_path)
+face_cam_dm = FaceCamDataManager(base_path, timestamp_start)
 
 #---------------------------------- Compute speed ----------------------------------
 speed, speed_time_stamps = compute_speed(base_path)
