@@ -16,6 +16,8 @@ import pandas as pd
 import h5py
 import pickle
 
+import utils.file as file
+
 app = QtWidgets.QApplication(sys.argv)
 
 # Launch the first GUI
@@ -38,6 +40,10 @@ starting_delay_2p = float(inputs["starting_delay_2p"])
 num_samples = int(inputs["bootstrap_nb_samples"])
 print('Base path:', base_path)
 print(f'Neuron type: {neuron_type} ; F0 method: {F0_method}')
+
+#---------------------------------- Get metadata ----------------------
+unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
+subject_id_anibio = file.get_mouse_id(base_path, subject_id)
 
 #---------------------------------- Load Ca-Imaging data ----------------------
 ca_img_dm = CaImagingDataManager(base_path, neuropil_impact_factor, F0_method, neuron_type, starting_delay_2p)
@@ -172,8 +178,8 @@ else :
 ################################
 
 photodiode = (Psignal_time, Psignal)
-pupil = (new_time_stamps, pupil)
-facemotion = (new_time_stamps, facemotion)
+pupilAndTimeSt  = (new_time_stamps, pupil)
+fmotionAndTimeSt  = (new_time_stamps, facemotion)
 speedAndTimeSt = (new_time_stamps, speed)
 background_image_path = os.path.join(base_path, "Mean_image_grayscale.png")
 protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
@@ -188,24 +194,34 @@ caImg_full_trace = caImg_group.create_group('full_trace')
 stimuli_group = hf.create_group("Stimuli")
 rois_group = hf.create_group("ROIs")
 
-General_functions.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
+file.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
 if 'grey-20min' in visual_stim.protocol_names :
-    General_functions.create_H5_dataset(correlation, [speed_corr, facemotion_corr, pupil_corr], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
+    file.create_H5_dataset(correlation, [speed_corr, facemotion_corr, pupil_corr], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
-General_functions.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
+file.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
-General_functions.create_H5_dataset(stimuli_group, [visual_stim.real_time_onset, F_Time_start_realigned, F_stim_init_indexes], 
+file.create_H5_dataset(stimuli_group, [visual_stim.real_time_onset, F_Time_start_realigned, F_stim_init_indexes], 
                                     ['time_onset', 'time_onset_caimg_timescale', 'idx_onset_caimg_timescale'])
-General_functions.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
+file.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
                                     ['0_original', '1_neuropil', '2_alpha', '3_F0'])
 
 hf.close()
 
 #---------------------------------- Outputs ----------------------------------
-with open(os.path.join(save_dir, 'ca_img_obj.pkl'), 'wb') as outp:
-    pickle.dump(ca_img_dm, outp, pickle.HIGHEST_PROTOCOL)
+file.save_pickle(ca_img_dm, save_directory=save_dir, filename='ca_img_obj')
+
+data_df = pd.DataFrame({
+            "Session_id": unique_id, "Protocol": global_protocol, "Experimenter": experimenter, "Mouse_id": subject_id_anibio,
+            'Mean_speed' : np.nanmean(speed), 'Std_speed' : np.std(speed),
+            'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.std(facemotion),
+            'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.std(pupil),
+            'Spontaneous' : True if 'grey-20min' in visual_stim.protocol_names else False,
+            'Mean_speed_corr' : np.nanmean(speed_corr), 'Mean_fmotion_corr' : np.nanmean(facemotion_corr), 'Mean_pupil_corr' : np.nanmean(pupil_corr), 
+            'Mean_dFoF0' : np.nanmean(ca_img_dm.dFoF0)
+            }, index=[0]).set_index("Session_id")
+file.compile_xlsx_file(data_df, save_dir)
 
 #---------------------------------- Second GUI ----------------------------------
-main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
+main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode, stim_time_period, red_image_path, save_dir)
 main_window.show()
 app.exec_()

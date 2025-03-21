@@ -63,7 +63,3 @@ def resample_signal(original_signal,
         return new_t, new_signal
     else :
         return new_signal
-
-def create_H5_dataset(group, variable, variable_name):
-    for name, value in zip(variable_name, variable):
-        group.create_dataset(name, data=value)
