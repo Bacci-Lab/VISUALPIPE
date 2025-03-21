@@ -170,8 +170,6 @@ if len(spont_stimuli_name) > 0 :
 
         # Correlation with dFoF0
         speed_spont = speed[start_spont_index:end_spont_index]
-        print(F_spontaneous[i].shape)
-        print(F_spontaneous[i][0, :])
         speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[i]]
         speed_corr = [float(value) for value in speed_corr]
         speed_corr_list.append(speed_corr)
