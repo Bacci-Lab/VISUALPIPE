@@ -1,6 +1,9 @@
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter1d
+from scipy.ndimage import gaussian_filter1d
 from scipy.interpolate import interp1d
+import scipy.stats
+import matplotlib.pyplot as plt
+import pandas as pd
 
 def bootstrap(data, num_samples):
     indices = np.random.choice(data.shape[0], size=num_samples, replace=True)
