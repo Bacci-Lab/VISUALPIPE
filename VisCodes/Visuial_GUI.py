@@ -137,7 +137,7 @@ class CustomGraphicsView_protocol(QGraphicsView):
         super().mousePressEvent(event)
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, cell_info, protocol_validity_npz, corr_running, facemotion_corr, pupil_corr, F, Time, Run, FaceMotion, Pupil, Photodiode, stimulus, red_frame_path, save_dir):
+    def __init__(self, cell_info, protocol_validity_npz, corr_running, facemotion_corr, pupil_corr, F, Time, Run, FaceMotion, Pupil, Photodiode, stimulus, red_image_path, save_dir):
         super().__init__()
         self.protocolValidity = protocol_validity_npz
         self.stimuliNames = protocol_validity_npz.files
@@ -152,9 +152,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stimulus = stimulus
         
         self.setupFirstTab(cell_info, corr_running, facemotion_corr, pupil_corr)
-        self.setupSecondTab(red_frame_path, save_dir)
-        Green_Cell = protocol_validity_npz["static-patch"]
-        self.SetUpThirdTab(cell_info, Green_Cell, red_frame_path)
+        self.setupSecondTab(red_image_path, save_dir)
+        list_keys = protocol_validity_npz.files
+        Green_Cell = protocol_validity_npz[list_keys[0]]
+        self.SetUpThirdTab(cell_info, Green_Cell, red_image_path)
 
     def setupMainWindow(self):
         """Set up main window properties and the tab widget."""
@@ -181,7 +182,7 @@ class MainWindow(QtWidgets.QMainWindow):
             gridline-color: rgb(213, 213, 213);
             border-top-color: rgb(197, 197, 197);
         """)
-        self.setGeometry(100, 100, 1500, 641)
+        self.setGeometry(100, 100, 1500, 700)
 
     def setupFirstTab(self, cell_info, corr_running, facemotion_corr, pupil_corr):
         self.setupMainWindow()
@@ -212,7 +213,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout_third = QtWidgets.QVBoxLayout(self.third_tab)
         self.Sellect_cell_window = QtWidgets.QMainWindow()
 
-        self.select_cell_ui = SelectCell(cell_info, Green_Cell, redtif_path + "/red.tif")
+        self.select_cell_ui = SelectCell(cell_info, Green_Cell, redtif_path)
 
         # Add SelectCell's central widget to the third tab layout
         layout_third.addWidget(self.select_cell_ui.centralWidget())

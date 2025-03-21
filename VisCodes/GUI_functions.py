@@ -2,6 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import cv2
 import os.path
 from PyQt5.QtGui import QPixmap
+
 def initialize_attributes(obj):
     obj.intensity = 1
     obj.brightness = 0
@@ -40,12 +41,14 @@ def setup_pushButton(parent, location, size, color, function):
     PushButton.setStyleSheet(color)
     PushButton.clicked.connect(function)
     return PushButton
+
 def cv2_to_pixmap(cv_image):
     height, width = cv_image.shape[:2]
     bytes_per_line = width
     q_image = QtGui.QImage(cv_image.data.tobytes(), width, height, bytes_per_line, QtGui.QImage.Format_Indexed8)
     pixmap = QtGui.QPixmap.fromImage(q_image)
     return pixmap
+
 def update_image(scene, image, intensity,blur_kernel, brightness):
     scene.clear()
     adjusted_image = cv2.convertScaleAbs(image, alpha=intensity, beta=brightness)
@@ -58,19 +61,21 @@ def update_image(scene, image, intensity,blur_kernel, brightness):
     item = QtWidgets.QGraphicsPixmapItem(pixmap)
     scene.addItem(item)
     return blurred
-def load_init_image(scene, BasePath):
-    image_path = os.path.join(BasePath, "red.tif")
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    normalized_image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
-    ## check if you wantn clahe
-    # clahe = cv2.createCLAHE(clipLimit=9.0, tileGridSize=(15,15))
-    # image = clahe.apply(image)
 
-    pixmap = cv2_to_pixmap(normalized_image)
-    scene.clear()
-    item = QtWidgets.QGraphicsPixmapItem(pixmap)
-    scene.addItem(item)
-    return normalized_image
+def load_init_image(scene, image_path):
+    if image_path is not None and os.path.exists(image_path) :
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        normalized_image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
+        ## check if you wantn clahe
+        # clahe = cv2.createCLAHE(clipLimit=9.0, tileGridSize=(15,15))
+        # image = clahe.apply(image)
+
+        pixmap = cv2_to_pixmap(normalized_image)
+        scene.clear()
+        item = QtWidgets.QGraphicsPixmapItem(pixmap)
+        scene.addItem(item)
+        return normalized_image
+    
 def load_mask_image(scene,image_contours):
     height, width, channel = image_contours.shape
     bytes_per_line = 3 * width
@@ -85,7 +90,7 @@ def thresholding(image,intensity, brightness, th_value, blur_kernel, scene):
         blur_kernel = blur_kernel
     else:
         blur_kernel = (blur_kernel, blur_kernel)
-    print("blur_kernel", blur_kernel)
+    #print("blur_kernel", blur_kernel)
     adjusted_image = cv2.convertScaleAbs(image, alpha=intensity, beta=brightness)
     blurred = cv2.GaussianBlur(adjusted_image, blur_kernel, 0)
     _, thresh = cv2.threshold(blurred, th_value, 255, cv2.THRESH_BINARY)

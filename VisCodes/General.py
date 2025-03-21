@@ -15,9 +15,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import h5py
 import pickle
+import red_cell_function
 
 import utils.file as file
 
+#---------------------------------- Launch app ----------------------
 app = QtWidgets.QApplication(sys.argv)
 
 # Launch the first GUI
@@ -44,6 +46,9 @@ print(f'Neuron type: {neuron_type} ; F0 method: {F0_method}')
 #---------------------------------- Get metadata ----------------------
 unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
 subject_id_anibio = file.get_mouse_id(base_path, subject_id)
+
+#---------------------------------- Get red channel path ----------------------
+_, red_image_path = red_cell_function.get_red_channel(base_path)    
 
 #---------------------------------- Load Ca-Imaging data ----------------------
 ca_img_dm = CaImagingDataManager(base_path, neuropil_impact_factor, F0_method, neuron_type, starting_delay_2p)

@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import os
 from numpy.fft import fft2, ifft2, fftshift
+import glob
 
 def image_shift(suite2p_image, red_image):
     f1 = fft2(suite2p_image)
@@ -49,6 +50,29 @@ def detect_REDROI(thresh,image, min_area, max_area):
             cv2.drawContours(image_contours, [contour], -1, (255, 0, 0), 1)
     return blank3, image_contours
 
+def get_red_channel(base_path):
+    list_dir_red = glob.glob(os.path.join(base_path, "SingleImage-*red*"))
+
+    if len(list_dir_red) > 0 :
+        if len(list_dir_red) > 1 : 
+            print(f"Many possible directory found : {list_dir_red}.\nUsing the first one:{list_dir_red[0]}")
+        red_channel_path = list_dir_red[0]
+        list_dir_red_image = glob.glob(os.path.join(red_channel_path, "*_Ch2_*.ome.tif"))
+        if len(list_dir_red_image) >= 1 :
+            red_image_path = list_dir_red_image[0]
+            if len(list_dir_red_image) != 1 :
+                print(f"More than one red channel image found. First image used: {red_image_path}")
+                print(f"Other found red channel image: {list_dir_red_image[1:]}")
+        
+        else :
+            print("No red channel image found.")
+            red_image_path = None
+    else :
+        print("No red channel directory found.")
+        red_channel_path, red_image_path = None, None
+    
+    return red_channel_path, red_image_path
+
 def loadred(Base_path):
     suite2p_path = os.path.join(Base_path, "suite2p", "plane0")
     ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
@@ -56,52 +80,36 @@ def loadred(Base_path):
     stat = np.load((os.path.join(suite2p_path, "stat.npy")), allow_pickle=True)
     single_red = cv2.imread((os.path.join(Base_path, 'red.tif')))
     return suite2p_path, ops, Mean_image, stat, single_red
+
 def single_mask(ops, cell_info):
-    separete_masks = []
+    separated_masks = []
     for i in range(0, len(cell_info)):
-        neumask1 = np.zeros((ops['Ly'], ops['Lx']))
-        neumask1[cell_info[i]['ypix'], cell_info[i]['xpix']] = 2
-        separete_masks.append(neumask1)
-    return separete_masks
+        roi_mask = np.zeros((ops['Ly'], ops['Lx']))
+        roi_mask[cell_info[i]['ypix'], cell_info[i]['xpix']] = 2
+        separated_masks.append(roi_mask)
+    return separated_masks
 
+def select_mask(red_masks_dir, separated_masks, cell_true=2, save=True, save_red_results='', with_masks=False):
+    red_cell_masks =  np.load(red_masks_dir, allow_pickle=True)
+    overlap_masks, overlap_cells = [], []
+    only_green_masks, only_green_cells = [], []
 
-def select_mask2(save_red_results, thresh2, separete_masks, cell_true = 2):
-    KeepMask = []
-    comen_cell = []
-    only_green_mask = []
-    only_green_cell = []
-
-    for i in range(len(separete_masks)):
-        blank2 = thresh2 + separete_masks[i]
-        if (cell_true + 2) in blank2:
-            comen_cell.append(i)
-            KeepMask.append(separete_masks[i])
+    for i in range(len(separated_masks)):
+        masks_sum = red_cell_masks + separated_masks[i]
+        if (cell_true + 2) in masks_sum: #if there are any overlap in the two masks, it is considered as the same cell
+            overlap_cells.append(i)
+            overlap_masks.append(separated_masks[i])
         else:
-            only_green_cell.append(i)
-            only_green_mask.append(separete_masks[i])
-    save_direction1 = os.path.join(save_red_results, 'red_green_cells.npy')
-    save_direction2 = os.path.join(save_red_results, 'only_green.npy')
-    np.save(save_direction1, comen_cell, allow_pickle=True)
-    np.save(save_direction2, only_green_cell, allow_pickle=True)
-    return only_green_mask, only_green_cell, comen_cell, KeepMask, blank2
-############################ Check ####################################
-def select_mask(save_red_results, thresh_dir, separete_masks, cell_true = 2):
-    thrsh =  np.load(thresh_dir, allow_pickle=True)
-    KeepMask = []
-    comen_cell = []
-    only_green_mask = []
-    only_green_cell = []
+            only_green_cells.append(i)
+            only_green_masks.append(separated_masks[i])
+    
+    if save :
+        save_direction1 = os.path.join(save_red_results, 'red_green_cells.npy')
+        save_direction2 = os.path.join(save_red_results, 'only_green.npy')
+        np.save(save_direction1, overlap_cells, allow_pickle=True)
+        np.save(save_direction2, only_green_cells, allow_pickle=True)
 
-    for i in range(len(separete_masks)):
-        blank2 = thrsh + separete_masks[i]
-        if (cell_true + 2) in blank2:
-            comen_cell.append(i)
-            KeepMask.append(separete_masks[i])
-        else:
-            only_green_cell.append(i)
-            only_green_mask.append(separete_masks[i])
-    save_direction1 = os.path.join(save_red_results, 'red_green_cells.npy')
-    save_direction2 = os.path.join(save_red_results, 'only_green.npy')
-    np.save(save_direction1, comen_cell, allow_pickle=True)
-    np.save(save_direction2, only_green_cell, allow_pickle=True)
-    return only_green_mask, only_green_cell, comen_cell, KeepMask, blank2
+    if with_masks :
+        return only_green_cells, overlap_cells, only_green_masks, overlap_masks
+    else :
+        return  only_green_cells, overlap_cells
