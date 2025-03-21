@@ -140,45 +140,80 @@ if not os.path.exists(os.path.join(base_path, "protocol_validity.npz")):
     print(protocol_validity)
 
 #---------------------------------- Spontaneous behaviour ----------------------------------
-if 'grey-20min' in visual_stim.protocol_names :
-    id_spont = protocol_df[protocol_df['name'] == 'grey-20min'].index[0]
-    duration_spont = protocol_df.iloc[id_spont]["duration"]
-    idx_lim_protocol, F_spontaneous = visual_stim.get_protocol_onset_index(id_spont, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.dFoF0)
-    [start_spont_index, end_spont_index] = idx_lim_protocol[0]
+speed_corr_list = []
+facemotion_corr_list = []
+pupil_corr_list = []
+spont_stimuli_name = []
+spont_stimuli_id = []
+analyze_pupil = []
+for stimuli_name in visual_stim.protocol_names :
+    if 'grey' in stimuli_name :
+        if stimuli_name not in spont_stimuli_name :
+            spont_stimuli_name.append(stimuli_name)
+            analyze_pupil.append(1)
+    elif 'black' in stimuli_name :
+        if stimuli_name not in spont_stimuli_name :
+            spont_stimuli_name.append(stimuli_name)
+            analyze_pupil.append(0)
 
-    speed_spont = speed[start_spont_index:end_spont_index]
-    facemotion_spont = facemotion[start_spont_index:end_spont_index]
-    pupil_spont = pupil[start_spont_index:end_spont_index]
-    time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
-    print("Spontaneous activity time: from", time_stamps_spont[0], "to", time_stamps_spont[-1])
+if len(spont_stimuli_name) > 0 :
+    for el in spont_stimuli_name :
+        id_spont = protocol_df[protocol_df['name'] == el].index[0]
+        spont_stimuli_id.append(id_spont)
 
-    """ ax1 = plt.subplot(311)
-    ax1.plot(time_stamps_spont, speed_spont, color='goldenrod')
-    ax1.set_title('speed')
-    ax1.set_xticks([])
-    ax2 = plt.subplot(312)
-    ax2.plot(time_stamps_spont, facemotion_spont, color='gray')
-    ax2.set_title('facemotion')
-    ax2.set_xticks([])
-    ax3 = plt.subplot(313)
-    ax3.plot(time_stamps_spont, pupil_spont, color='black')
-    ax3.set_title('pupil')
-    ax3.set_xlabel('Time (s)')
-    plt.show() """
+    idx_lim_protocol, spont_stimuli_id_order, F_spontaneous = visual_stim.get_protocol_onset_index(spont_stimuli_id, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.dFoF0)
 
-    # Correlation with dFoF0
-    speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
-    speed_corr = [float(value) for value in speed_corr]
+    analyze_pupil_order = dict(zip(spont_stimuli_id, analyze_pupil))
 
-    facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
-    facemotion_corr = [float(value) for value in facemotion_corr]
+    for i, id  in zip(range(len(spont_stimuli_id_order)), spont_stimuli_id_order):
+        [start_spont_index, end_spont_index] = idx_lim_protocol[i]
 
-    pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[:, 0, :]]
-    pupil_corr = [float(value) for value in pupil_corr]
+        # Correlation with dFoF0
+        speed_spont = speed[start_spont_index:end_spont_index]
+        print(F_spontaneous[i].shape)
+        print(F_spontaneous[i][0, :])
+        speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[i]]
+        speed_corr = [float(value) for value in speed_corr]
+        speed_corr_list.append(speed_corr)
 
+        facemotion_spont = facemotion[start_spont_index:end_spont_index]
+        facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[i]]
+        facemotion_corr = [float(value) for value in facemotion_corr]
+        facemotion_corr_list.append(facemotion_corr)
+
+        pupil_spont = pupil[start_spont_index:end_spont_index]
+        if analyze_pupil_order[id] :
+            pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[i]]
+            pupil_corr = [float(value) for value in pupil_corr]
+            pupil_corr_list.append(pupil_corr)
+
+        time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
+        print(f"Spontaneous activity time {i}: from {time_stamps_spont[0]} s to {time_stamps_spont[-1]} s")
+
+        """ ax1 = plt.subplot(311)
+        ax1.plot(time_stamps_spont, speed_spont, color='goldenrod')
+        ax1.set_title('speed')
+        ax1.set_xticks([])
+        ax2 = plt.subplot(312)
+        ax2.plot(time_stamps_spont, facemotion_spont, color='gray')
+        ax2.set_title('facemotion')
+        ax2.set_xticks([])
+        ax3 = plt.subplot(313)
+        ax3.plot(time_stamps_spont, pupil_spont, color='black')
+        ax3.set_title('pupil')
+        ax3.set_xlabel('Time (s)')
+        plt.show() """
+
+    mean_speed_corr = np.mean(speed_corr_list, axis=0)
+    mean_facemotion_corr = np.mean(facemotion_corr_list, axis=0)
+    if len(pupil_corr_list) > 0 :
+        mean_pupil_corr = np.mean(pupil_corr_list, axis=0)
+    else :
+        nb_rois = len(ca_img_dm.dFoF0)
+        mean_pupil_corr = list(np.zeros(nb_rois))
 else : 
     nb_rois = len(ca_img_dm.dFoF0)
-    speed_corr, facemotion_corr, pupil_corr = list(np.zeros(nb_rois)), list(np.zeros(nb_rois)), list(np.zeros(nb_rois))
+    mean_speed_corr, mean_facemotion_corr, mean_pupil_corr = list(np.zeros(nb_rois)), list(np.zeros(nb_rois)), list(np.zeros(nb_rois))
 
 ################################
 
@@ -200,8 +235,8 @@ stimuli_group = hf.create_group("Stimuli")
 rois_group = hf.create_group("ROIs")
 
 file.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
-if 'grey-20min' in visual_stim.protocol_names :
-    file.create_H5_dataset(correlation, [speed_corr, facemotion_corr, pupil_corr], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
+if len(spont_stimuli_name) > 0 :
+    file.create_H5_dataset(correlation, [speed_corr_list, facemotion_corr_list, pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
 file.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
@@ -220,13 +255,13 @@ data_df = pd.DataFrame({
             'Mean_speed' : np.nanmean(speed), 'Std_speed' : np.std(speed),
             'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.std(facemotion),
             'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.std(pupil),
-            'Spontaneous' : True if 'grey-20min' in visual_stim.protocol_names else False,
-            'Mean_speed_corr' : np.nanmean(speed_corr), 'Mean_fmotion_corr' : np.nanmean(facemotion_corr), 'Mean_pupil_corr' : np.nanmean(pupil_corr), 
+            'Spontaneous' : True if len(spont_stimuli_name) > 0 else False,
+            'Mean_speed_corr' : np.nanmean(mean_speed_corr), 'Mean_fmotion_corr' : np.nanmean(mean_facemotion_corr), 'Mean_pupil_corr' : np.nanmean(mean_pupil_corr), 
             'Mean_dFoF0' : np.nanmean(ca_img_dm.dFoF0)
             }, index=[0]).set_index("Session_id")
 file.compile_xlsx_file(data_df, save_dir)
 
 #---------------------------------- Second GUI ----------------------------------
-main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode, stim_time_period, red_image_path, save_dir)
+main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, mean_speed_corr, mean_facemotion_corr, mean_pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode, stim_time_period, red_image_path, save_dir)
 main_window.show()
 app.exec_()

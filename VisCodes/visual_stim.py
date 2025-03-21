@@ -99,39 +99,46 @@ class VisualStim(object):
             plt.legend(loc="upper right")
             plt.show()
 
-    def get_protocol_onset_index(self, chosen_protocol, F_stim_init_indexes, freq, tseries=None):
+    def get_protocol_onset_index(self, chosen_protocols: list, F_stim_init_indexes, freq, tseries=None):
         """
         Get the start and end index of chosen protocol in a list.
         """
-        protocol_duration = self.protocol_df['duration'][chosen_protocol]
-        protocol_nb_frames = int(protocol_duration * freq)
-        nb_stimuli = self.order.count(chosen_protocol)
-        
+        protocol_nb_frames = []
+        stimuli_ids_order = []
+        nb_stimuli = 0
+
+        for id in chosen_protocols :
+            protocol_duration = self.protocol_df['duration'][id]
+            protocol_nb_frames.append(int(protocol_duration * freq))
+            nb_stimuli += self.order.count(id)
+
         if nb_stimuli > 0 :
-            if tseries is not None :
-                var_protocol = np.ones((len(tseries), nb_stimuli, protocol_nb_frames))
             idx_lim_protocol = []
+            var_protocol = []
             stim = 0
 
             for i in range(len(self.order)):
                 
-                if self.order[i] == chosen_protocol:
+                if self.order[i] in chosen_protocols:
+                    stimuli_ids_order.append(self.order[i])
                     start_spon_index = int(F_stim_init_indexes[i])
-                    idx_lim_protocol.append([start_spon_index, start_spon_index + protocol_nb_frames])
+                    idx_lim_protocol.append([start_spon_index, start_spon_index + protocol_nb_frames[stim]])
                     
                     if tseries is not None :
+                        temp = np.ones((len(tseries), protocol_nb_frames[stim]))
                         for neuron in range(len(tseries)):
-                            F_spontaneous_i = tseries[neuron, start_spon_index: start_spon_index + protocol_nb_frames]
-                            var_protocol[neuron][stim] = F_spontaneous_i
-                        stim += 1
+                            F_spontaneous_i = tseries[neuron, start_spon_index: start_spon_index + protocol_nb_frames[stim]]
+                            temp[neuron] = F_spontaneous_i
+                        var_protocol.append(temp)
+                    stim += 1
         
         else :
             raise Exception("0 stimuli of the chosen protocol has been found")
         
         if tseries is not None :
-            return idx_lim_protocol, var_protocol
+            return idx_lim_protocol, stimuli_ids_order, var_protocol
         else : 
-            return idx_lim_protocol
+            return idx_lim_protocol, stimuli_ids_order
         
 if __name__ == "__main__":
     import Photodiode
@@ -149,7 +156,8 @@ if __name__ == "__main__":
 
     ca_img_dm = Ca_imaging.CaImagingDataManager(base_path)
     F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(visual_stim.real_time_onset, ca_img_dm.time_stamps)
-    idx_lim_protocol, F_spontaneous = visual_stim.get_protocol_onset_index(5, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.raw_F)
+    idx_lim_protocol, stimuli_ids, F_spontaneous = visual_stim.get_protocol_onset_index([5], F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.raw_F)
 
     print(len(idx_lim_protocol))
-    print(F_spontaneous.shape)
+    print(len(F_spontaneous))
+    print(stimuli_ids)
