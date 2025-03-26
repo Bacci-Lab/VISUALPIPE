@@ -83,3 +83,13 @@ def create_output_folder(path, unique_id):
     else :
         raise Exception("Folder should not exist")
     return save_dir, id_version
+
+def save_analysis_settings(data:dict, save_directory):
+    text = ""
+    for el in data :
+        temp = f"{el} : {data[el]}\n"
+        text += temp
+    
+    save_direction_text = os.path.join(save_directory , "analysis_settings.txt")
+    with open(save_direction_text, 'a') as file:
+        file.write(text + '\n')

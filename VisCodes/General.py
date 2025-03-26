@@ -17,6 +17,7 @@ import h5py
 import pickle
 import red_cell_function
 import glob
+import datetime
 
 import utils.file as file
 
@@ -270,6 +271,20 @@ if COMPILE :
                 'Mean_dFoF0' : np.nanmean(ca_img_dm.dFoF0)
                 }, index=[0]).set_index("Session_id")
     file.compile_xlsx_file(data_df, compile_dir)
+
+settings = {"Date" : datetime.date.today(),
+            "Time" : datetime.datetime.now().time(),
+            "Session_id" : unique_id,
+            "Neuron type" : neuron_type,
+            "Neuropil impact factor" : ca_img_dm._neuropil_if,
+            "F0 calculateion method" : F0_method,
+            "2p starting delay" : starting_delay_2p,
+            "Bootstrapping nb of samples" : num_samples,
+            "Analyzed folder" : base_path,
+            "Saving folder" : save_dir,
+            "Compile folder" : compile_dir
+            }
+file.save_analysis_settings(settings, save_dir)
 #---------------------------------- Second GUI ----------------------------------
 main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, mean_speed_corr, mean_facemotion_corr, mean_pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode, stim_time_period, red_image_path, save_dir)
 main_window.show()
