@@ -12,7 +12,7 @@ def Visualize_baseline(smooth_signal, baseline):
     plt.legend()
     plt.show()
 
-def Bootstrapping_fig(bootstrapped_data, real_stim_mean, protocol_name, p_value, Neuron_index,color_histo, save_dir):
+def Bootstrapping_fig(bootstrapped_data, real_stim_mean, protocol_name, p_value, Neuron_index,color_histo, save_dir, file_prefix=''):
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.hist(bootstrapped_data, bins=30, alpha=0.5, edgecolor='white', color=color_histo,
             label='bootstraped baseline')
@@ -24,7 +24,8 @@ def Bootstrapping_fig(bootstrapped_data, real_stim_mean, protocol_name, p_value,
                 va='top', ha='left')
     ax.legend()
     fig_name = " Bootstrapping Neuron " + str(Neuron_index)
-    save_direction = os.path.join(save_dir, protocol_name)
+    foldername = "_".join(list(filter(None, [file_prefix, protocol_name])))
+    save_direction = os.path.join(save_dir, foldername)
     isExist1 = os.path.exists(save_direction)
     if isExist1:
         pass
@@ -65,7 +66,7 @@ def box_plot(F_base, F_stim, save_dir, protocol_name, Neuron_index):
     fig.savefig(save_direction)
     plt.close(fig)
 
-def stim_period(protocol_duration_s,Photon_fre, mean_F_specific_protocol,std_F_specific_protocol, protocol_name, Neuron_index, save_dir):
+def stim_period(protocol_duration_s,Photon_fre, mean_F_specific_protocol,std_F_specific_protocol, protocol_name, Neuron_index, save_dir, file_prefix=''):
     protocol_duration = int(protocol_duration_s  * Photon_fre) + 58
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2,
@@ -85,7 +86,8 @@ def stim_period(protocol_duration_s,Photon_fre, mean_F_specific_protocol,std_F_s
     ax.set_ylabel(r"$\Delta$F/$F_0$")
     ax.set_title(protocol_name + '\n' + fig_name)
     ax.legend(bbox_to_anchor=(0, 1), loc='upper left', frameon=False)
-    save_direction1 = os.path.join(save_dir, protocol_name)
+    foldername = "_".join(list(filter(None, [file_prefix, protocol_name])))
+    save_direction1 = os.path.join(save_dir, foldername)
     isExist1 = os.path.exists(save_direction1)
     if isExist1:
         pass

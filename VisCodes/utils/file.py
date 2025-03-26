@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import pickle
 import json
+import glob
 
 def create_H5_dataset(group, variable, variable_name):
     for name, value in zip(variable_name, variable):
@@ -62,3 +63,23 @@ def get_metadata(path):
             return unique_id, global_protocol, experimenter, subject_id
     else:
         raise Exception("No JSON metadata file exists in this directory")
+    
+def create_output_folder(path, unique_id):
+    version = []
+    i = 1
+    list_dir = glob.glob(os.path.join(path, unique_id + "_output_*"))
+
+    for s in list_dir :
+        splited_string = os.path.basename(s).split("_")
+        version.append(int(splited_string[5]))
+        
+    while i in version :
+        i +=1
+    id_version = str(i)
+
+    save_dir = os.path.join(path, unique_id + "_output_" + id_version)
+    if not os.path.exists(save_dir) :
+        os.makedirs(save_dir)
+    else :
+        raise Exception("Folder should not exist")
+    return save_dir, id_version

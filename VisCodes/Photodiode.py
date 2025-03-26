@@ -62,7 +62,7 @@ def get_base_line(F, F_stim_init_indexes):
 
 def average_image(
     F, protocol_ids, chosen_protocol, protocol_duration_s, protocol_name,
-    F_stim_init_indexes, Photon_fre, num_samples, save_dir
+    F_stim_init_indexes, Photon_fre, num_samples, save_dir, file_prefix=''
 ):
     """
     Analyze neurons for the given protocol and determine valid neurons.
@@ -103,13 +103,13 @@ def average_image(
         # Generate figures
         figures.Bootstrapping_fig(
             fith_bootstraping_base, twenty_perc_F_stim, protocol_name,
-            p_value, Neuron_index, color_histo, save_dir
+            p_value, Neuron_index, color_histo, save_dir, file_prefix
         )
         mean_F_specific_protocol = np.mean(F_specific_protocol, 0)
         std_F_specific_protocol = np.std(F_specific_protocol, 0)
         figures.stim_period(
             protocol_duration_s, Photon_fre, mean_F_specific_protocol,
-            std_F_specific_protocol, protocol_name, Neuron_index, save_dir
+            std_F_specific_protocol, protocol_name, Neuron_index, save_dir, file_prefix
         )
     # Finalize protocol_validity
     protocol_validity = {protocol_name: Valid_Neuron}

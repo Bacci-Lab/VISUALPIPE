@@ -142,7 +142,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.protocolValidity = protocol_validity_npz
         self.stimuliNames = protocol_validity_npz.files
         self.selectedProtocol = protocol_validity_npz[self.stimuliNames[0]]
-        self.background_image_path = os.path.join(save_dir, "Mean_image_grayscale.png")
+        self.background_image_path = os.path.join(os.path.abspath(os.path.join(save_dir, os.pardir)), "Mean_image_grayscale.png")
         self.computed_F = F
         self.Time = Time
         self.Run = Run

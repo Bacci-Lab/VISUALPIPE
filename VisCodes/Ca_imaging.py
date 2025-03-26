@@ -85,13 +85,16 @@ class CaImagingDataManager(object):
             return xml
     
     def save_mean_image(self, save_directory):
-        suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
-        ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
-        mean_image = ((ops['meanImg']))
-        normalized_image = (mean_image - mean_image.min()) / (mean_image.max() - mean_image.min()) * 255
-        normalized_image = normalized_image.astype(np.uint8)
         save_image_dir = os.path.join(save_directory, "Mean_image_grayscale.png")
-        cv2.imwrite(save_image_dir, normalized_image)
+        if not os.path.exists(save_image_dir) :
+            suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
+            ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
+            mean_image = ((ops['meanImg']))
+            normalized_image = (mean_image - mean_image.min()) / (mean_image.max() - mean_image.min()) * 255
+            normalized_image = normalized_image.astype(np.uint8)
+            cv2.imwrite(save_image_dir, normalized_image)
+        else :
+            print("Mean_image_grayscale.png already exist.")
 
     def get_list_of_ROIs_from_iscell(self):
         kept_ROI = [j for j, i in enumerate(self.iscell) if i[0] != 0]

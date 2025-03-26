@@ -16,7 +16,7 @@ class InputWindow(QtWidgets.QMainWindow):
         """Retrieve user inputs from the first GUI."""
         return {
             "base_path": self.ui.data_directory,
-            "save_dir": self.ui.save_directory,
+            "compile_dir": self.ui.compile_directory,
             "neuropil_impact_factor": self.ui.neuropil_if,
             "bootstrap_nb_samples" : self.ui.nb_samples,
             "F0_method": self.ui.f0_method,
@@ -94,14 +94,14 @@ class Ui_MainWindow(object):
         self.second_grid = QGridLayout()
 
         self.lineEdit_data_directory = self.create_line_edit(self.second_grid, 0, 1)
-        self.lineEdit_save_directory = self.create_line_edit(self.second_grid, 1, 1)
+        self.lineEdit_compile_directory = self.create_line_edit(self.second_grid, 1, 1)
 
         self.pushButton_data = QPushButton("Data directory", self.centralwidget)
         self.pushButton_data.clicked.connect(self.open_folder_dialog)
         self.second_grid.addWidget(self.pushButton_data, 0, 0)
 
 
-        self.pushButton_save = QPushButton("Save directory", self.centralwidget)
+        self.pushButton_save = QPushButton("Compile directory", self.centralwidget)
         self.pushButton_save.clicked.connect(self.open_save_folder)
         self.second_grid.addWidget(self.pushButton_save, 1, 0)
 
@@ -115,16 +115,18 @@ class Ui_MainWindow(object):
         self.neuropil_if = float(self.lineEdit_Neuropil_IF.text())
         self.nb_samples = float(self.lineEdit_num_samples.text())
         self.data_directory = str(self.lineEdit_data_directory.text())
-        self.save_directory = str(self.lineEdit_save_directory.text())
+        self.compile_directory = str(self.lineEdit_compile_directory.text())
         
-        if not self.data_directory.strip():
-            self.show_error_popup('No data folder selected. Please select a folder')
-        elif not self.save_directory.strip():
-            self.show_error_popup('No saving folder selected. Please select a folder')
-        elif not self.protocolLoaded :
-            self.show_error_popup('Protocol not loaded. Please select a file')
-        else : 
-            self.statusbar.showMessage('Information saved. Close the window.', 0)
+        if not self.compile_directory.strip():
+            self.show_warning_popup("Do you want to analyze data without final compiling?", self.handle_warning_response)
+
+        if self.compile_directory.strip():
+            if not self.data_directory.strip():
+                self.show_error_popup('No data folder selected. Please select a folder')
+            elif not self.protocolLoaded :
+                self.show_error_popup('Protocol not loaded. Please select a file')
+            else : 
+                self.statusbar.showMessage('Information saved. Close the window.', 0)
 
     def show_error_popup(self, message):
         msg = QtWidgets.QMessageBox()
@@ -133,11 +135,26 @@ class Ui_MainWindow(object):
         msg.setWindowTitle("Error")
         msg.exec_()
     
+    def show_warning_popup(self, message, fct):
+        msg = QtWidgets.QMessageBox()
+        msg.setIcon(QtWidgets.QMessageBox.Warning)
+        msg.setText(message)
+        msg.setWindowTitle("Warning")
+        msg.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        msg.buttonClicked.connect(fct)
+        msg.exec_()
+
+    def handle_warning_response(self, button):
+        if button.text() == "&Yes":
+            self.lineEdit_compile_directory.setText("No compilation")
+            self.compile_directory = "no_compile"
+        elif  button.text() == "&No":
+            self.statusbar.showMessage('', 0)
+    
     def open_folder_dialog(self):
         folder_path = QFileDialog.getExistingDirectory(None, "Select folder containing data")
         if folder_path:
             self.lineEdit_data_directory.setText(folder_path)
-            self.lineEdit_save_directory.setText(folder_path + "/output")
             protocol_filepath = Path(folder_path + "/protocol.json")
             if protocol_filepath.is_file():
                 self.get_protocol(protocol_filepath)
@@ -146,7 +163,7 @@ class Ui_MainWindow(object):
     def open_save_folder(self):
         save_folder = QFileDialog.getExistingDirectory(None, "Select Saving directory")
         if save_folder:
-            self.lineEdit_save_directory.setText(save_folder)
+            self.lineEdit_compile_directory.setText(save_folder)
 
     def create_label(self, text, layout, row, col):
         label = QLabel(text, self.centralwidget)
@@ -199,7 +216,7 @@ class Ui_MainWindow(object):
         model.setStringList(self.protocol_items)
         self.listView.setModel(model)
 
-        self.statusbar.showMessage('Protocol was loaded', 5000)
+        self.statusbar.showMessage('Protocol was loaded', 4000)
         self.protocolLoaded = True
 
     def retranslateUi(self, MainWindow):
