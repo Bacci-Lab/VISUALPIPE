@@ -202,7 +202,7 @@ class CaImagingDataManager(object):
     def compute_F0(self, percentile=10, win=60, sig=60, save_directory=None):
 
         if self._f0_method == 'hamming':
-            f0 = []
+            f0_list = []
             window_duration = 0.5  # Duration of the Hamming window in seconds
             window_size = round(window_duration * self.fs)
             hamming_window = hamming(window_size)
@@ -213,13 +213,16 @@ class CaImagingDataManager(object):
                 F_below_percentile = np.extract(F_smooth <= roi_percentile, F_smooth)
                 f0 = np.mean(F_below_percentile)
                 f0 = [f0]*len(self.fluorescence[i])
-                f0.append(f0)
-            self.f0 = np.array(f0)
+                f0_list.append(f0)
+            self.f0 = np.array(f0_list)
         
         elif self._f0_method  == 'sliding':
             f0 = gaussian_filter1d(self.fluorescence, sig)
             f0 = minimum_filter1d(f0, round(win * self.fs), mode='wrap')
             self.f0 = maximum_filter1d(f0, round(win * self.fs), mode='wrap')
+        
+        else :
+            raise Exception(f"Invalid f0 calculation method selected : {self._f0_method}")
         
         if 'f0' not in self._to_update_frames_list :
             self._to_update_frames_list.append('f0')
@@ -227,7 +230,7 @@ class CaImagingDataManager(object):
             self._to_update_ROIs_list.append('f0')
         
         #Remove Neurons with F0 less than 1 at any point in time
-        invalid_f0_cells = [i for i, val in enumerate(f0) if np.any(val < 1)]
+        invalid_f0_cells = [i for i, val in enumerate(self.f0) if np.any(val < 1)]
 
         #Update metrics and iscell
         self.update_iscell(invalid_f0_cells, save_directory)

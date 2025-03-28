@@ -87,7 +87,7 @@ class Ui_MainWindow(object):
         self.comboBox_neural_type = self.create_combo_box(["PYR", "Other"], self.first_grid, 4, 0)
         self.label_3 = self.create_label("Neural type", self.first_grid, 3, 0)
 
-        self.comboBox_F0_method = self.create_combo_box(["sliding", "Hamming"], self.first_grid, 4, 1)
+        self.comboBox_F0_method = self.create_combo_box(["sliding", "hamming"], self.first_grid, 4, 1)
         self.label_4 = self.create_label("F0 method", self.first_grid, 3, 1)
 
     def setup_second_grid(self):
