@@ -1,25 +1,26 @@
-from Running_computation import compute_speed
-from Ca_imaging import CaImagingDataManager
-from face_camera import FaceCamDataManager
-from visual_stim import VisualStim
 import numpy as np
 from scipy.stats import pearsonr
 import sys
-import General_functions
-from Visuial_GUI import MainWindow
-import Photodiode
 from PyQt5 import QtWidgets
 import os
-from inputUI import InputWindow
 import matplotlib.pyplot as plt
 import pandas as pd
 import h5py
 import pickle
-import red_cell_function
 import glob
 import datetime
 
+from Running_computation import compute_speed
+from Ca_imaging import CaImagingDataManager
+from face_camera import FaceCamDataManager
+from visual_stim import VisualStim
+import General_functions
+from Visuial_GUI import MainWindow
+import Photodiode
+from inputUI import InputWindow
+import red_cell_function
 import utils.file as file
+from trial import Trial
 
 COMPILE = False
 
@@ -142,6 +143,12 @@ stim_time_end = list(visual_stim.real_time_onset + visual_stim.duration)
 stim_time_period = [visual_stim.real_time_onset, stim_time_end]
 
 F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(visual_stim.real_time_onset, ca_img_dm.time_stamps)
+
+#---------------------------------- Compute trials -----------------
+trials = Trial(ca_img_dm, visual_stim, F_stim_init_indexes, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0)
+for i in range(len(protocol_df)):
+    trials.trial_average_rasterplot(i, save_fig_dir) #plot trial-average raster
+    trials.trial_rasterplot(i, 'dFoF0', dt_pre_stim=0.5, dt_post_stim=0, savepath=save_fig_dir) #plot trials raster
 
 #---------------------------------- Bootstrapping ----------------------------------
 protocol_validity = []
