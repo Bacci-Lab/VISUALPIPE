@@ -191,8 +191,9 @@ class CaImagingDataManager(object):
         # Calculate neuropil impact factor if neurons are pyramidals
         if self._neuron_type == "PYR" :
             self.calculate_alpha()
+            print(f"Alpha calculated: {self._neuropil_if}")
         
-        self.fluorescence = self.raw_F - (self._neuropil_if * self.raw_Fneu)
+        self.fluorescence = self.raw_F - self._neuropil_if * self.raw_Fneu
         
         if 'fluorescence' not in self._to_update_frames_list :
             self._to_update_frames_list.append('fluorescence')
@@ -277,6 +278,59 @@ class CaImagingDataManager(object):
         trace_scaled = trace_normalized * (upper - lower) + lower
         
         return trace_scaled
+
+    def plot(self, attr, sigma=0, mean=False, save_dir='', legend=False):
+        if hasattr(self, attr):
+            trace = getattr(self, attr)
+        else :
+            raise Exception("attribute doesn't exist.")
+
+        fig = plt.figure(figsize=(18, 10))
+        if sigma > 0 :
+            prefix = 'filtered '
+            for i in range(len(self._list_ROIs_idx)):
+                plt.plot(gaussian_filter1d(trace[i], sigma), linestyle="--", label=str(i))
+        else :
+            prefix = ''
+            for i in range(len(self._list_ROIs_idx)):
+                plt.plot(trace[i], linestyle="--", label=str(i))
+        if mean :
+            plt.plot(np.mean(trace, axis=0), color='black', label='mean')
+        plt.xlabel('Frame')
+        plt.ylabel(prefix + attr)
+        if legend :
+            plt.legend(loc='upper right')
+        fig.savefig(os.path.join(save_dir, attr+"_traces.png"))
+        plt.close(fig)
+
+    def plot_raster(self, attr, sigma=0, save_dir='') :
+        if hasattr(self, attr):
+            trace = getattr(self, attr)
+        else :
+            raise Exception("attribute doesn't exist.")
+
+        fig = plt.figure(figsize=(18, 10))
+        gs = fig.add_gridspec(6, 25)
+        ax0 = fig.add_subplot(gs[0:5, 0:24])
+        ax0b = fig.add_subplot(gs[0:5, 24])
+        ax1 = fig.add_subplot(gs[5:6, 0:24], sharex=ax0)
+        
+        im = ax0.pcolormesh(trace, cmap='Greys')
+        ax0.set_title(attr)
+        ax0.set_ylabel('Neuron')
+        fig.colorbar(im, cax=ax0b)
+        if sigma > 0 :
+            prefix = 'filtered '
+            ax1.plot(gaussian_filter1d(np.mean(trace, axis=0), 10), color='black')
+        else :
+            prefix = ''
+            ax1.plot(np.mean(trace, axis=0), color='black')
+        ax1.set_xlabel('Frame')
+        ax1.set_ylabel(prefix + 'mean ' + attr)
+        plt.setp(ax0.get_xticklabels(), visible=False)
+
+        fig.savefig(os.path.join(save_dir, attr+"_raster.png"))
+        plt.close(fig)
 
 if __name__ == "__main__":
     starting_delay_2p = 0.1

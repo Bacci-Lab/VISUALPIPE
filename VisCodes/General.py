@@ -115,6 +115,13 @@ print('Number of remaining neurons after F0 calculation  :', len(kept_ROI_F0))
 ca_img_dm.compute_dFoF0()
 computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=5)
 
+#---------------------------------- Plot calcium imaging traces ----------------------
+ca_img_dm.plot('f0', sigma=0, mean=True, save_dir=save_fig_dir, legend=True)
+ca_img_dm.plot('fluorescence', sigma=10, save_dir=save_fig_dir, legend=True)
+ca_img_dm.plot('dFoF0', sigma=10, save_dir=save_fig_dir, legend=True)
+ca_img_dm.plot_raster('fluorescence', sigma=10, save_dir=save_fig_dir)
+ca_img_dm.plot_raster('dFoF0', sigma=10, save_dir=save_fig_dir)
+
 #---------------------------------- Load Photodiode data -----------------------------
 NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
 Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
