@@ -19,9 +19,11 @@ class VisualStim(object):
         self.protocol_df: pd.DataFrame = None
         self.real_time_onset: list = None
         self.dt_shift: list = None
+        self.stimuli_idx: dict = {}
 
         self.get_protocol(base_path)
         self.build_df()
+        self.set_stimulus_order_idxes()
 
     def load_visual_stim(self, base_path):
         visual_stim_path = os.path.join(base_path, "visual-stim.npy")
@@ -60,6 +62,11 @@ class VisualStim(object):
         protocol_df = pd.DataFrame({"id" : self.protocol_ids, "name" : self.protocol_names})
         protocol_duration = pd.DataFrame({ "id" : self.order, "duration" : self.duration}).groupby(by="id").mean()
         self.protocol_df = protocol_df.join(protocol_duration, on="id", how="inner").set_index("id")
+
+    def set_stimulus_order_idxes(self):
+        for protocol_id in self.protocol_ids :
+            indices = [i for i, val in enumerate(self.order) if val == protocol_id]
+            self.stimuli_idx.update({protocol_id : indices})
 
     def realign_from_photodiode(self, Psignal_time, Psignal, plot=False):
         """
