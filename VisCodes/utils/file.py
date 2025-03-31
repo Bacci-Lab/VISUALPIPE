@@ -82,7 +82,12 @@ def create_output_folder(path, unique_id):
         os.makedirs(save_dir)
     else :
         raise Exception("Folder should not exist")
-    return save_dir, id_version
+    
+    save_fig_dir = os.path.join(save_dir, unique_id + "_figures")
+    if not os.path.exists(save_fig_dir) :
+        os.makedirs(save_fig_dir)
+
+    return save_dir, save_fig_dir, id_version
 
 def save_analysis_settings(data:dict, save_directory):
     text = ""

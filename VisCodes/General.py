@@ -54,7 +54,7 @@ unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_pa
 subject_id_anibio = file.get_mouse_id(base_path, subject_id)
 
 #---------------------------------- Create saving folder ----------------------
-save_dir, id_version = file.create_output_folder(base_path, unique_id)
+save_dir, save_fig_dir, id_version = file.create_output_folder(base_path, unique_id)
 
 #---------------------------------- Get red channel path ----------------------
 _, red_image_path = red_cell_function.get_red_channel(base_path)    
