@@ -4,6 +4,8 @@ from visual_stim import VisualStim
 import matplotlib.pyplot as plt
 import math
 import os
+from scipy.ndimage import gaussian_filter1d
+from matplotlib.colors import LinearSegmentedColormap
 
 class Trial(object):
 
@@ -16,7 +18,9 @@ class Trial(object):
         self.dt_post_stim = dt_post_stim
 
         self.trial_fluorescence, self.pre_trial_fluorescence = self.compute_trial(self.ca_attr, self.dt_pre_stim, self.dt_post_stim)
-        self.trial_averaged_zscores, self.pre_trial_averaged_zscores = self.compute_trial_averaged_zscores(self.trial_fluorescence, self.pre_trial_fluorescence)
+        self.average_baselines = self.compute_average_baselines(self.pre_trial_fluorescence)
+        self.trial_averaged_zscores, self.pre_trial_averaged_zscores = self.compute_trial_averaged_zscores(self.trial_fluorescence, self.average_baselines)
+        self.trial_zscores, self.pre_trial_zscores = self.compute_trial_zscores_avb()
         
     def get_baseline(self, roi_id, stimulus_id, attr='fluorescence', dt_pre=0.5):
         """
@@ -75,6 +79,9 @@ class Trial(object):
 
     def zscores(self, baselines, traces):
         return np.array([(traces[i, :] - np.mean(baselines, axis=1)[i]) / np.std(baselines, axis=1)[i] for i in range(traces.shape[0])])
+    
+    def zscores2(self, baselines, traces):
+        return np.array([(traces[i, :] - np.mean(baselines)) / np.std(baselines) for i in range(traces.shape[0])])
 
     def compute_trial(self, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0):
 
@@ -95,6 +102,15 @@ class Trial(object):
 
         return trial_fluorescence, pre_trial_fluorescence
     
+    def compute_average_baselines(self, pre_trial_fluorescence) :
+        average_baselines = {}
+
+        for i in self.visual_stim.stimuli_idx.keys() :
+            average_baseline_i = np.mean(pre_trial_fluorescence[i], axis=1)
+            average_baselines.update({i: average_baseline_i})
+
+        return average_baselines
+
     def compute_trial_zscores(self, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0):
 
         trial_zscores, pre_trial_zscores = {}, {}
@@ -117,12 +133,33 @@ class Trial(object):
 
         return trial_zscores, pre_trial_zscores
 
-    def compute_trial_averaged_zscores(self, trial_fluorescence, pre_trial_fluorescence):
+    def compute_trial_zscores_avb(self):
+        trial_zscores, pre_trial_zscores = {}, {}
+
+        for i in self.visual_stim.stimuli_idx.keys() :
+            roi_zscores, roi_f0_zscores = [], []
+
+            for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
+                roi_baselines = self.get_baseline(roi_idx, i, self.ca_attr, self.dt_pre_stim)
+                roi_trial_fluorescence = self.get_trial_trace(roi_idx, i, self.ca_attr, self.dt_post_stim)
+
+                roi_zscore = self.zscores2(self.average_baselines[i][roi_idx], roi_trial_fluorescence)
+                roi_f0_zscore = self.zscores2(self.average_baselines[i][roi_idx], roi_baselines)
+            
+                roi_zscores.append(roi_zscore)
+                roi_f0_zscores.append(roi_f0_zscore)
+
+            trial_zscores.update({i : np.array(roi_zscores)})
+            pre_trial_zscores.update({i : np.array(roi_f0_zscores)})
+
+        return trial_zscores, pre_trial_zscores
+
+    def compute_trial_averaged_zscores(self, trial_fluorescence, average_baselines):
 
         trial_averaged_zscores, pre_trial_averaged_zscores = {}, {}
 
         for i in self.visual_stim.stimuli_idx.keys() :
-            average_baseline = np.mean(pre_trial_fluorescence[i], axis=1)
+            average_baseline = average_baselines[i]
             average_trial = np.mean(trial_fluorescence[i], axis=1)
 
             trial_averaged_zscores.update({i : self.zscores(average_baseline, average_trial)})
@@ -145,7 +182,7 @@ class Trial(object):
 
         fig = plt.figure(figsize=(10, 6))
         im = plt.pcolormesh(time, np.arange(data.shape[0]), data, cmap='RdBu_r', vmin=-lim, vmax=lim)
-        plt.colorbar(im, label=self.ca_attr + "z-score")
+        plt.colorbar(im, label=self.ca_attr + " z-score")
         plt.axvline(0, color='black', linestyle='--')
         plt.xlabel('Time (s)')
         plt.ylabel('Neuron')
@@ -154,9 +191,8 @@ class Trial(object):
         fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot.png"))
         plt.close(fig)
 
-    def trial_rasterplot(self, stimuli_id, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0, savepath='') :
+    def trial_rasterplot(self, trial_zscores, pre_trial_zscores, stimuli_id, attr='fluorescence', savepath='') :
         
-        trial_zscores, pre_trial_zscores = self.compute_trial_zscores(attr, dt_pre_stim, dt_post_stim)
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stimuli_onset = pre_trial_zscores[stimuli_id].shape[2]
         data = np.concatenate((pre_trial_zscores[stimuli_id], trial_zscores[stimuli_id]), axis=2).reshape((-1, trial_zscores[stimuli_id].shape[2]+pre_trial_zscores[stimuli_id].shape[2]))
