@@ -217,3 +217,41 @@ class Trial(object):
 
         fig.savefig(os.path.join(savepath, stimuli_name + "_trial_rasterplot.png"))
         plt.close(fig)
+
+    def plot_stim_response(self, stimuli_id, neuron_idx, save_dir, file_prefix=''):
+
+        stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
+        stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
+        
+        trial_rois_zscores = self.trial_zscores[stimuli_id][neuron_idx]
+        pre_trial_rois_zscores = self.pre_trial_zscores[stimuli_id][neuron_idx]
+        trial_averaged_zscore = np.array(self.trial_averaged_zscores[stimuli_id][neuron_idx])
+        pre_trial_averaged_zscore = np.array(self.pre_trial_averaged_zscores[stimuli_id][neuron_idx])
+        
+        data_av = np.concatenate((pre_trial_averaged_zscore, trial_averaged_zscore))
+        data = np.concatenate((pre_trial_rois_zscores, trial_rois_zscores), axis=1)
+        time = (np.arange(data_av.shape[0]) - stimuli_onset) / self.ca_img.fs
+        
+        colors, positions = ['midnightblue', 'paleturquoise'], [0, 1]
+        cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=trial_rois_zscores.shape[0])
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2,
+                label='stim start')
+        for i in range(trial_rois_zscores.shape[0]):
+            ax.plot(time, data[i], color=cmap(i), linewidth=0.5, alpha=0.5)
+        ax.plot(time, data_av, color='black', label='Mean', linewidth=2)
+        fig_name = stimuli_name + "_neuron_" + str(neuron_idx)
+        ax.margins(x=0)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel(self.ca_attr + " z-score")
+        ax.set_title(stimuli_name + '\n' + fig_name)
+        ax.legend(bbox_to_anchor=(0, 1), loc='upper left', frameon=False)
+        
+        foldername = "_".join(list(filter(None, [file_prefix, stimuli_name])))
+        save_folder = os.path.join(save_dir, foldername)
+        if not os.path.exists(save_folder):
+            os.mkdir(save_folder)
+        save_path = os.path.join(save_folder, fig_name)
+        fig.savefig(save_path)
+        plt.close(fig)

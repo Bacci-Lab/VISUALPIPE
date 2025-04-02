@@ -151,6 +151,8 @@ for i in range(len(protocol_df)):
     trials.trial_average_rasterplot(i, save_fig_dir) #plot trial-average raster
     trials.trial_rasterplot(trial_zscores, pre_trial_zscores, i, 'dFoF0', savepath=save_fig_dir) #plot trials raster
     #trials.trial_rasterplot(trials.trial_zscores, trials.pre_trial_zscores, i, trials.ca_attr, savepath=save_fig_dir)
+    for k in range(len(ca_img_dm._list_ROIs_idx)):
+        trials.plot_stim_response(i, k, save_dir, file_prefix="_".join([unique_id, id_version]))
 
 #---------------------------------- Bootstrapping ----------------------------------
 protocol_validity = []
