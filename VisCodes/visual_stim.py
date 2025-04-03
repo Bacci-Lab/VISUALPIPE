@@ -20,10 +20,12 @@ class VisualStim(object):
         self.real_time_onset: list = None
         self.dt_shift: list = None
         self.stimuli_idx: dict = {}
+        self.stim_cat: list = []
 
         self.get_protocol(base_path)
         self.build_df()
         self.set_stimulus_order_idxes()
+        self.set_stim_categories()
 
     def load_visual_stim(self, base_path):
         visual_stim_path = os.path.join(base_path, "visual-stim.npy")
@@ -147,6 +149,13 @@ class VisualStim(object):
         else : 
             return idx_lim_protocol, stimuli_ids_order
         
+    def set_stim_categories(self) :
+        for stimuli_name in self.protocol_names :
+            if 'grey' in stimuli_name or 'black' in stimuli_name:
+                self.stim_cat.append(0)
+            else :
+                self.stim_cat.append(1)
+
 if __name__ == "__main__":
     import Photodiode
     import General_functions
