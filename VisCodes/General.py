@@ -116,6 +116,11 @@ print('Number of remaining neurons after F0 calculation  :', len(kept_ROI_F0))
 ca_img_dm.compute_dFoF0()
 computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=5)
 
+#---------------------------------- Compute correlation ----------------------
+speed_corr_list = [pearsonr(speed, ROI)[0] for ROI in ca_img_dm.dFoF0]
+facemotion_corr_list = [pearsonr(facemotion, ROI)[0] for ROI in ca_img_dm.dFoF0]
+pupil_corr_list = [pearsonr(pupil, ROI)[0] for ROI in ca_img_dm.dFoF0]
+
 #---------------------------------- Plot calcium imaging traces ----------------------
 ca_img_dm.plot('f0', sigma=0, mean=True, save_dir=save_fig_dir, legend=True)
 ca_img_dm.plot('fluorescence', sigma=10, save_dir=save_fig_dir, legend=True)
@@ -172,9 +177,9 @@ np.savez(os.path.join(save_dir, filename_protocol), **{key: value for d in proto
 print(protocol_validity)
 
 #---------------------------------- Spontaneous behaviour ----------------------------------
-speed_corr_list = []
-facemotion_corr_list = []
-pupil_corr_list = []
+spont_speed_corr_list = []
+spont_facemotion_corr_list = []
+spont_pupil_corr_list = []
 spont_stimuli_name = []
 spont_stimuli_id = []
 analyze_pupil = []
@@ -204,18 +209,18 @@ if len(spont_stimuli_name) > 0 :
         speed_spont = speed[start_spont_index:end_spont_index]
         speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[i]]
         speed_corr = [float(value) for value in speed_corr]
-        speed_corr_list.append(speed_corr)
+        spont_speed_corr_list.append(speed_corr)
 
         facemotion_spont = facemotion[start_spont_index:end_spont_index]
         facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[i]]
         facemotion_corr = [float(value) for value in facemotion_corr]
-        facemotion_corr_list.append(facemotion_corr)
+        spont_facemotion_corr_list.append(facemotion_corr)
 
         pupil_spont = pupil[start_spont_index:end_spont_index]
         if analyze_pupil_order[id] :
             pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[i]]
             pupil_corr = [float(value) for value in pupil_corr]
-            pupil_corr_list.append(pupil_corr)
+            spont_pupil_corr_list.append(pupil_corr)
 
         time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
         print(f"Spontaneous activity time {i}: from {time_stamps_spont[0]} s to {time_stamps_spont[-1]} s")
@@ -234,10 +239,10 @@ if len(spont_stimuli_name) > 0 :
         ax3.set_xlabel('Time (s)')
         plt.show() """
 
-    mean_speed_corr = np.mean(speed_corr_list, axis=0)
-    mean_facemotion_corr = np.mean(facemotion_corr_list, axis=0)
-    if len(pupil_corr_list) > 0 :
-        mean_pupil_corr = np.mean(pupil_corr_list, axis=0)
+    mean_speed_corr = np.mean(spont_speed_corr_list, axis=0)
+    mean_facemotion_corr = np.mean(spont_facemotion_corr_list, axis=0)
+    if len(spont_pupil_corr_list) > 0 :
+        mean_pupil_corr = np.mean(spont_pupil_corr_list, axis=0)
     else :
         nb_rois = len(ca_img_dm.dFoF0)
         mean_pupil_corr = list(np.zeros(nb_rois))
@@ -260,14 +265,16 @@ H5_dir = os.path.join(save_dir, filename)
 hf = h5py.File(H5_dir, 'w')
 behavioral_group = hf.create_group('Behavioral')
 correlation = behavioral_group.create_group("Correlation")
+spont_correlation = behavioral_group.create_group("Spont_correlation")
 caImg_group = hf.create_group('Ca_imaging')
 caImg_full_trace = caImg_group.create_group('full_trace')
 stimuli_group = hf.create_group("Stimuli")
 rois_group = hf.create_group("ROIs")
 
 file.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
+file.create_H5_dataset(correlation, [speed_corr_list, facemotion_corr_list, pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 if len(spont_stimuli_name) > 0 :
-    file.create_H5_dataset(correlation, [speed_corr_list, facemotion_corr_list, pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
+    file.create_H5_dataset(spont_correlation, [spont_speed_corr_list, spont_facemotion_corr_list, spont_pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
 file.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
