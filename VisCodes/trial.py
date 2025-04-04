@@ -6,10 +6,12 @@ import math
 import os
 from scipy.ndimage import gaussian_filter1d
 from matplotlib.colors import LinearSegmentedColormap
+from sklearn import metrics
 
 class Trial(object):
 
     def __init__(self, ca_img: CaImagingDataManager, visual_stim: VisualStim, ca_onset_idxes, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0):
+
         self.ca_img = ca_img
         self.visual_stim = visual_stim
         self.ca_onset_idxes = np.array(ca_onset_idxes)
@@ -21,6 +23,7 @@ class Trial(object):
         self.average_baselines = self.compute_average_baselines(self.pre_trial_fluorescence)
         self.trial_averaged_zscores, self.pre_trial_averaged_zscores = self.compute_trial_averaged_zscores(self.trial_fluorescence, self.average_baselines)
         self.trial_zscores, self.pre_trial_zscores = self.compute_trial_zscores_avb()
+        self.trial_response_bounds, self.responsive = self.find_responsive_rois()
         
     def get_baseline(self, roi_id, stimulus_id, attr='fluorescence', dt_pre=0.5):
         """
@@ -87,25 +90,28 @@ class Trial(object):
 
         trial_fluorescence, pre_trial_fluorescence = {}, {}
 
-        for i in self.visual_stim.stimuli_idx.keys() :
-            trial_fluorescence_i, baselines_i = [], []
+        for i in self.visual_stim.protocol_ids :
 
-            for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
-                roi_baselines = self.get_baseline(roi_idx, i, attr, dt_pre_stim)
-                roi_trial_fluorescence = self.get_trial_trace(roi_idx, i, attr, dt_post_stim)
+            if self.visual_stim.stim_cat[i] :
 
-                baselines_i.append(roi_baselines)
-                trial_fluorescence_i.append(roi_trial_fluorescence)
+                trial_fluorescence_i, baselines_i = [], []
 
-            trial_fluorescence.update({i : np.array(trial_fluorescence_i)})
-            pre_trial_fluorescence.update({i : np.array(baselines_i)})
+                for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
+                    roi_baselines = self.get_baseline(roi_idx, i, attr, dt_pre_stim)
+                    roi_trial_fluorescence = self.get_trial_trace(roi_idx, i, attr, dt_post_stim)
+
+                    baselines_i.append(roi_baselines)
+                    trial_fluorescence_i.append(roi_trial_fluorescence)
+
+                trial_fluorescence.update({i : np.array(trial_fluorescence_i)})
+                pre_trial_fluorescence.update({i : np.array(baselines_i)})
 
         return trial_fluorescence, pre_trial_fluorescence
     
     def compute_average_baselines(self, pre_trial_fluorescence) :
         average_baselines = {}
 
-        for i in self.visual_stim.stimuli_idx.keys() :
+        for i in self.trial_fluorescence.keys() :
             average_baseline_i = np.mean(pre_trial_fluorescence[i], axis=1)
             average_baselines.update({i: average_baseline_i})
 
@@ -115,7 +121,7 @@ class Trial(object):
 
         trial_zscores, pre_trial_zscores = {}, {}
 
-        for i in self.visual_stim.stimuli_idx.keys() :
+        for i in self.trial_fluorescence.keys() :
             roi_zscores, roi_f0_zscores = [], []
 
             for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
@@ -136,7 +142,7 @@ class Trial(object):
     def compute_trial_zscores_avb(self):
         trial_zscores, pre_trial_zscores = {}, {}
 
-        for i in self.visual_stim.stimuli_idx.keys() :
+        for i in self.trial_fluorescence.keys() :
             roi_zscores, roi_f0_zscores = [], []
 
             for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
@@ -158,7 +164,7 @@ class Trial(object):
 
         trial_averaged_zscores, pre_trial_averaged_zscores = {}, {}
 
-        for i in self.visual_stim.stimuli_idx.keys() :
+        for i in self.trial_fluorescence.keys() :
             average_baseline = average_baselines[i]
             average_trial = np.mean(trial_fluorescence[i], axis=1)
 
@@ -166,6 +172,57 @@ class Trial(object):
             pre_trial_averaged_zscores.update({i : self.zscores(average_baseline, average_baseline)})
 
         return trial_averaged_zscores, pre_trial_averaged_zscores
+
+    def find_responsive_rois(self, dt_min=0.2, auc_min=5):
+
+        responsive = {}
+        trial_response_bounds = {}
+        nb_frames_min = dt_min * self.ca_img.fs
+
+        for i in self.trial_fluorescence.keys():
+            stim_dt = self.visual_stim.protocol_df['duration'][i]
+            trial_response_bounds_roi = []
+            responsive_roi = []
+
+            for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
+                roi_trial = self.trial_averaged_zscores[i][roi_idx]
+                max_val = np.max(roi_trial)
+
+                if max_val > 1 : 
+                    start_idx, end_idx = self.find_bounds(np.argmax(roi_trial), roi_trial >= 0)
+                    if end_idx - start_idx + 1 >= nb_frames_min :
+                        time = np.linspace(0, stim_dt, len(roi_trial))
+                        auc = metrics.auc(time[start_idx:end_idx+1], roi_trial[start_idx:end_idx+1])
+                        if auc >= auc_min :
+                            responsive_roi.append(1)
+                        else :
+                            responsive_roi.append(0)
+                    else :
+                        responsive_roi.append(0)
+                    trial_response_bounds_roi.append([start_idx, end_idx])
+                else :
+                    responsive_roi.append(0)
+                    trial_response_bounds_roi.append([None, None])
+
+            responsive.update({i : responsive_roi})
+            trial_response_bounds.update({i : trial_response_bounds_roi})
+        
+        return trial_response_bounds, responsive
+
+    def find_bounds(self, index, bool_array):
+        n = len(bool_array)
+        
+        i = index - 1
+        while i >= 0 and bool_array[i] == True :
+            i -= 1
+        start_idx = i + 1
+
+        i = index + 1
+        while i < n and bool_array[i] == True :
+            i += 1
+        end_idx = i - 1
+
+        return start_idx, end_idx
 
     def trial_average_rasterplot(self, stimuli_id, savepath='') :
         
@@ -218,29 +275,34 @@ class Trial(object):
         fig.savefig(os.path.join(savepath, stimuli_name + "_trial_rasterplot.png"))
         plt.close(fig)
 
-    def plot_stim_response(self, stimuli_id, neuron_idx, save_dir, file_prefix=''):
+    def plot_stim_response(self, stimuli_id, neuron_idx, save_dir, file_prefix='', show_per_rois=False):
 
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
-        
-        trial_rois_zscores = self.trial_zscores[stimuli_id][neuron_idx]
-        pre_trial_rois_zscores = self.pre_trial_zscores[stimuli_id][neuron_idx]
         trial_averaged_zscore = np.array(self.trial_averaged_zscores[stimuli_id][neuron_idx])
         pre_trial_averaged_zscore = np.array(self.pre_trial_averaged_zscores[stimuli_id][neuron_idx])
         
         data_av = np.concatenate((pre_trial_averaged_zscore, trial_averaged_zscore))
-        data = np.concatenate((pre_trial_rois_zscores, trial_rois_zscores), axis=1)
         time = (np.arange(data_av.shape[0]) - stimuli_onset) / self.ca_img.fs
         
-        colors, positions = ['midnightblue', 'paleturquoise'], [0, 1]
-        cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=trial_rois_zscores.shape[0])
-
+        if show_per_rois :
+            trial_rois_zscores = self.trial_zscores[stimuli_id][neuron_idx]
+            pre_trial_rois_zscores = self.pre_trial_zscores[stimuli_id][neuron_idx]
+            data = np.concatenate((pre_trial_rois_zscores, trial_rois_zscores), axis=1)
+            colors, positions = ['midnightblue', 'paleturquoise'], [0, 1]
+            cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=trial_rois_zscores.shape[0])
+        
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2,
                 label='stim start')
-        for i in range(trial_rois_zscores.shape[0]):
-            ax.plot(time, data[i], color=cmap(i), linewidth=0.5, alpha=0.5)
+        if show_per_rois :
+            for i in range(trial_rois_zscores.shape[0]):
+                ax.plot(time, data[i], color=cmap(i), linewidth=0.5, alpha=0.5)
         ax.plot(time, data_av, color='black', label='Mean', linewidth=2)
+        if self.responsive[stimuli_id][neuron_idx] :
+            start = self.trial_response_bounds[stimuli_id][neuron_idx][0] + stimuli_onset
+            end = self.trial_response_bounds[stimuli_id][neuron_idx][1] + stimuli_onset + 1
+            ax.plot(time[start:end], data_av[start:end], color='green', label='trial response', linewidth=2)
         fig_name = stimuli_name + "_neuron_" + str(neuron_idx)
         ax.margins(x=0)
         ax.set_xlabel("Time (s)")

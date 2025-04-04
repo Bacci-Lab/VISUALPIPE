@@ -147,12 +147,16 @@ F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(visu
 #---------------------------------- Compute trials -----------------
 trials = Trial(ca_img_dm, visual_stim, F_stim_init_indexes, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0)
 trial_zscores, pre_trial_zscores = trials.compute_trial_zscores('dFoF0', dt_pre_stim=0.5, dt_post_stim=0)
-for i in range(len(protocol_df)):
-    trials.trial_average_rasterplot(i, save_fig_dir) #plot trial-average raster
-    trials.trial_rasterplot(trial_zscores, pre_trial_zscores, i, 'dFoF0', savepath=save_fig_dir) #plot trials raster
-    #trials.trial_rasterplot(trials.trial_zscores, trials.pre_trial_zscores, i, trials.ca_attr, savepath=save_fig_dir)
-    for k in range(len(ca_img_dm._list_ROIs_idx)):
-        trials.plot_stim_response(i, k, save_dir, file_prefix="_".join([unique_id, id_version]))
+for i in range(len(protocol_df)):  
+    if visual_stim.stim_cat[i] :
+        trials.trial_average_rasterplot(i, save_fig_dir) #plot trial-average raster
+        trials.trial_rasterplot(trial_zscores, pre_trial_zscores, i, 'dFoF0', savepath=save_fig_dir) #plot trials raster
+        #trials.trial_rasterplot(trials.trial_zscores, trials.pre_trial_zscores, i, trials.ca_attr, savepath=save_fig_dir)
+        for k in range(len(ca_img_dm._list_ROIs_idx)):
+            trials.plot_stim_response(i, k, save_dir, file_prefix="_".join([unique_id, id_version]))
+
+filename = "_".join([unique_id, id_version, 'protocol_validity_2']) + ".npz"
+np.savez(os.path.join(save_dir, filename), trials.responsive)
 
 #---------------------------------- Bootstrapping ----------------------------------
 protocol_validity = []
