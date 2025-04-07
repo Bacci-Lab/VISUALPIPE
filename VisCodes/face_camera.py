@@ -1,6 +1,8 @@
 import numpy as np
 import os
 import datetime
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter1d
 
 class FaceCamDataManager(object) :
     __slots__ = ['time_stamps', 'fs', 'facemotion', 'pupil']
@@ -67,6 +69,30 @@ class FaceCamDataManager(object) :
         pupil = (faceitOutput['pupil_dilation'])
         return facemotion, pupil
             
+    def plot(self, attr='facemotion', filter_kernel=0, save_dir=None) :
+
+        if hasattr(self, attr) and (attr=='facemotion' or attr=='pupil'):
+            data = getattr(self, attr)
+        else :
+            raise Exception("Not a valid attributes to plot.")
+         
+        if filter_kernel > 0 :
+            data = gaussian_filter1d(data, filter_kernel)
+        fig, ax = plt.subplots(figsize=(20, 6))
+        ax.plot(self.time_stamps, data, color='black', linewidth=0.8)
+        ax.margins(x=0)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel(attr + f"filtered with kernel {filter_kernel}")
+        ax.set_title(attr)
+        
+        if save_dir is not None :
+            if not os.path.exists(save_dir):
+                os.mkdir(save_dir)
+            save_path = os.path.join(save_dir, attr)
+            fig.savefig(save_path)
+        else :
+            plt.show()
+        plt.close(fig)
 
 if __name__ == "__main__":
     import Photodiode
@@ -75,3 +101,4 @@ if __name__ == "__main__":
     timestamp_start = Photodiode.get_timestamp_start(base_path)
     face_cam = FaceCamDataManager(base_path, timestamp_start)
     print(face_cam)
+    face_cam.plot(attr='facemotion', filter_kernel=10)
