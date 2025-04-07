@@ -247,16 +247,16 @@ class Red_IMAGE_Adgustment(object):
         label_color = "color: rgb(255, 255, 255);"
 
         SelectCell.setObjectName("MainWindow")
-        SelectCell.resize(1300, 581)
+        SelectCell.resize(1321, 700)
         SelectCell.setStyleSheet("background-color: rgb(27, 27, 27);")
         self.centralwidget = QtWidgets.QWidget(SelectCell)
         self.centralwidget.setObjectName("centralwidget")
         self.graphicsView = QtWidgets.QGraphicsView(self.centralwidget)
-        self.graphicsView.setGeometry(QtCore.QRect(20, 30, 514, 514))
+        self.graphicsView.setGeometry(QtCore.QRect(20, 30, 520, 520))
         self.graphicsView.setObjectName("graphicsView")
         #-------------------second graphic view -------------------
         self.mask_graphicsView = QtWidgets.QGraphicsView(self.centralwidget)
-        self.mask_graphicsView.setGeometry(QtCore.QRect(766, 30, 514, 514))
+        self.mask_graphicsView.setGeometry(QtCore.QRect(781, 30, 520, 520))
         self.mask_graphicsView.setObjectName("mask_graphicsView")
         self.scene_mask = QtWidgets.QGraphicsScene()
         self.mask_graphicsView.setScene(self.scene_mask)
@@ -265,27 +265,27 @@ class Red_IMAGE_Adgustment(object):
         self.graphicsView.setScene(self.scene)
         self.image = GUI_functions.load_init_image(self.scene, red_frame_path)
         # ---------------------------------------- Setup Sliders ------------------------------------
-        self.verticalSlider_brightness = GUI_functions.setup_sliders(self.centralwidget,(630,70), (22,131), -100, 100, 0,"vertical", self.brightness_value)
-        self.verticalSlider_threshold = GUI_functions.setup_sliders(self.centralwidget, (700, 70), (22, 131), 0, 255, 0,"vertical", self.set_threshold)
-        self.verticalSlider_intensity = GUI_functions.setup_sliders(self.centralwidget,(560, 70),(22, 131),0,30,1,"vertical",self.intensity_value)
-        self.Slider_min = GUI_functions.setup_sliders(self.centralwidget,(620, 250),(100, 25),0,500,self.min_area, "horizontal", self.set_min)
-        self.Slider_max = GUI_functions.setup_sliders(self.centralwidget,(620, 280),(100, 25),0,500,self.max_area, "horizontal", self.set_max)
-        self.Slider_blur = GUI_functions.setup_sliders(self.centralwidget, (620, 310), (100, 25), 0, 7, 0,"horizontal", self.blur_values)
+        self.verticalSlider_brightness = GUI_functions.setup_sliders(self.centralwidget,(645,70), (22,131), -100, 100, 0,"vertical", self.brightness_value)
+        self.verticalSlider_threshold = GUI_functions.setup_sliders(self.centralwidget, (715, 70), (22, 131), 0, 255, 0,"vertical", self.set_threshold)
+        self.verticalSlider_intensity = GUI_functions.setup_sliders(self.centralwidget,(575, 70),(22, 131),0,30,1,"vertical",self.intensity_value)
+        self.Slider_min = GUI_functions.setup_sliders(self.centralwidget,(635, 250),(100, 25),0,500,self.min_area, "horizontal", self.set_min)
+        self.Slider_max = GUI_functions.setup_sliders(self.centralwidget,(635, 280),(100, 25),0,500,self.max_area, "horizontal", self.set_max)
+        self.Slider_blur = GUI_functions.setup_sliders(self.centralwidget, (635, 310), (100, 25), 0, 7, 0,"horizontal", self.blur_values)
         #-----------------------------------------SetUp Labels----------------------------------------
-        self.label_threshold_value  = GUI_functions.setup_labels(self.centralwidget,(700, 210),( 20, 10), label_color, self.verticalSlider_threshold.value())
-        self.label_intensity_value  = GUI_functions.setup_labels(self.centralwidget,(560, 210),( 20, 10),  label_color, self.verticalSlider_intensity.value())
-        self.label_blur_value       = GUI_functions.setup_labels(self.centralwidget,(730, 310),( 20, 25),  label_color, self.Slider_blur.value())
-        self.label_brightness_value = GUI_functions.setup_labels(self.centralwidget,(630, 210),( 20, 10), label_color, self.verticalSlider_brightness.value())
-        self.label_min_value        = GUI_functions.setup_labels(self.centralwidget, (730, 250), (20, 25), label_color, self.Slider_min.value())
-        self.label_max_value        = GUI_functions.setup_labels(self.centralwidget,(730, 280),( 20, 25), label_color, self.Slider_max.value())
-        self.label_Brightness = GUI_functions.setup_labels(self.centralwidget, (610, 30),(51,21), label_color)
-        self.label_intensity = GUI_functions.setup_labels(self.centralwidget, (540, 30), (51, 21), label_color)
-        self.label_min_area = GUI_functions.setup_labels(self.centralwidget, (540, 250), (65, 25), label_color)
-        self.label_max_area = GUI_functions.setup_labels(self.centralwidget,(540, 280),( 65, 25), label_color)
-        self.label_blur_kernel = GUI_functions.setup_labels(self.centralwidget, (540, 310), (65, 25), label_color)
-        self.label_Thresholding = GUI_functions.setup_labels(self.centralwidget,(680, 30),( 71, 21), label_color)
-        self.label_red_image = GUI_functions.setup_labels(self.centralwidget,(247, 3),(110, 23),  label_color)
-        self.label_detected_mask = GUI_functions.setup_labels(self.centralwidget,(987, 3),(110, 23), label_color)
+        self.label_threshold_value  = GUI_functions.setup_labels(self.centralwidget,(715, 210),( 20, 10), label_color, self.verticalSlider_threshold.value())
+        self.label_intensity_value  = GUI_functions.setup_labels(self.centralwidget,(575, 210),( 20, 10),  label_color, self.verticalSlider_intensity.value())
+        self.label_blur_value       = GUI_functions.setup_labels(self.centralwidget,(745, 310),( 20, 25),  label_color, self.Slider_blur.value())
+        self.label_brightness_value = GUI_functions.setup_labels(self.centralwidget,(645, 210),( 20, 10), label_color, self.verticalSlider_brightness.value())
+        self.label_min_value        = GUI_functions.setup_labels(self.centralwidget, (745, 250), (20, 25), label_color, self.Slider_min.value())
+        self.label_max_value        = GUI_functions.setup_labels(self.centralwidget,(745, 280),( 20, 25), label_color, self.Slider_max.value())
+        self.label_Brightness = GUI_functions.setup_labels(self.centralwidget, (625, 30),(51,21), label_color)
+        self.label_intensity = GUI_functions.setup_labels(self.centralwidget, (555, 30), (51, 21), label_color)
+        self.label_min_area = GUI_functions.setup_labels(self.centralwidget, (555, 250), (65, 25), label_color)
+        self.label_max_area = GUI_functions.setup_labels(self.centralwidget,(555, 280),( 65, 25), label_color)
+        self.label_blur_kernel = GUI_functions.setup_labels(self.centralwidget, (555, 310), (70, 25), label_color)
+        self.label_Thresholding = GUI_functions.setup_labels(self.centralwidget,(695, 30),( 71, 21), label_color)
+        self.label_red_image = GUI_functions.setup_labels(self.centralwidget,(262, 3),(110, 23),  label_color)
+        self.label_detected_mask = GUI_functions.setup_labels(self.centralwidget,(1002, 3),(110, 23), label_color)
         #--------------------------------------------- PushButton -------------------------------------
         self.pushSave = GUI_functions.setup_pushButton(self.centralwidget, (650, 520), (95, 23), label_color, lambda: self.save_image(self.SavePath))
         self.pushmask = GUI_functions.setup_pushButton(self.centralwidget, (550, 520), (95, 23), label_color, self.show_mask)
@@ -308,6 +308,7 @@ class Red_IMAGE_Adgustment(object):
     def set_max(self, value):
         self.max_area = value
         self.label_max_value.setText(str(self.max_area))
+    
     def blur_values(self, value):
         value = (value*2) + 1
         self.blur_kernel = value
@@ -323,10 +324,12 @@ class Red_IMAGE_Adgustment(object):
         self.intensity = value
         self.label_intensity_value.setText(str(self.intensity))
         self.updated_image = GUI_functions.update_image(self.scene, self.image, self.intensity,self.blur_kernel, self.brightness)
+    
     def brightness_value(self, bightness_val):
         self.brightness = bightness_val
         self.label_brightness_value.setText(str(self.brightness))
         self.updated_image = GUI_functions.update_image(self.scene, self.image, self.intensity,self.blur_kernel, self.brightness)
+    
     def set_threshold(self, threshold_value):
         self.threshold = threshold_value
         self.label_threshold_value.setText(str(self.threshold))
@@ -349,7 +352,6 @@ class Red_IMAGE_Adgustment(object):
         self.adjust_image_exist = True
         return self.adjust_image_exist
 
-
     def save_image(self, SavePath):
         save_background_path = os.path.join(SavePath, "adjusted_image.jpg")
         save_mask_path = os.path.join(SavePath, "red_mask.npy")
@@ -364,9 +366,6 @@ class Red_IMAGE_Adgustment(object):
         else:
             self.show_warning_popup("Please first detect masks")
 
-
-
-
     def show_mask(self):
         if self.hresholded_im is not None:
             self.hresholded_im, self.updated_image = GUI_functions.thresholding(self.image, self.intensity, self.brightness,
@@ -375,7 +374,6 @@ class Red_IMAGE_Adgustment(object):
             GUI_functions.load_mask_image(self.scene_mask, self.image_contours)
         else:
             self.show_warning_popup("Please first adjust thresholding")
-
 
     def load_parameters(self, SavePath):
         parameter_directory = os.path.join(SavePath, "red_image_parameters.txt")
@@ -395,8 +393,6 @@ class Red_IMAGE_Adgustment(object):
         self.Slider_min.setValue(self.min_area)
         self.blur_kernel = int((self.blur_kernel -1)/2)
         self.Slider_blur.setValue(self.blur_kernel)
-
-
 
     def retranslateUi(self, SelectCell):
         _translate = QtCore.QCoreApplication.translate
@@ -419,8 +415,8 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     SelectCell = QtWidgets.QMainWindow()
     # Pass the necessary paths (replace with actual paths if needed)
-    SavePath = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
-    red_frame_path = r"C:\Users\faezeh.rabbani\Desktop\2024_09_03\16-00-59"
+    SavePath = r"C:\Users\mai-an.nguyen\Documents\16-00-59\2024_09_03_16-00-59_output_9"
+    red_frame_path = r"C:\Users\mai-an.nguyen\Documents\16-00-59\SingleImage-red\red.tif"
 
     ui = Red_IMAGE_Adgustment()
     ui.setupUi(SelectCell, SavePath, red_frame_path)
