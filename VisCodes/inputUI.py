@@ -5,6 +5,7 @@ from PyQt5.QtGui import QIntValidator, QDoubleValidator
 import json
 from PyQt5.QtCore import QStringListModel
 from pathlib import Path
+from red_cell_function import get_red_channel
 
 class InputWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -17,6 +18,7 @@ class InputWindow(QtWidgets.QMainWindow):
         return {
             "base_path": self.ui.data_directory,
             "compile_dir": self.ui.compile_directory,
+            "red_image_path": self.ui.red_image_path,
             "neuropil_impact_factor": self.ui.neuropil_if,
             "bootstrap_nb_samples" : self.ui.nb_samples,
             "F0_method": self.ui.f0_method,
@@ -141,6 +143,7 @@ class Ui_MainWindow(object):
 
         self.lineEdit_data_directory = self.create_line_edit(self.second_grid, 0, 1)
         self.lineEdit_compile_directory = self.create_line_edit(self.second_grid, 1, 1)
+        self.lineEdit_red_tif_path = self.create_line_edit(self.second_grid, 2, 1)
 
         self.pushButton_data = QPushButton("Data directory", self.centralwidget)
         self.pushButton_data.clicked.connect(self.open_folder_dialog)
@@ -149,6 +152,10 @@ class Ui_MainWindow(object):
         self.pushButton_save = QPushButton("Compile directory", self.centralwidget)
         self.pushButton_save.clicked.connect(self.open_save_folder)
         self.second_grid.addWidget(self.pushButton_save, 1, 0)
+
+        self.pushButton_red = QPushButton("Red channel", self.centralwidget)
+        self.pushButton_red.clicked.connect(self.get_redfile_path)
+        self.second_grid.addWidget(self.pushButton_red, 2, 0)
 
     def save_changes(self):
         # Retrieve inputs from combo boxes
@@ -168,6 +175,8 @@ class Ui_MainWindow(object):
 
         self.data_directory = str(self.lineEdit_data_directory.text())
         self.compile_directory = str(self.lineEdit_compile_directory.text())
+        text = str(self.lineEdit_red_tif_path.text())
+        self.red_image_path = text if text != '' else None
         
         if not self.compile_directory.strip():
             self.show_warning_popup("Do you want to analyze data without final compiling?", self.handle_warning_response)
@@ -211,11 +220,18 @@ class Ui_MainWindow(object):
             if protocol_filepath.is_file():
                 self.get_protocol(protocol_filepath)
                 self.protocolLoaded = True
+            _, red_image_path = get_red_channel(folder_path)
+            if red_image_path is not None :
+                self.lineEdit_red_tif_path.setText(red_image_path)
 
     def open_save_folder(self):
         save_folder = QFileDialog.getExistingDirectory(None, "Select Saving directory")
         if save_folder:
             self.lineEdit_compile_directory.setText(save_folder)
+
+    def get_redfile_path(self):
+        red_path = QFileDialog.getOpenFileName(None, "Select red channel TIF file", filter="Images (*.tif *.tiff )")
+        self.lineEdit_red_tif_path.setText(red_path[0])
 
     def create_label(self, text, layout, row, col, rowspan=1, colspan=1):
         label = QLabel(text, self.centralwidget)

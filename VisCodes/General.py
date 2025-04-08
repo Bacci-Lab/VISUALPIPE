@@ -39,6 +39,7 @@ inputs = input_window.get_inputs()
 # Convert inputs
 base_path = inputs["base_path"]
 compile_dir = inputs["compile_dir"]
+red_image_path = inputs["red_image_path"]
 if os.path.exists(compile_dir):
     COMPILE = True
 else : 
@@ -67,9 +68,6 @@ subject_id_anibio = file.get_mouse_id(base_path, subject_id)
 
 #---------------------------------- Create saving folder ----------------------
 save_dir, save_fig_dir, id_version = file.create_output_folder(base_path, unique_id)
-
-#---------------------------------- Get red channel path ----------------------
-_, red_image_path = red_cell_function.get_red_channel(base_path)    
 
 #---------------------------------- Load Ca-Imaging data ----------------------
 ca_img_dm = CaImagingDataManager(base_path, neuropil_impact_factor, F0_method, neuron_type, starting_delay_2p)
