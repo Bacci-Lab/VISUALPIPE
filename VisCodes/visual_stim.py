@@ -58,7 +58,7 @@ class VisualStim(object):
             self.protocol_ids.append(0)
             self.protocol_names.append(data["Stimulus"])
         else :
-            print(f"Protocol is neither multiprotocol or stimuli sequence: {data["Presentation"]}")
+            print(f"Protocol is neither multiprotocol or stimuli sequence: {data['Presentation']}")
 
     def build_df(self) :
         protocol_df = pd.DataFrame({"id" : self.protocol_ids, "name" : self.protocol_names})

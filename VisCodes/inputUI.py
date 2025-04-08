@@ -207,9 +207,9 @@ class Ui_MainWindow(object):
                         self.protocol_items.append(f"{self.protocol_number}: {self.protocol_name}")
 
         elif data["Presentation"] == "Stimuli-Sequence" :
-            self.protocol_items.append(f"{0}: {data["Stimulus"]}")
+            self.protocol_items.append(f"{0}: {data['Stimulus']}")
         else :
-            print(f"Protocol is neither multiprotocol or stimuli sequence: {data["Presentation"]}")
+            print(f"Protocol is neither multiprotocol or stimuli sequence: {data['Presentation']}")
 
         # Display the protocols in the QListView
         model = QStringListModel()
