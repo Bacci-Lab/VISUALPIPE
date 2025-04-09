@@ -52,17 +52,21 @@ class CaImagingDataManager(object):
         if len(file) > 1:
             raise Exception("There are multiple Tseries in this directory please keep one")
         elif len(file) == 0 :
-            raise Exception("No Tseries found in the base directory.")
+            print("No Tseries found in the base directory.")
+            directory = base_path
         else:
             directory = os.path.join(base_path, file[0])
         return directory
 
     def load_suite2p(self):
         suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
-        raw_F = np.load(os.path.join(suite2p_path, "F.npy"), allow_pickle=True)
-        raw_Fneu = np.load(os.path.join(suite2p_path, "Fneu.npy"), allow_pickle=True)
-        iscell = np.load(os.path.join(suite2p_path, "iscell.npy"), allow_pickle=True)
-        stat = np.load((os.path.join(suite2p_path, "stat.npy")), allow_pickle=True)
+        if os.path.exists(suite2p_path) :
+            raw_F = np.load(os.path.join(suite2p_path, "F.npy"), allow_pickle=True)
+            raw_Fneu = np.load(os.path.join(suite2p_path, "Fneu.npy"), allow_pickle=True)
+            iscell = np.load(os.path.join(suite2p_path, "iscell.npy"), allow_pickle=True)
+            stat = np.load((os.path.join(suite2p_path, "stat.npy")), allow_pickle=True)
+        else : 
+            raise Exception("suite2p folder not found.")
         return raw_F, raw_Fneu, iscell, stat
 
     def load_xml(self, metadata=False):
