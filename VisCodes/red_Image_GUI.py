@@ -51,7 +51,6 @@ class CustomGraphicsView_red(QGraphicsView):
                 return
         super().mousePressEvent(event)
 
-
 class CustomGraphicsView_green(QGraphicsView):
     objectClicked = pyqtSignal(int)
 
@@ -92,7 +91,6 @@ class CustomGraphicsView_green(QGraphicsView):
                 self.objectClicked.emit(object_index)
                 return
         super().mousePressEvent(event)
-
 
 class SelectCell(QtWidgets.QMainWindow):
     def __init__(self, cell_info, Green_Cell, background_image_path):
@@ -363,6 +361,7 @@ class Red_IMAGE_Adgustment(object):
             cv2.imwrite(save_mask_path_image, self.image_contours)
             print("saving function works")
 
+
         else:
             self.show_warning_popup("Please first detect masks")
 
@@ -412,13 +411,41 @@ class Red_IMAGE_Adgustment(object):
 
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    SelectCell = QtWidgets.QMainWindow()
-    # Pass the necessary paths (replace with actual paths if needed)
-    SavePath = r"C:\Users\mai-an.nguyen\Documents\16-00-59\2024_09_03_16-00-59_output_9"
-    red_frame_path = r"C:\Users\mai-an.nguyen\Documents\16-00-59\SingleImage-red\red.tif"
+    import easygui
+    import pickle
+    import utils.file as file
+    from pathlib import Path
 
+    import red_cell_function
+
+    save_dir = easygui.diropenbox(title='Select folder containing output data')
+    red_image_path = easygui.fileopenbox(title='Select red channel tif')
+    suite2p = easygui.diropenbox(title='Select suite2p folder')
+    path = Path(save_dir)
+    base_path = path.parent.absolute()
+
+    unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
+    id_version = save_dir.split('_')[5]
+
+    # Load Calcium imaging object
+    filename_pkl = "_".join([unique_id, id_version, 'ca_img_obj']) + ".pkl"
+    with open(os.path.join(save_dir, filename_pkl), 'rb') as inp:
+        ca_img_dm = pickle.load(inp)
+
+    # Load ops file
+    suite2p_path = os.path.join(suite2p, "plane0")
+    ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
+
+    app = QtWidgets.QApplication(sys.argv)
+    main_window = QtWidgets.QMainWindow()
     ui = Red_IMAGE_Adgustment()
-    ui.setupUi(SelectCell, SavePath, red_frame_path)
-    SelectCell.show()
+    ui.setupUi(main_window, save_dir, red_image_path)
+    main_window.show()
+    app.exec_()
+
+    adjusted_image_path = os.path.join(save_dir, 'adjusted_image.jpg')
+    only_green_cells = red_cell_function.get_GreenMask(save_dir, ops, ca_img_dm.stat)
+
+    main_window = SelectCell(ca_img_dm.stat, only_green_cells, adjusted_image_path)
+    main_window.show()
     sys.exit(app.exec_())

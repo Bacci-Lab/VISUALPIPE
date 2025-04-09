@@ -113,3 +113,16 @@ def select_mask(red_masks_dir, separated_masks, cell_true=2, save=True, save_red
         return only_green_cells, overlap_cells, only_green_masks, overlap_masks
     else :
         return  only_green_cells, overlap_cells
+
+def get_GreenMask(save_dir, ops, cell_info):
+
+    separated_masks = single_mask(ops, cell_info)
+
+    red_masks_dir = os.path.join(save_dir, "red_mask.npy")
+    if os.path.exists(red_masks_dir) :
+        _, overlap_cells = select_mask(red_masks_dir, separated_masks, save_red_results=save_dir)
+        only_green_cells = np.ones(len(cell_info))
+        only_green_cells[overlap_cells] = 0
+        return only_green_cells
+    else :
+        raise Exception(f"{red_masks_dir} does not exist.")
