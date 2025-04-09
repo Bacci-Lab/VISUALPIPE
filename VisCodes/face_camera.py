@@ -47,7 +47,10 @@ class FaceCamDataManager(object) :
         except :
             print("No FaceCamera-summary.npy file found. Creating one.")
             face_cam_img_path = os.path.join(base_path, "FaceCamera-imgs")
-            self.load_FaceCamera_data(face_cam_img_path)
+            if os.path.exists(face_cam_img_path) :
+                self.load_FaceCamera_data(face_cam_img_path)
+            else :
+                raise Exception('No FaceCamera-imgs folder to create FaceCamera-summary.npy from.S')
             face_camera = np.load(os.path.join(base_path, "FaceCamera-summary.npy"), allow_pickle=True)
         
         if face_camera.item().get('times')[0] > 1e8 :
