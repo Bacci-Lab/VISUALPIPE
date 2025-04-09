@@ -5,11 +5,15 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
 
 class FaceCamDataManager(object) :
-    __slots__ = ['time_stamps', 'fs', 'facemotion', 'pupil']
+    __slots__ = ['time_stamps', 'fs', 'facemotion', 'pupil', 'no_face_data']
     
     def __init__(self, base_path, timestamp_start):
+        self.no_face_data = False
         self.time_stamps = self.get_time_stamps(base_path, timestamp_start)
-        self.fs = 1. / np.mean(self.time_stamps[1:] - self.time_stamps[:-1])
+        if self.time_stamps is not None :
+            self.fs = 1. / np.mean(self.time_stamps[1:] - self.time_stamps[:-1])
+        else :
+            self.fs = None
         self.facemotion, self.pupil = self.get_face_metrics(base_path)
 
     def __str__(self) :
@@ -50,7 +54,9 @@ class FaceCamDataManager(object) :
             if os.path.exists(face_cam_img_path) :
                 self.load_FaceCamera_data(face_cam_img_path)
             else :
-                raise Exception('No FaceCamera-imgs folder to create FaceCamera-summary.npy from.')
+                self.no_face_data = True
+                print("No FaceCamera-imgs folder.")
+                return None
             face_camera = np.load(os.path.join(base_path, "FaceCamera-summary.npy"), allow_pickle=True)
         
         if face_camera.item().get('times')[0] > 1e8 :
@@ -65,7 +71,9 @@ class FaceCamDataManager(object) :
         if not os.path.exists(face_it_path) :
             face_it_path = os.path.join(base_path, "FaceIt", "FaceIt.npz")
             if not os.path.exists(face_it_path) :
-                raise Exception(f"{face_it_path} doesn't exist.")
+                print(f"{face_it_path} doesn't exist.")
+                self.no_face_data = True
+                return None, None
         
         faceitOutput = np.load(face_it_path, allow_pickle=True)
         facemotion = (faceitOutput['motion_energy'])

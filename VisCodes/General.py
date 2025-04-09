@@ -83,8 +83,9 @@ face_cam_dm = FaceCamDataManager(base_path, timestamp_start)
 speed, speed_time_stamps = compute_speed(base_path)
 
 #---------------------------------- Resample facemotion, pupil and speed traces ----------------------------------
-last_F_index = np.argmin(np.abs(ca_img_dm.time_stamps - face_cam_dm.time_stamps[-1]))
-ca_img_dm.cut_frames(last_index=last_F_index) #update metrics with new frames length
+if not face_cam_dm.no_face_data :
+    last_F_index = np.argmin(np.abs(ca_img_dm.time_stamps - face_cam_dm.time_stamps[-1]))
+    ca_img_dm.cut_frames(last_index=last_F_index) #update metrics with new frames length
 new_time_stamps = ca_img_dm.time_stamps
 total_duration = ca_img_dm.time_stamps[-1] - ca_img_dm.time_stamps[0]
 print(f"Total duration of the recording: {total_duration} s")
@@ -95,18 +96,22 @@ speed = General_functions.resample_signal(speed,
                                           new_freq=ca_img_dm.fs,
                                           interp_time=new_time_stamps,
                                           post_smoothing=2./50.)
-pupil = General_functions.resample_signal(face_cam_dm.pupil, 
-                                          t_sample=face_cam_dm.time_stamps, 
-                                          new_freq=ca_img_dm.fs, 
-                                          interp_time=new_time_stamps)
-facemotion = General_functions.resample_signal(face_cam_dm.facemotion, 
-                                               t_sample=face_cam_dm.time_stamps,
-                                               new_freq=ca_img_dm.fs, 
-                                               interp_time=new_time_stamps)
 
-# Normalize
-pupil = General_functions.scale_trace(pupil)
-facemotion = General_functions.scale_trace(facemotion)
+if not face_cam_dm.no_face_data :
+    pupil = General_functions.resample_signal(face_cam_dm.pupil, 
+                                              t_sample=face_cam_dm.time_stamps, 
+                                              new_freq=ca_img_dm.fs, 
+                                              interp_time=new_time_stamps)
+    facemotion = General_functions.resample_signal(face_cam_dm.facemotion, 
+                                                   t_sample=face_cam_dm.time_stamps,
+                                                   new_freq=ca_img_dm.fs, 
+                                                   interp_time=new_time_stamps)
+
+    # Normalize
+    pupil = General_functions.scale_trace(pupil)
+    facemotion = General_functions.scale_trace(facemotion)
+else :
+    facemotion, pupil = [np.nan] * len(new_time_stamps), [np.nan] * len(new_time_stamps)
 
 #---------------------------------- Detect ROIs with bad neuropils ------------------
 ca_img_dm.detect_bad_neuropils()
@@ -165,41 +170,56 @@ min_states_window = {'run' : round(min_run_window * ca_img_dm.fs),
                      'AS' : round(min_as_window * ca_img_dm.fs), 
                      'rest' : round(min_rest_window * ca_img_dm.fs)}
 
-# Facemotion threshold
-real_time_states_facemotion, states_window_facemotion =\
-      behavioral_states.split_stages(speed, facemotion, speed_threshold, facemotion_threshold, 
-                                     ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
-                                     'facemotion', speed_filter_kernel, motion_filter_kernel)
+if not face_cam_dm.no_face_data :
+    # Facemotion threshold
+    real_time_states_facemotion, states_window_facemotion =\
+        behavioral_states.split_stages(speed, facemotion, speed_threshold, facemotion_threshold, 
+                                       ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
+                                       'facemotion', speed_filter_kernel, motion_filter_kernel)
 
-behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
-                             ca_img_dm.time_stamps, real_time_states_facemotion, states_window_facemotion, 
-                             save_fig_dir, speed_threshold, facemotion_threshold,'facemotion', 
-                             speed_filter_kernel, motion_filter_kernel, pupil_filter_kernel, dFoF_filter_kernel,
-                             svg=False)
+    behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
+                                 ca_img_dm.time_stamps, real_time_states_facemotion, states_window_facemotion, 
+                                 save_fig_dir, speed_threshold, facemotion_threshold,'facemotion', 
+                                 speed_filter_kernel, motion_filter_kernel, pupil_filter_kernel, dFoF_filter_kernel,
+                                 svg=False)
 
-run_ratio_facemotion, as_ratio_facemotion, rest_ratio_facemotion =\
-    behavioral_states.time_pie(real_time_states_facemotion, total_duration, 
-                               save_fig_dir,figname="states_duration_pie_facemotion")
+    run_ratio_facemotion, as_ratio_facemotion, rest_ratio_facemotion =\
+        behavioral_states.time_pie(real_time_states_facemotion, total_duration, 
+                                   save_fig_dir,figname="states_duration_pie_facemotion")
 
-# Pupil threshold
-real_time_states_pupil, states_window_pupil =\
-      behavioral_states.split_stages(speed, pupil, speed_threshold, pupil_threshold, 
-                                     ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
-                                     'pupil', speed_filter_kernel, pupil_filter_kernel)
+    # Pupil threshold
+    real_time_states_pupil, states_window_pupil =\
+        behavioral_states.split_stages(speed, pupil, speed_threshold, pupil_threshold, 
+                                       ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
+                                       'pupil', speed_filter_kernel, pupil_filter_kernel)
 
-behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
-                             ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, 
-                             save_fig_dir, speed_threshold, pupil_threshold, 'pupil', 
-                             speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
-                             svg=False)
+    behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
+                                 ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, 
+                                 save_fig_dir, speed_threshold, pupil_threshold, 'pupil', 
+                                 speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
+                                 svg=False)
 
-run_ratio_pupil, as_ratio_pupil, rest_ratio_pupil =\
-      behavioral_states.time_pie(real_time_states_pupil, total_duration, 
-                                 save_fig_dir, figname="states_duration_pie_pupil")
+    run_ratio_pupil, as_ratio_pupil, rest_ratio_pupil =\
+        behavioral_states.time_pie(real_time_states_pupil, total_duration, 
+                                   save_fig_dir, figname="states_duration_pie_pupil")
+else :
+    real_time_states, states_window =\
+        behavioral_states.split_stages_locomotion(speed, speed_threshold, 
+                                                  ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, speed_filter_kernel)
+
+    behavioral_states.stage_plot_locomotion(speed, ca_img_dm.dFoF0, 
+                                            ca_img_dm.time_stamps, real_time_states, states_window, 
+                                            save_fig_dir, speed_threshold, speed_filter_kernel, 
+                                            dFoF_filter_kernel,
+                                            svg=False)
+
+    run_ratio, rest_ratio =\
+        behavioral_states.time_pie_locomotion(real_time_states, total_duration, 
+                                   save_fig_dir,figname="states_duration_pie")
 
 #---------------------------------- Compute trials -----------------
-trials = Trial(ca_img_dm, visual_stim, F_stim_init_indexes, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0)
-trial_zscores, pre_trial_zscores = trials.compute_trial_zscores('dFoF0', dt_pre_stim=0.5, dt_post_stim=0)
+trials = Trial(ca_img_dm, visual_stim, F_stim_init_indexes, attr='fluorescence', dt_pre_stim=1, dt_post_stim=0)
+trial_zscores, pre_trial_zscores = trials.compute_trial_zscores('dFoF0', dt_pre_stim=1, dt_post_stim=0)
 for i in range(len(protocol_df)):  
     if visual_stim.stim_cat[i] :
         trials.trial_average_rasterplot(i, save_fig_dir) #plot trial-average raster
@@ -319,12 +339,16 @@ caImg_full_trace = caImg_group.create_group('full_trace')
 stimuli_group = hf.create_group("Stimuli")
 rois_group = hf.create_group("ROIs")
 states_group = hf.create_group("Arousal states")
-states_with_pupil = states_group.create_group("Arousal states pupil")
-frame_bounds_pupil = states_with_pupil.create_group("Frame bounds")
-time_bounds_pupil = states_with_pupil.create_group("Time bounds")
-states_with_facemotion = states_group.create_group("Arousal states facemotion")
-frame_bounds_facemotion = states_with_facemotion.create_group("Frame bounds")
-time_bounds_facemotion = states_with_facemotion.create_group("Time bounds")
+if not face_cam_dm.no_face_data :
+    states_with_pupil = states_group.create_group("Arousal states pupil")
+    frame_bounds_pupil = states_with_pupil.create_group("Frame bounds")
+    time_bounds_pupil = states_with_pupil.create_group("Time bounds")
+    states_with_facemotion = states_group.create_group("Arousal states facemotion")
+    frame_bounds_facemotion = states_with_facemotion.create_group("Frame bounds")
+    time_bounds_facemotion = states_with_facemotion.create_group("Time bounds")
+else :
+    frame_bounds = states_group.create_group("Frame bounds")
+    time_bounds = states_group.create_group("Time bounds")
 
 file.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
 file.create_H5_dataset(correlation, [speed_corr_list, facemotion_corr_list, pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
@@ -337,10 +361,14 @@ file.create_H5_dataset(stimuli_group, [visual_stim.real_time_onset, F_Time_start
                                     ['time_onset', 'time_onset_caimg_timescale', 'idx_onset_caimg_timescale'])
 file.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
                                     ['0_original', '1_neuropil', '2_alpha', '3_F0'])
-file.create_H5_dataset(frame_bounds_pupil, [states_window_pupil['run'], states_window_pupil['AS'], states_window_pupil['rest']], ['Run', 'AS', 'Rest'])
-file.create_H5_dataset(time_bounds_pupil, [real_time_states_pupil['run'], real_time_states_pupil['AS'], real_time_states_pupil['rest']], ['Run', 'AS', 'Rest'])
-file.create_H5_dataset(frame_bounds_facemotion, [states_window_facemotion['run'], states_window_facemotion['AS'], states_window_facemotion['rest']], ['Run', 'AS', 'Rest'])
-file.create_H5_dataset(time_bounds_facemotion, [real_time_states_facemotion['run'], real_time_states_facemotion['AS'], real_time_states_facemotion['rest']], ['Run', 'AS', 'Rest'])
+if not face_cam_dm.no_face_data :
+    file.create_H5_dataset(frame_bounds_pupil, [states_window_pupil['run'], states_window_pupil['AS'], states_window_pupil['rest']], ['Run', 'AS', 'Rest'])
+    file.create_H5_dataset(time_bounds_pupil, [real_time_states_pupil['run'], real_time_states_pupil['AS'], real_time_states_pupil['rest']], ['Run', 'AS', 'Rest'])
+    file.create_H5_dataset(frame_bounds_facemotion, [states_window_facemotion['run'], states_window_facemotion['AS'], states_window_facemotion['rest']], ['Run', 'AS', 'Rest'])
+    file.create_H5_dataset(time_bounds_facemotion, [real_time_states_facemotion['run'], real_time_states_facemotion['AS'], real_time_states_facemotion['rest']], ['Run', 'AS', 'Rest'])
+else :
+    file.create_H5_dataset(frame_bounds, [states_window['run'], states_window['rest']], ['Run', 'Rest'])
+    file.create_H5_dataset(time_bounds, [real_time_states['run'], real_time_states['rest']], ['Run', 'Rest'])
 
 hf.close()
 
@@ -351,9 +379,9 @@ file.save_pickle(ca_img_dm, save_directory=save_dir, filename=filename)
 if COMPILE :
     data_df = pd.DataFrame({
                 "Session_id": unique_id, "Protocol": global_protocol, "Experimenter": experimenter, "Mouse_id": subject_id_anibio,
-                'Mean_speed' : np.nanmean(speed), 'Std_speed' : np.std(speed),
-                'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.std(facemotion),
-                'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.std(pupil),
+                'Mean_speed' : np.nanmean(speed), 'Std_speed' : np.nanstd(speed),
+                'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.nanstd(facemotion),
+                'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.nanstd(pupil),
                 'Spontaneous' : True if len(spont_stimuli_name) > 0 else False,
                 'Mean_speed_corr' : np.nanmean(mean_speed_corr), 'Mean_fmotion_corr' : np.nanmean(mean_facemotion_corr), 'Mean_pupil_corr' : np.nanmean(mean_pupil_corr), 
                 'Mean_dFoF0' : np.nanmean(ca_img_dm.dFoF0), 
