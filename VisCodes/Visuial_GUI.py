@@ -534,16 +534,22 @@ if __name__ == "__main__":
     import h5py
     import pickle
 
-    #base_path = easygui.diropenbox(title='Select folder containing data')
-    base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
-    save_dir = os.path.join(base_path, "output")
+    import utils.file as file
 
+    base_path = easygui.diropenbox(title='Select base folder containing data')
+    save_dir = easygui.diropenbox(title='Select folder containing output data')
+    red_image_path = easygui.fileopenbox(title='Select red channel tif')
+
+    unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
+    id_version = save_dir.split('_')[5]
+    
     # Load protocol validity
-    protocol_validity_npz = np.load(os.path.join(base_path, "protocol_validity.npz"))
+    filename_protocol = "_".join([unique_id, id_version, 'protocol_validity']) + ".npz"
+    protocol_validity_npz = np.load(os.path.join(save_dir, filename_protocol))
     
     # Load HDF5 file data
-    with h5py.File(os.path.join(save_dir, "postprocessing.h5"), "r") as f:
-
+    filename_h5 = "_".join([unique_id, id_version, 'postprocessing']) + ".h5"
+    with h5py.File(os.path.join(save_dir, filename_h5), "r") as f:
         speed_corr = f['Behavioral']['Correlation']['speed_corr'][()]
         facemotion_corr = f['Behavioral']['Correlation']['facemotion_corr'][()]
         pupil_corr = f['Behavioral']['Correlation']['pupil_corr'][()]
@@ -562,12 +568,18 @@ if __name__ == "__main__":
     stim_time_period = [time_onset, list(time_onset + duration)]
 
     # Load Calcium imaging object
-    with open(os.path.join(save_dir, 'ca_img_obj.pkl'), 'rb') as inp:
+    filename_pkl = "_".join([unique_id, id_version, 'ca_img_obj']) + ".pkl"
+    with open(os.path.join(save_dir, filename_pkl), 'rb') as inp:
         ca_img_dm = pickle.load(inp)
     computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=5)
 
     # Launch App
     app = QtWidgets.QApplication(sys.argv)
-    main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr, computed_F_norm, ca_img_dm.time_stamps, speed, facemotion, pupil, photodiode, stim_time_period, base_path, save_dir)
+    main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, 
+                             speed_corr, facemotion_corr, pupil_corr, 
+                             computed_F_norm, ca_img_dm.time_stamps, 
+                             speed, facemotion, pupil, photodiode, 
+                             stim_time_period, 
+                             red_image_path, save_dir)
     main_window.show()
     app.exec_()
