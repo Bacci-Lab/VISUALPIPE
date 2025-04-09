@@ -533,12 +533,14 @@ if __name__ == "__main__":
     import easygui
     import h5py
     import pickle
+    from pathlib import Path
 
     import utils.file as file
-
-    base_path = easygui.diropenbox(title='Select base folder containing data')
+    
     save_dir = easygui.diropenbox(title='Select folder containing output data')
     red_image_path = easygui.fileopenbox(title='Select red channel tif')
+    path = Path(save_dir)
+    base_path = path.parent.absolute()
 
     unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
     id_version = save_dir.split('_')[5]
