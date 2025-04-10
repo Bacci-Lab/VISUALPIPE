@@ -15,7 +15,7 @@ def scale_trace(data):
     min_val = np.min(data)
     max_val = np.max(data)
     data = (data - min_val) / (max_val - min_val)
-    data = data * 5
+    data = data * 1
     return data
 
 def resample_signal(original_signal,
