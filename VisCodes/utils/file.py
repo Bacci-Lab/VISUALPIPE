@@ -45,7 +45,7 @@ def compile_xlsx_file(df : pd.DataFrame, filepath, filename="compile_per_Tseries
 def get_mouse_id(path, filename):
     excel_path = os.path.join(path, filename+'.xlsx')
     if os.path.exists(excel_path) :
-        df = pd.read_excel(excel_path)
+        df = pd.read_excel(excel_path, header=1, keep_default_na=False)
         return df["Code"].loc[0]
     else :
         print(f"No excel file for mouse metadata found : {excel_path}")
