@@ -317,3 +317,10 @@ class Trial(object):
         save_path = os.path.join(save_folder, fig_name)
         fig.savefig(save_path)
         plt.close(fig)
+
+    def save_protocol_validity(self, save_dir, filename):
+        protocol_validity = []
+        for id in self.responsive.keys():
+            d = {self.visual_stim.protocol_names[id] : self.responsive[id]}
+            protocol_validity.append(d)
+        np.savez(os.path.join(save_dir, filename + ".npz" ), **{key: value for d in protocol_validity for key, value in d.items()})

@@ -228,8 +228,8 @@ for i in range(len(protocol_df)):
         for k in range(len(ca_img_dm._list_ROIs_idx)):
             trials.plot_stim_response(i, k, save_dir, file_prefix="_".join([unique_id, id_version]))
 
-filename = "_".join([unique_id, id_version, 'protocol_validity_2']) + ".npz"
-np.savez(os.path.join(save_dir, filename), trials.responsive)
+filename = "_".join([unique_id, id_version, 'protocol_validity_2'])
+trials.save_protocol_validity(save_dir, filename)
 
 #---------------------------------- Bootstrapping ----------------------------------
 protocol_validity = []
