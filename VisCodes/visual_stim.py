@@ -24,6 +24,7 @@ class VisualStim(object):
 
         self.get_protocol(base_path)
         self.build_df()
+        self.add_subtype_stimuli(visual_stim)
         self.set_stimulus_order_idxes()
         self.set_stim_categories()
 
@@ -64,6 +65,78 @@ class VisualStim(object):
         protocol_df = pd.DataFrame({"id" : self.protocol_ids, "name" : self.protocol_names})
         protocol_duration = pd.DataFrame({ "id" : self.order, "duration" : self.duration}).groupby(by="id").mean()
         self.protocol_df = protocol_df.join(protocol_duration, on="id", how="inner").set_index("id")
+
+    def add_subtype_stimuli(self, visual_stim):
+        qsm_loc, qsm_names, id_qsm = self.get_qsm_loc(visual_stim)
+        cs_type, surround_type, cs_names, surround_names, id_cs, id_s = self.get_surround_mod_type(visual_stim)
+
+        if qsm_loc is not None :
+            self.separate_subtype_stimuli(qsm_loc, qsm_names, id_qsm)
+
+        if cs_type is not None :
+            self.separate_subtype_stimuli(cs_type, cs_names, id_cs)
+        
+        if surround_type is not None :
+            self.separate_subtype_stimuli(surround_type, surround_names, id_s)
+        
+        self.build_df()
+
+    def get_qsm_loc(self, visual_stim) :
+        if 'grating' in self.protocol_names or 'quick-spatial-mapping' in self.protocol_names:
+            id_qsm = self.protocol_df.loc[(self.protocol_df['name'] == 'grating') | (self.protocol_df['name'] == 'quick-spatial-mapping')].index[0]
+            qsm_names = ['center', 'right', 'left', 'up', 'down', 'up-right', 'up-left', 'down-right', 'down-left']
+            map = {'0': 'center', 
+                   '36' : 'right', 
+                   '-36': 'left', 
+                   '23': 'up', 
+                   '-23': 'down', 
+                   '59':'up-right', 
+                   '-13': 'up-left', 
+                   '13':'down-right', 
+                   '-59':'down-left'}
+            qsm_loc = [map[str(int(value))] if id == id_qsm else None for id, value in zip(visual_stim['protocol_id'], np.array(visual_stim['x-center']) + np.array(visual_stim['y-center']))]
+        else :
+            qsm_loc = None
+            qsm_names = None
+            id_qsm = None
+        
+        return qsm_loc, qsm_names, id_qsm
+
+    def get_surround_mod_type(self, visual_stim):
+        if 'center-surround' in self.protocol_names :
+            cs_names = ["iso", "cross"]
+            id_cs = self.protocol_df[self.protocol_df['name'] == 'center-surround'].index[0]
+            cs_type = ['iso' if angle_s == angle and id == id_cs else 'cross' if id == id_cs else None for id, angle, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle'], visual_stim['angle-surround'])]
+        else :
+            cs_type = None
+            cs_names = None
+            id_cs = None
+
+        if 'surround' in self.protocol_names :
+            s_names = ["iso_ctrl", "cross_ctrl"]
+            id_s = self.protocol_df[self.protocol_df['name'] == 'surround'].index[0]
+            surround_type = ['iso_ctrl' if angle_s == angle and id == id_s else 'cross_ctrl' if id == id_s else None for id, angle, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle'], visual_stim['angle-surround'])]
+        else :
+            surround_type = None
+            s_names = None
+            id_s = None
+
+        return cs_type, surround_type, cs_names, s_names, id_cs, id_s
+
+    def separate_subtype_stimuli(self, subtype_stim_order, subtype_stim_names, id_stim) :
+        protocol_name = self.protocol_names[id_stim]
+        self.protocol_names[id_stim] = protocol_name + '-' + subtype_stim_names[0]
+        for name in subtype_stim_names[1:] :
+            i = len(self.protocol_ids)
+            self.protocol_ids.append(i)
+            self.protocol_names.append(protocol_name + '-' + name)
+        
+        for name in subtype_stim_names :
+            indices = [i for i, val in enumerate(subtype_stim_order) if val == name]
+            id_protocol = np.argwhere(np.array(self.protocol_names) == protocol_name + '-' + name).reshape(-1)[0]
+            order_temp = np.array(self.order)
+            order_temp[indices] = id_protocol
+            self.order = order_temp.tolist()
 
     def set_stimulus_order_idxes(self):
         for protocol_id in self.protocol_ids :
@@ -164,6 +237,7 @@ if __name__ == "__main__":
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
 
     visual_stim = VisualStim(base_path)
+    print(visual_stim.protocol_df)
     NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
     Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
                                                               original_freq=acq_freq,
