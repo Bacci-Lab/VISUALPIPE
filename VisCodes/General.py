@@ -316,7 +316,7 @@ if len(spont_stimuli_name) > 0 :
         mean_pupil_corr = list(np.zeros(nb_rois))
 else : 
     nb_rois = len(ca_img_dm.dFoF0)
-    mean_speed_corr, mean_facemotion_corr, mean_pupil_corr = list(np.zeros(nb_rois)), list(np.zeros(nb_rois)), list(np.zeros(nb_rois))
+    mean_speed_corr, mean_facemotion_corr, mean_pupil_corr = np.mean(speed_corr_list), np.mean(facemotion_corr_list), np.mean(pupil_corr_list)
 
 ################################
 
