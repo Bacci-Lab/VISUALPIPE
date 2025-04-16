@@ -224,12 +224,14 @@ class Trial(object):
 
         return start_idx, end_idx
 
-    def trial_average_rasterplot(self, stimuli_id, savepath='') :
+    def trial_average_rasterplot(self, stimuli_id, savepath='', sort=True) :
         
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
         data = np.concatenate((self.pre_trial_averaged_zscores[stimuli_id], self.trial_averaged_zscores[stimuli_id], self.post_trial_averaged_zscores[stimuli_id]), axis=1)
+        if sort :
+            data = np.array([trace for _, trace in sorted(zip(np.mean(self.trial_averaged_zscores[stimuli_id], axis=1), data))])
         time = (np.arange(data.shape[1]) - stimuli_onset) / self.ca_img.fs
 
         vmin, vmax = np.nanmin(data), np.nanmax(data)
@@ -248,7 +250,10 @@ class Trial(object):
         plt.ylabel('Neuron')
         plt.title(stimuli_name)
 
-        fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot.png"))
+        if sort :
+            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot_sorted.png"))
+        else :
+            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot.png"))
         plt.close(fig)
 
     def trial_rasterplot(self, trial_zscores, pre_trial_zscores, post_trial_zscores, stimuli_id, attr='fluorescence', savepath='') :
