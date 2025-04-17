@@ -218,13 +218,21 @@ else :
                                    save_fig_dir,figname="states_duration_pie")
 
 #---------------------------------- Compute trials -----------------
-trials = Trial(ca_img_dm, visual_stim, F_stim_init_indexes, attr='dFoF0', dt_pre_stim=1, dt_post_stim=1)
+trials = Trial(ca_img_dm, visual_stim, F_stim_init_indexes, attr='dFoF0', dt_pre_stim=1, dt_post_stim=0.5)
 trial_zscores, pre_trial_zscores, post_trial_zscores = trials.compute_trial_zscores('dFoF0')
+
+if not face_cam_dm.no_face_data :
+    real_time_states_sorted = behavioral_states.sort_dict_el(real_time_states_pupil)
+else :
+    real_time_states_sorted = behavioral_states.sort_dict_el(real_time_states)
+
 for i in range(len(protocol_df)):  
     if visual_stim.stim_cat[i] :
         trials.trial_average_rasterplot(i, save_fig_dir) #plot trial-average raster
         trials.trial_rasterplot(trial_zscores, pre_trial_zscores, post_trial_zscores, i, 'dFoF0', savepath=save_fig_dir) #plot trials raster
         #trials.trial_rasterplot(trials.trial_zscores, trials.pre_trial_zscores, i, trials.post_trial_zscores, trials.ca_attr, savepath=save_fig_dir)
+        trials.plot_stim_occurence(i, trial_zscores, pre_trial_zscores, real_time_states_sorted, F_Time_start_realigned,
+                                   save_dir, file_prefix="_".join([unique_id, id_version]))
         for k in range(len(ca_img_dm._list_ROIs_idx)):
             trials.plot_stim_response(i, k, save_dir, file_prefix="_".join([unique_id, id_version]))
 

@@ -7,6 +7,8 @@ import os
 from scipy.ndimage import gaussian_filter1d
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn import metrics
+from matplotlib.lines import Line2D
+from matplotlib.ticker import AutoLocator
 
 class Trial(object):
 
@@ -334,6 +336,83 @@ class Trial(object):
         save_path = os.path.join(save_folder, fig_name)
         fig.savefig(save_path)
         plt.close(fig)
+
+    def plot_stim_occurence(self, stimuli_id, trial_zscores, pre_trial_zscores, real_time_states_sorted,
+                            time_onset_aligned_on_ca_img, save_dir='', file_prefix=''):
+        
+        stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
+        stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
+        colors, positions = ['darkred', 'lightgray'], [0, 1]
+        cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=3)
+        color_dict = {'run': cmap(0), 'AS': cmap(1), 'rest': cmap(2)}
+
+        for i in range(trial_zscores[stimuli_id].shape[1]) :
+            
+            stim_onset_idx = self.visual_stim.stimuli_idx[stimuli_id][i]
+            stim_onset_time = np.array(time_onset_aligned_on_ca_img)[stim_onset_idx]
+            time = (np.arange(pre_trial_zscores[stimuli_id].shape[2] + trial_zscores[stimuli_id].shape[2]) -  pre_trial_zscores[stimuli_id].shape[2]) / self.ca_img.fs + stim_onset_time
+            
+            stim_states = self.get_stim_states(real_time_states_sorted, time[0], time[-1])
+
+            fig = plt.figure(figsize=(24, 20))
+            gs = fig.add_gridspec(2*trial_zscores[stimuli_id].shape[0], 1)
+
+            for roi_id in range(trial_zscores[stimuli_id].shape[0]):
+                data = np.concatenate((pre_trial_zscores[stimuli_id][roi_id, i, :], trial_zscores[stimuli_id][roi_id, i, :]))
+                ax = fig.add_subplot(gs[2*roi_id:2*(roi_id+1), 0])
+                ax.plot(time, data, color='black', linewidth=2)
+                ax.axvline(x=stim_onset_time, color='red', linestyle='--', linewidth=2)
+                if self.dt_post_stim > 0 :
+                    ax.axvline(x=stim_onset_time + stim_dt, color='red', linestyle='--', linewidth=2)
+                for k in range(len(stim_states)):
+                    if stim_states[k][1] != 'undefined' :
+                        ax.axvspan(stim_states[k][0][0], stim_states[k][0][1], color=color_dict[stim_states[k][1]], alpha=0.4)
+                ax.set_xticks([])
+                ax.margins(x=0)
+                ax.set_ylabel(f'ROI {roi_id}')
+            
+            run_legend = Line2D([0], [0], color=color_dict['run'], linewidth=5)
+            as_legend = Line2D([0], [0], color=color_dict['AS'], linewidth=5)
+            rest_legend = Line2D([0], [0], color=color_dict['rest'], linewidth=5)
+            ax.legend([run_legend, as_legend, rest_legend], ['run', 'AS', 'rest'], 
+                      loc='lower left', bbox_to_anchor=(1.0, 0.0), prop={'size': 9})
+            ax.set_xlabel("Time (s)")
+            ax.xaxis.set_major_locator(AutoLocator())
+            fig.suptitle(stimuli_name + '\n' + f'Occurence {i} of stimulus')
+
+            fig_name = stimuli_name + "_occ_" + str(i)
+            foldername = "_".join(list(filter(None, [file_prefix, stimuli_name])))
+            save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence')
+            if not os.path.exists(save_folder):
+                os.mkdir(save_folder)
+            save_path = os.path.join(save_folder, fig_name)
+            fig.savefig(save_path)
+            plt.close(fig)
+
+    def get_stim_states(self, real_time_states_sorted, t0, tf):
+
+        l_el, l_key = [], []
+
+        k = 0
+        while k < len(real_time_states_sorted) and \
+            not (real_time_states_sorted[k][0][0] <=  t0 <= real_time_states_sorted[k][0][1]) and \
+                np.abs(real_time_states_sorted[k][0][0] - t0) > np.abs(real_time_states_sorted[k+1][0][0] - t0) :
+            k +=1
+        idx_interval_1 = int(k)
+
+        k = 0
+        while k < len(real_time_states_sorted) and \
+            not (real_time_states_sorted[k][0][0] <=  tf <= real_time_states_sorted[k][0][1]) and \
+                np.abs(real_time_states_sorted[k][0][1] - tf) > np.abs(real_time_states_sorted[k+1][0][1] - tf) :
+            k +=1
+        idx_interval_2 = int(k)
+
+        for i in range(idx_interval_1, idx_interval_2+1):
+            l_el.append([np.max([real_time_states_sorted[i][0][0], t0]), 
+                         np.min([real_time_states_sorted[i][0][1], tf])])
+            l_key.append(real_time_states_sorted[i][1])
+
+        return list(zip(l_el, l_key))
 
     def save_protocol_validity(self, save_dir, filename):
         protocol_validity = []
