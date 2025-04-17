@@ -50,7 +50,6 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     
     if method == 'facemotion' :
         behav_threshold = behav_threshold*(np.std(behavior))
-        print(behav_threshold)
     elif method == "pupil" :
         scaler = MinMaxScaler()
         behavior = scaler.fit_transform(behavior.reshape(-1, 1)).reshape(-1)
@@ -623,3 +622,12 @@ def time_pie_locomotion(real_time_states, total_duration, save_direction, svg=Fa
     plt.close()
 
     return run_dt / total_duration, rest_dt / total_duration
+
+def sort_dict_el(d: dict):
+    l_el, l_key = [], []
+    for key in d.keys():
+        for i in range(len(d[key])):
+            l_el.append(d[key][i])
+            l_key.append(key)
+
+    return sorted(zip(l_el, l_key))
