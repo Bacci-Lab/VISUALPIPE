@@ -67,10 +67,10 @@ class Trial(object):
             baseline_i = trace[roi_id][i-pre_trial_nb_frames : i]
             baseline_list.append(baseline_i)
 
-            trial_trace_i = trace[roi_id][i : i + trial_nb_frames]
+            trial_trace_i = trace[roi_id][i : i + trial_nb_frames + 1]
             trial_trace_list.append(trial_trace_i)
 
-            trial_trace_i = trace[roi_id][i + trial_nb_frames: i + trial_nb_frames + ptrial_nb_frames]
+            trial_trace_i = trace[roi_id][i + trial_nb_frames + 1 : i + trial_nb_frames + ptrial_nb_frames]
             ptrial_trace_list.append(trial_trace_i)
         
         return np.array(baseline_list), np.array(trial_trace_list), np.array(ptrial_trace_list)
@@ -182,7 +182,9 @@ class Trial(object):
         nb_frames_min = dt_min * self.ca_img.fs
 
         for i in self.trial_fluorescence.keys():
-            stim_dt = self.visual_stim.protocol_df['duration'][i]
+            stim_dt = self.visual_stim.protocol_df['duration'][i] + self.dt_post_stim
+            if stim_dt < 2.5 :
+                auc_min = auc_min * stim_dt / 2.5
             trial_response_bounds_roi = []
             responsive_roi = []
 
