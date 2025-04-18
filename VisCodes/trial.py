@@ -235,7 +235,8 @@ class Trial(object):
         stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
         data = np.concatenate((self.pre_trial_averaged_zscores[stimuli_id], self.trial_averaged_zscores[stimuli_id], self.post_trial_averaged_zscores[stimuli_id]), axis=1)
         if sort :
-            data = np.array([trace for _, trace in sorted(zip(np.mean(self.trial_averaged_zscores[stimuli_id], axis=1), data))])
+            idx_sorted = np.argsort(np.mean(self.trial_averaged_zscores[stimuli_id], axis=1))
+            data = data[idx_sorted]
         time = (np.arange(data.shape[1]) - stimuli_onset) / self.ca_img.fs
 
         vmin, vmax = np.nanmin(data), np.nanmax(data)
