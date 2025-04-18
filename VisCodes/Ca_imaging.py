@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class CaImagingDataManager(object):
     __slots__ = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay',
                  'raw_F', 'raw_Fneu', 'fluorescence', 'f0', 'dFoF0',
-                 'iscell', 'stat', 'xml', 'fs', 'time_stamps',
+                 'iscell', 'stat', 'ops', 'xml', 'fs', 'time_stamps',
                  '_to_update_ROIs_list', '_to_update_frames_list', '_list_ROIs_idx']
 
     def __init__(self, base_path, neuropil_if=0.7, f0_method='sliding', neuron_type='PYR', starting_delay=0.1):
@@ -23,7 +23,7 @@ class CaImagingDataManager(object):
         self._neuron_type = neuron_type
         self._starting_delay = starting_delay
 
-        self.raw_F, self.raw_Fneu, self.iscell, self.stat = self.load_suite2p()
+        self.raw_F, self.raw_Fneu, self.iscell, self.stat, self.ops = self.load_suite2p()
         self._to_update_ROIs_list = ['raw_F', 'raw_Fneu', 'stat']
         bad_cells = [i for i, c in enumerate(self.iscell) if c[0] == 0]
         self.remove_ROIs(bad_cells) #remove cells that didn't pass manual curation in suite2p
@@ -65,9 +65,10 @@ class CaImagingDataManager(object):
             raw_Fneu = np.load(os.path.join(suite2p_path, "Fneu.npy"), allow_pickle=True)
             iscell = np.load(os.path.join(suite2p_path, "iscell.npy"), allow_pickle=True)
             stat = np.load((os.path.join(suite2p_path, "stat.npy")), allow_pickle=True)
+            ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
         else : 
             raise Exception("suite2p folder not found.")
-        return raw_F, raw_Fneu, iscell, stat
+        return raw_F, raw_Fneu, iscell, stat, ops
 
     def load_xml(self, metadata=False):
         xml_direction = glob.glob(os.path.join(self._tseries_path, '*.xml'))[0]
