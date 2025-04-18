@@ -77,7 +77,7 @@ class FaceCamDataManager(object) :
         
         faceitOutput = np.load(face_it_path, allow_pickle=True)
         facemotion = (faceitOutput['motion_energy'])
-        pupil = (faceitOutput['pupil_dilation'])
+        pupil = (faceitOutput['pupil_dilation_blinking_corrected'])
         return facemotion, pupil
             
     def plot(self, attr='facemotion', filter_kernel=0, save_dir=None) :
