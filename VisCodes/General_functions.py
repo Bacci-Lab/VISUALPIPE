@@ -11,11 +11,11 @@ def bootstrap(data, num_samples):
     fith_perc_bootstraping = np.percentile(bootstrapped_data, 95, axis=1)
     return bootstrapped_data, fith_perc_bootstraping
 
-def scale_trace(data):
-    min_val = np.min(data)
-    max_val = np.max(data)
+def scale_trace(data, upper=1, lower=0, axis=0, keepdims=True):
+    min_val = np.min(data, axis=axis, keepdims=keepdims)
+    max_val = np.max(data, axis=axis, keepdims=keepdims)
     data = (data - min_val) / (max_val - min_val)
-    data = data * 1
+    data = data * (upper - lower) + lower
     return data
 
 def resample_signal(original_signal,

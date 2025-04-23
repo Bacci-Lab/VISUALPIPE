@@ -1,41 +1,54 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from PyQt5 import QtWidgets
+from PyQt5.QtGui import QIntValidator
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-class Ui_MainWindow(object):
-    def setupUi(self, MainWindow, F, Time, Run,FaceMotion, Pupil, Photodiode, stimulus):
+class TimeSeriesUI(object):
+    
+    def __init__(self, centralwidget, fluorescence, time, speed, facemotion, pupil, photodiode, stimuli):
+        self.centralwidget = centralwidget
+
+        self.fluorescence = fluorescence
+        self.time = time
+        self.speed = speed
+        self.facemotion = facemotion
+        self.pupil = pupil
+        self.photodiode = photodiode
+        self.stimuli = stimuli
+
+        self.setupUi()
+
+    def setupUi(self):
         """
         Sets up the main window UI and initializes the layout, input fields, and graphics view.
-
-        Args:
-            MainWindow: The main application window.
-            datasets: A list of tuples (x, y) representing time series data.
         """
-        # Configure the main window
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(945, 842)
-        MainWindow.setStyleSheet("background-color: rgb(85, 85, 85);")
 
         # Create the central widget and layout
-        self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
 
         # Create a horizontal layout for the checkboxes, line edit, and refresh button
         self.topLayout = QtWidgets.QHBoxLayout()
-        self.Run = Run
-        self.FaceMotion = FaceMotion
-        self.Pupil = Pupil
-        self.Photodiode = Photodiode
 
+        stylesheet = "color: lightgray; font-family: 'Calibri'; font-size: 15px"
 
         # Add checkboxes
         self.checkboxRun = QtWidgets.QCheckBox("Run", self.centralwidget)
+        self.checkboxRun.setChecked(True)
+        self.checkboxRun.setStyleSheet(stylesheet)
         self.checkboxFaceMotion = QtWidgets.QCheckBox("FaceMotion", self.centralwidget)
+        self.checkboxFaceMotion.setChecked(True)
+        self.checkboxFaceMotion.setStyleSheet(stylesheet)
         self.checkboxPupil = QtWidgets.QCheckBox("Pupil", self.centralwidget)
+        self.checkboxPupil.setChecked(True)
+        self.checkboxPupil.setStyleSheet(stylesheet)
         self.checkboxPhotodiode = QtWidgets.QCheckBox("Photodiode", self.centralwidget)
-        self.checkboxstimulus = QtWidgets.QCheckBox("stimulus", self.centralwidget)
+        self.checkboxPhotodiode.setChecked(True)
+        self.checkboxPhotodiode.setStyleSheet(stylesheet)
+        self.checkboxstimulus = QtWidgets.QCheckBox("Stimulus", self.centralwidget)
+        self.checkboxstimulus.setChecked(True)
+        self.checkboxstimulus.setStyleSheet(stylesheet)
 
         # Add checkboxes to the horizontal layout
         self.topLayout.addWidget(self.checkboxRun)
@@ -47,7 +60,9 @@ class Ui_MainWindow(object):
         # Add a line edit for user input and a refresh button
         self.line_edit = QtWidgets.QLineEdit(self.centralwidget)
         self.line_edit.setPlaceholderText("Enter number of series (n)...")
+        self.line_edit.setValidator(QIntValidator())
         self.refresh_button = QtWidgets.QPushButton("Refresh", self.centralwidget)
+        self.refresh_button.setStyleSheet("color: white")
 
         # Add the line edit and button to the horizontal layout
         self.topLayout.addWidget(self.line_edit)
@@ -60,15 +75,12 @@ class Ui_MainWindow(object):
         self.graphicsView = QtWidgets.QGraphicsView(self.centralwidget)
         self.gridLayout.addWidget(self.graphicsView, 1, 0, 1, 2)
 
-        # Set the central widget
-        MainWindow.setCentralWidget(self.centralwidget)
-
         # Connect the refresh button to the plotting function
         self.refresh_button.clicked.connect(
-            lambda: self.plot_n_time_series(F, Time, self.graphicsView, stimulus)
+            lambda: self.plot_n_time_series(self.graphicsView)
         )
 
-    def plot_n_time_series(self, F, Time, graphics_view, stimulus):
+    def plot_n_time_series(self, graphics_view):
         """
         Plots multiple time series on the given graphics view.
 
@@ -77,52 +89,52 @@ class Ui_MainWindow(object):
             Time: A 1D numpy array representing the time points.
             graphics_view: The graphics view where the plot will be displayed.
         """
-        try:
-            # Get the number of time series to plot from the line edit
-            n = int(self.line_edit.text())
-            if n > F.shape[0]:
-                n = F.shape[0]  # Limit to the number of available series in F
+        # Get the number of time series to plot from the line edit
+        if self.line_edit.text() == '' :
+            self.line_edit.setText('0')
+        
+        n = int(self.line_edit.text())
+        if n > self.fluorescence.shape[0]:
+            n = self.fluorescence.shape[0]  # Limit to the number of available series in F
+            self.line_edit.setText(str(n))
 
-            # Clear the existing content in the graphics view
-            self._clear_graphics_view(graphics_view)
+        # Clear the existing content in the graphics view
+        self._clear_graphics_view(graphics_view)
 
-            # Create a new Matplotlib figure and axes
-            fig, ax = plt.subplots()
-            fig.tight_layout(pad=0)  # Remove padding
-            fig.patch.set_facecolor("#3d4242")  # Set figure background color to gray
+        # Create a new Matplotlib figure and axes
+        fig, ax = plt.subplots()
+        fig.tight_layout(pad=0)  # Remove padding
+        fig.patch.set_facecolor("#3d4242")  # Set figure background color to gray
 
-            # Plot the time series with vertical offsets
-            for i in range(n):
-                y = F[i, :]  # Get the i-th time series
-                offset = i * (max(y) - min(y) + 1) * 1.2  # Calculate vertical offset
-                y_offset = y + offset  # Add the offset to the y-values
-                ax.plot(Time, y_offset, color="green")  # Plot with the time array as x-axis
-                # Highlight specified intervals
-            if self.checkboxstimulus.isChecked():
-                if len(stimulus) == 2:  # Ensure stimulus contains two lists
-                    for start, end in zip(stimulus[0], stimulus[1]):  # Pair start and end times
-                        ax.axvspan(start, end, color="white", alpha=0.3, zorder=0)
+        # Plot the time series with vertical offsets
+        for i in range(n):
+            y = self.fluorescence[i, :]  # Get the i-th time series
+            offset = i * (max(y) - min(y) + 1)  # Calculate vertical offset
+            y_offset = y + offset  # Add the offset to the y-values
+            ax.plot(self.time, y_offset, linewidth=0.5, color="forestgreen")  # Plot with the time array as x-axis
+            # Highlight specified intervals
+        
+        if self.checkboxstimulus.isChecked():
+            if len(self.stimuli) == 2:  # Ensure stimulus contains two lists
+                for start, end in zip(self.stimuli[0], self.stimuli[1]):  # Pair start and end times
+                    ax.axvspan(start, end, color="white", alpha=0.2, zorder=0)
 
-            self._plot_secondary_series(ax)
+        self._plot_secondary_series(ax)
 
-            # Customize the plot appearance
-            ax.set_facecolor("#3d4242")  # Set axes background to gray
-            ax.set_xlim(Time[0], Time[-1])  # Set x-axis limits to match Time
-            ax.set_yticks([])  # Remove y-axis ticks
-            ax.tick_params(labelleft=False)  # Remove y-axis labels
-            ax.grid(False)  # Disable the grid
-            for spine in ax.spines.values():  # Remove all spines (box lines around the plot)
-                spine.set_visible(False)
+        # Customize the plot appearance
+        ax.set_facecolor("#3d4242")  # Set axes background to gray
+        ax.set_xlim(self.time[0], self.time[-1])  # Set x-axis limits to match Time
+        ax.set_yticks([])  # Remove y-axis ticks
+        ax.tick_params(labelleft=False)  # Remove y-axis labels
+        ax.grid(False)  # Disable the grid
+        for spine in ax.spines.values():  # Remove all spines (box lines around the plot)
+            spine.set_visible(False)
 
-            # Add zoom and pan interactions
-            self._setup_interaction_events(fig, ax)
+        # Add zoom and pan interactions
+        self._setup_interaction_events(fig, ax)
 
-            # Integrate the Matplotlib canvas into the graphics view
-            self._integrate_canvas_into_view(graphics_view, fig)
-
-        except ValueError:
-            # Show a warning message box if the input is invalid
-            QtWidgets.QMessageBox.warning(None, "Input Error", "Please enter a valid integer.")
+        # Integrate the Matplotlib canvas into the graphics view
+        self._integrate_canvas_into_view(graphics_view, fig)
 
     def _plot_secondary_series(self, ax):
         """
@@ -131,39 +143,42 @@ class Ui_MainWindow(object):
         """
         # Define specific colors for each dataset type
         color_map = {
-            "Run": "red",
-            "FaceMotion": "blue",
-            "Pupil": "plum",
-            "Photodiode": "orange",
+            "Run": "goldenrod",
+            "FaceMotion": "lightgray",
+            "Pupil": "black",
+            "Photodiode": "thistle",
         }
 
         secondary_data = []
         if self.checkboxRun.isChecked():
-            secondary_data.append(("Run", self.Run))
+            secondary_data.append(("Run", self.speed))
         if self.checkboxFaceMotion.isChecked():
-            secondary_data.append(("FaceMotion", self.FaceMotion))
+            secondary_data.append(("FaceMotion", self.facemotion))
         if self.checkboxPupil.isChecked():
-            secondary_data.append(("Pupil", self.Pupil))
+            secondary_data.append(("Pupil", self.pupil))
         if self.checkboxPhotodiode.isChecked():
-            secondary_data.append(("Photodiode", self.Photodiode))
+            secondary_data.append(("Photodiode", self.photodiode))
 
-
+        offset = -1
         # Plot secondary datasets with offsets to avoid overlap
         for i, (label, (x, y)) in enumerate(secondary_data):
-            offset = -1 * (i + 1) * (max(max(y) - min(y), 1) * 1.2)  # Negative vertical offset
+            offset -= (max(y) - min(y))
             y_offset = np.array(y) + offset
             ax.plot(
-                x, y_offset, label=label, linestyle="--", color=color_map.get(label, "gray")
+                x, y_offset, label=label, linewidth=0.5, linestyle="-", color=color_map.get(label, "gray")
             )  # Use the specific color for each label, default to gray
+            offset -= 1
 
         # Add the legend to the plot
-        ax.legend(
+        leg = ax.legend(
             loc="upper right",  # Position of the legend
             fontsize=10,  # Font size
             frameon=True,  # Add a box around the legend
+            labelcolor='lightgray',
             facecolor="#3d4242",  # Legend background color to match the plot
-            edgecolor="white",  # Edge color of the legend box
         )
+        for line in leg.get_lines():
+            line.set_linewidth(2)
 
     def _setup_interaction_events(self, fig, ax):
         panning = {"active": False, "start_xlim": None, "start_ylim": None, "start_pos": None}
@@ -250,52 +265,68 @@ class Ui_MainWindow(object):
         graphics_view.setLayout(layout)
 
 if __name__ == "__main__":
+    from PyQt5.QtCore import Qt
+    import easygui
     import sys
     import os
-    import Photodiode
     import numpy as np
-    import Running_computation
-    import Ca_imaging
+    import h5py
+    from pathlib import Path
+
+    import utils.file as file
     import General_functions
-    import face_camera
-    from visual_stim import VisualStim
+
+    class MainWindow(QtWidgets.QMainWindow):
+        def __init__(self, raw_F, time_stamps, speed, FaceMotion, Pupil, photodiode, stim_time_period):
+            super().__init__(flags=Qt.WindowStaysOnTopHint)
+            self.setWindowTitle("Visualization GUI")
+            self.setStyleSheet("""
+                background-color: rgb(85, 85, 85);
+                gridline-color: rgb(213, 213, 213);
+                border-top-color: rgb(197, 197, 197);
+            """)
+            self.aw, self.ah = 1500, 700
+            self.setGeometry(500, 50, self.aw, self.ah)
+            self.centralwidget = QtWidgets.QWidget(self)
+            self.setCentralWidget(self.centralwidget)
+
+            self.ui = TimeSeriesUI(self.centralwidget, raw_F, time_stamps, speed, FaceMotion, Pupil, photodiode, stim_time_period)
 
     # Generate some sample datasets
-    base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
+    save_dir = easygui.diropenbox(title='Select folder containing output data')
+    path = Path(save_dir)
+    base_path = path.parent.absolute()
 
-    ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=0.1)
-    face_cam = face_camera.FaceCamDataManager(base_path)
+    unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
+    id_version = save_dir.split('_')[5]
     
-    speed, speed_time_stamps = Running_computation.compute_speed(base_path)
-    speed_time_stamps, speed = General_functions.resample_signal(speed, 
-                                                                 t_sample=speed_time_stamps, 
-                                                                 new_freq=ca_img.fs,
-                                                                 post_smoothing=2./50.)
-    speed = (speed_time_stamps, speed)
+    # Load HDF5 file data
+    filename_h5 = "_".join([unique_id, id_version, 'postprocessing']) + ".h5"
+    with h5py.File(os.path.join(save_dir, filename_h5), "r") as f:
 
-    visual_stim = VisualStim(base_path)
-    NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
-    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
-                                                          original_freq=acq_freq,
-                                                          new_freq=1000)
-    visual_stim.realign_from_photodiode(Psignal_time, Psignal)
-    stim_time_period = [visual_stim.real_time_onset, visual_stim.real_time_onset + visual_stim.duration]
-    print(len(stim_time_period))
-    print(len(stim_time_period[0]))
-    print(len(stim_time_period[1]))
+        time_stamps = f['Ca_imaging']['Time'][()]
+        dFoF0 = f['Ca_imaging']['full_trace']['dFoF0'][()]
+        
+        speed_corr = f['Behavioral']['Correlation']['speed_corr'][()]
+        facemotion_corr = f['Behavioral']['Correlation']['facemotion_corr'][()]
+        pupil_corr = f['Behavioral']['Correlation']['pupil_corr'][()]
 
-    raw_F = ca_img.normalize_time_series("raw_F", lower=0, upper=5)
-    Psignal = General_functions.scale_trace(Psignal)
-    pupil = General_functions.scale_trace(face_cam.pupil)
-    facemotion = General_functions.scale_trace(face_cam.facemotion)
+        speed = f['Behavioral']['Speed'][()]
+        facemotion = f['Behavioral']['FaceMotion'][()]
+        pupil = f['Behavioral']['Pupil'][()]
+        photodiode = f['Behavioral']['Photodiode'][()]
 
-    FaceMotion = (face_cam.time_stamps, facemotion)
-    Pupil = (face_cam.time_stamps, pupil)
-    photodiode = (Psignal_time, Psignal)
+        time_onset = f['Stimuli']['time_onset'][()]
+
+    # Load visual stimuli data
+    visual_stim_path = os.path.join(base_path, "visual-stim.npy")
+    visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
+    duration = visual_stim['time_duration']
+    stim_time_period = [time_onset, list(time_onset + duration)]
+
+    dFoF0_norm = General_functions.scale_trace(dFoF0, axis=1)
 
     app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow, raw_F, ca_img.time_stamps, speed, FaceMotion, Pupil, photodiode, stim_time_period)
-    MainWindow.show()
+    main_window = MainWindow(dFoF0_norm, time_stamps, speed, facemotion, pupil, photodiode, stim_time_period)
+    main_window.show()
     sys.exit(app.exec_())
