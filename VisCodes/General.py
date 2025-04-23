@@ -381,8 +381,8 @@ else :
 hf.close()
 
 #---------------------------------- Outputs ----------------------------------
-filename = "_".join([unique_id, id_version, 'ca_img_obj'])
-file.save_pickle(ca_img_dm, save_directory=save_dir, filename=filename)
+filename = "_".join([unique_id, id_version, 'stat.npy'])
+np.save(os.path.join(save_dir, filename), ca_img_dm.stat, allow_pickle=True)
 
 if COMPILE :
     data_df = pd.DataFrame({
