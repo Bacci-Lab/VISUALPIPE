@@ -358,7 +358,7 @@ else :
     frame_bounds = states_group.create_group("Frame bounds")
     time_bounds = states_group.create_group("Time bounds")
 
-file.create_H5_dataset(behavioral_group, [speedAndTimeSt, facemotion, pupil, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
+file.create_H5_dataset(behavioral_group, [speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
 file.create_H5_dataset(correlation, [speed_corr_list, facemotion_corr_list, pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
 if len(spont_stimuli_name) > 0 :
     file.create_H5_dataset(spont_correlation, [spont_speed_corr_list, spont_facemotion_corr_list, spont_pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
