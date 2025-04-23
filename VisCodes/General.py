@@ -72,6 +72,7 @@ save_dir, save_fig_dir, id_version = file.create_output_folder(base_path, unique
 #---------------------------------- Load Ca-Imaging data ----------------------
 ca_img_dm = CaImagingDataManager(base_path, neuropil_impact_factor, F0_method, neuron_type, starting_delay_2p)
 ca_img_dm.save_mean_image(base_path)
+ca_img_dm.save_max_proj_image(base_path)
 detected_roi = ca_img_dm._list_ROIs_idx
 print('Original number of neurons :', len(detected_roi))
 

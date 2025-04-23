@@ -101,6 +101,18 @@ class CaImagingDataManager(object):
         else :
             print("Mean_image_grayscale.png already exist.")
 
+    def save_max_proj_image(self, save_directory):
+        save_image_dir = os.path.join(save_directory, "Max_proj_image_grayscale.png")
+        if not os.path.exists(save_image_dir) :
+            suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
+            ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
+            max_proj_img = ((ops['max_proj']))
+            normalized_image = (max_proj_img - max_proj_img.min()) / (max_proj_img.max() - max_proj_img.min()) * 255
+            normalized_image = normalized_image.astype(np.uint8)
+            cv2.imwrite(save_image_dir, normalized_image)
+        else :
+            print("Max_proj_image_grayscale.png already exist.")
+
     def get_list_of_ROIs_from_iscell(self):
         kept_ROI = [j for j, i in enumerate(self.iscell) if i[0] != 0]
         return kept_ROI
