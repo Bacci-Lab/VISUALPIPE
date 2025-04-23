@@ -120,7 +120,7 @@ def get_GreenMask(save_dir, ops, cell_info):
 
     red_masks_dir = os.path.join(save_dir, "red_mask.npy")
     if os.path.exists(red_masks_dir) :
-        _, overlap_cells = select_mask(red_masks_dir, separated_masks, save_red_results=save_dir)
+        _, overlap_cells = select_mask(red_masks_dir, separated_masks, save=False, save_red_results=save_dir)
         only_green_cells = np.ones(len(cell_info))
         only_green_cells[overlap_cells] = 0
         return only_green_cells
