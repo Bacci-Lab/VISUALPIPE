@@ -14,6 +14,7 @@ def initialize_attributes(obj):
     obj.hresholded_im = None
     obj.image_contours = None
     obj.adjust_image_exist = False
+    
 def setup_sliders(parent, location,size,min,max,set_value, orientation, function):
     Slider = QtWidgets.QSlider(parent)
     Slider.setGeometry(QtCore.QRect(location[0], location[1], size[0], size[1]))
@@ -56,7 +57,10 @@ def update_image(scene, image, intensity,blur_kernel, brightness):
         blur_kernel = blur_kernel
     else:
         blur_kernel = (blur_kernel, blur_kernel)
-    blurred = cv2.GaussianBlur(adjusted_image, blur_kernel, 0)
+    if blur_kernel[0] > 0 :
+        blurred = cv2.GaussianBlur(adjusted_image, blur_kernel, 0)
+    else :
+        blurred = adjusted_image
     pixmap = cv2_to_pixmap(blurred)
     item = QtWidgets.QGraphicsPixmapItem(pixmap)
     scene.addItem(item)
@@ -92,7 +96,10 @@ def thresholding(image,intensity, brightness, th_value, blur_kernel, scene):
         blur_kernel = (blur_kernel, blur_kernel)
     #print("blur_kernel", blur_kernel)
     adjusted_image = cv2.convertScaleAbs(image, alpha=intensity, beta=brightness)
-    blurred = cv2.GaussianBlur(adjusted_image, blur_kernel, 0)
+    if blur_kernel[0] > 0 :
+        blurred = cv2.GaussianBlur(adjusted_image, blur_kernel, 0)
+    else :
+        blurred = adjusted_image
     _, thresh = cv2.threshold(blurred, th_value, 255, cv2.THRESH_BINARY)
     scene.clear()
     pixmap= cv2_to_pixmap(thresh)
