@@ -15,7 +15,7 @@ import utils.file as file
 class RedGUI(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__(flags=Qt.WindowStaysOnTopHint)
-        self.data_folder = QFileDialog.getExistingDirectory(self, caption='Select folder containing output data')
+        self.save_folder = QFileDialog.getExistingDirectory(self, caption='Select folder containing output data')
         self.setupUi()
 
     def setupUi(self):
@@ -65,10 +65,10 @@ class RedGUI(QtWidgets.QMainWindow):
         self.tabWidget.addTab(self.adjust_red_img_tab, 'Adjust Red Channel Image')
                               
         #------------------------- Tab 1 -------------------------
-        self.categorize_ui = CategorizeCells(self.categorize_cells_tab, self.data_folder)
+        self.categorize_ui = CategorizeCells(self.categorize_cells_tab, self.save_folder)
 
         #------------------------- Tab 2 -------------------------
-        self.red_img_adjust_ui = RedImageAdjust(self.adjust_red_img_tab, self.data_folder)
+        self.red_img_adjust_ui = RedImageAdjust(self.adjust_red_img_tab, self.save_folder)
 
         #--------------------------------------------------
         self.retranslateUi()
@@ -77,13 +77,17 @@ class RedGUI(QtWidgets.QMainWindow):
         
         save_dir = QFileDialog.getExistingDirectory(self, caption='Select folder containing output data')
         if save_dir is not None :
-            self.data_folder = save_dir
-            self.categorize_ui.data_folder = save_dir
+            self.save_folder = save_dir
+            self.categorize_ui.save_folder = save_dir
             self.red_img_adjust_ui.save_folder = save_dir
 
-            out = self.categorize_ui.set_attributes()
+            out = self.categorize_ui.set_cell_info()
             if out == -1 :
-                raise Exception(f"Can't find stat or ops file for {self.data_folder}.")
+                raise Exception("No valid stat.npy file.")
+            
+            out = self.categorize_ui.set_ops()
+            if out == -1 :
+                raise Exception("No valid ops.npy file.")
             
             # Load data in GUI
             out = self.categorize_ui.load_data_in_GUI()
@@ -180,25 +184,27 @@ class GreenView(QGraphicsView):
         super().mousePressEvent(event)
 
 class CategorizeCells(object):
-    def __init__(self, centralwidget, data_folder, cell_info=None, ops=None):
+    def __init__(self, centralwidget, save_folder, cell_info=None, ops=None):
 
         self.centralwidget = centralwidget
+        self.save_folder = save_folder
+        self.cell_info = cell_info
+        self.ops = ops
 
         # Initialize tracking lists
         self.currentRedObjects = []
         self.currentGreenObjects = []
-
         self.red_cell_num = 0
         self.green_cell_num = 0
 
-        self.data_folder = data_folder
-        self.cell_info = cell_info
-        self.ops = ops
-
-        if self.cell_info is None or self.ops is None :
-            out = self.set_attributes()
+        if self.cell_info is None :
+            out = self.set_cell_info()
             if out == -1 :
-                raise Exception(f"Can't find stat or ops file for {self.data_folder}.")
+                raise Exception("No valid stat.npy file.")
+        if self.ops is None :
+            out = self.set_ops()
+            if out == -1 :
+                raise Exception("No valid ops.npy file.")
         self.setupUi()
         self.load_data_in_GUI()
 
@@ -281,12 +287,10 @@ class CategorizeCells(object):
 
         self.retranslateUi()
 
-    def set_attributes(self):
+    def set_ops(self):
 
-        path = Path(self.data_folder)
+        path = Path(self.save_folder)
         base_path = path.parent.absolute()
-        unique_id, _, _, _ = file.get_metadata(base_path)
-        id_version = self.data_folder.split('_')[5]
 
         # Load ops file
         tseries = [f for f in os.listdir(base_path) if f.startswith("TSeries")]
@@ -298,19 +302,38 @@ class CategorizeCells(object):
         
         suite2p_path = os.path.join(directory, "suite2p", "plane0")
         if os.path.exists(suite2p_path) :
-            self.ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
+            self.ops = np.load(os.path.join(suite2p_path, "ops.npy"), allow_pickle=True).item()
         else :
-            print(f"{suite2p_path} doesn't exists. Select another folder.")
-            return -1
+            print(f"{suite2p_path} doesn't exists. Select op.npy file.")
+            ops_path = QFileDialog.getOpenFileName(self.centralwidget, caption='Select ops.npy file', filter="npy(*.npy)")[0]
+            if 'ops' in ops_path: 
+                self.ops = np.load(ops_path, allow_pickle=True).item()
+            else :
+                print(f"Selected file not valid ({ops_path}).")
+                return -1
+
+        return 0
+    
+    def set_cell_info(self):
+
+        path = Path(self.save_folder)
+        base_path = path.parent.absolute()
+        unique_id, _, _, _ = file.get_metadata(base_path)
+        id_version = self.save_folder.split('_')[5]
 
         # Load stat file
         filename = "_".join([unique_id, id_version, 'stat.npy'])
-        stat_path = os.path.join(self.data_folder, filename)
+        stat_path = os.path.join(self.save_folder, filename)
         if os.path.exists(stat_path) :
             self.cell_info = np.load(stat_path, allow_pickle=True)
         else :
-            print(f"{stat_path} doesn't exists. Select another folder.")
-            return -1
+            print(f"{stat_path} doesn't exists. Select stat.npy file.")
+            stat_path = QFileDialog.getOpenFileName(self.centralwidget, caption='Select stat.npy file', filter="npy(*.npy)")[0]
+            if 'stat' in stat_path: 
+                self.cell_info = np.load(stat_path, allow_pickle=True)
+            else :
+                print(f"Selected file not valid ({stat_path}).")
+                return -1
 
         return 0
         
@@ -343,29 +366,29 @@ class CategorizeCells(object):
         return self.currentRedObjects, self.currentGreenObjects
 
     def save_npy_files(self):
-        save_direction1 = os.path.join(self.data_folder, 'red_green_cells.npy')
-        save_direction2 = os.path.join(self.data_folder, 'only_green.npy')
+        save_direction1 = os.path.join(self.save_folder, 'red_green_cells.npy')
+        save_direction2 = os.path.join(self.save_folder, 'only_green.npy')
         np.save(save_direction1, self.currentRedObjects, allow_pickle=True)
         np.save(save_direction2, self.currentGreenObjects, allow_pickle=True)
 
     def load_data_in_GUI(self):
         
         # Load red_green_cells.npy file
-        red_green_filepath = os.path.join(self.data_folder, 'red_green_cells.npy')
+        red_green_filepath = os.path.join(self.save_folder, 'red_green_cells.npy')
         if os.path.exists(red_green_filepath) :
             data = np.load(red_green_filepath, allow_pickle=True)
             only_green_cells = np.ones(len(self.cell_info))
             only_green_cells[data] = 0
         else :
-            red_masks_dir = os.path.join(self.data_folder, "red_mask.npy")
+            red_masks_dir = os.path.join(self.save_folder, "red_mask.npy")
             if os.path.exists(red_masks_dir) :
-                only_green_cells = red_cell_function.get_GreenMask(self.data_folder, self.ops, self.cell_info)
+                only_green_cells = red_cell_function.get_GreenMask(self.save_folder, self.ops, self.cell_info)
             else : 
                 print("red_mask.npy doesn't exist. Compute masks first.")
                 return -1
         
         # Check existence of adjusted_image.jpg file
-        background_image_path = os.path.join(self.data_folder, 'adjusted_image.jpg')
+        background_image_path = os.path.join(self.save_folder, 'adjusted_image.jpg')
         if not os.path.exists(background_image_path):
             print("adjusted_image.jpg doesn't exist. Compute masks first.")
             return -1
@@ -607,7 +630,7 @@ class RedImageAdjust(object):
             print('No parameters file selected.')
     
     def load_red_tif(self):
-        red_frame_path = QFileDialog.getOpenFileName(self.centralwidget, caption='Select red channel tif')[0]
+        red_frame_path = QFileDialog.getOpenFileName(self.centralwidget, caption='Select red channel tif', filter="Images(*.tif *.tiff)")[0]
         
         if red_frame_path != '' :
             self.red_frame_path = red_frame_path
