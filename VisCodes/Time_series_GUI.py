@@ -1,13 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import h5py
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QIntValidator
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import General_functions
 
 class TimeSeriesUI(object):
     
     def __init__(self, centralwidget, fluorescence, time, speed, facemotion, pupil, photodiode, stimuli):
+
         self.centralwidget = centralwidget
 
         self.fluorescence = fluorescence
@@ -19,6 +22,28 @@ class TimeSeriesUI(object):
         self.stimuli = stimuli
 
         self.setupUi()
+
+    @classmethod
+    def from_file(cls, centralwidget, h5_filepath, visual_stim_filepath):
+        with h5py.File(h5_filepath, "r") as f:
+            time_stamps = f['Ca_imaging']['Time'][()]
+            dFoF0 = f['Ca_imaging']['full_trace']['dFoF0'][()]
+
+            speed = f['Behavioral']['Speed'][()]
+            facemotion = f['Behavioral']['FaceMotion'][()]
+            pupil = f['Behavioral']['Pupil'][()]
+            photodiode = f['Behavioral']['Photodiode'][()]
+
+            time_onset = f['Stimuli']['time_onset'][()]
+        
+        # Load visual stimuli data
+        visual_stim = np.load(visual_stim_filepath, allow_pickle=True).item()
+        duration = visual_stim['time_duration']
+        stim_time_period = [time_onset, list(time_onset + duration)]
+
+        dFoF0_norm = General_functions.scale_trace(dFoF0, axis=1)
+        
+        return cls(centralwidget, dFoF0_norm, time_stamps, speed, facemotion, pupil, photodiode, stim_time_period)
 
     def setupUi(self):
         """
@@ -269,15 +294,12 @@ if __name__ == "__main__":
     import easygui
     import sys
     import os
-    import numpy as np
-    import h5py
     from pathlib import Path
 
     import utils.file as file
-    import General_functions
 
     class MainWindow(QtWidgets.QMainWindow):
-        def __init__(self, raw_F, time_stamps, speed, FaceMotion, Pupil, photodiode, stim_time_period):
+        def __init__(self, h5_filepath, visual_stim_filepath):
             super().__init__(flags=Qt.WindowStaysOnTopHint)
             self.setWindowTitle("Visualization GUI")
             self.setStyleSheet("""
@@ -290,7 +312,7 @@ if __name__ == "__main__":
             self.centralwidget = QtWidgets.QWidget(self)
             self.setCentralWidget(self.centralwidget)
 
-            self.ui = TimeSeriesUI(self.centralwidget, raw_F, time_stamps, speed, FaceMotion, Pupil, photodiode, stim_time_period)
+            self.ui = TimeSeriesUI.from_file(self.centralwidget, h5_filepath, visual_stim_filepath)
 
     # Generate some sample datasets
     save_dir = easygui.diropenbox(title='Select folder containing output data')
@@ -299,34 +321,13 @@ if __name__ == "__main__":
 
     unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
     id_version = save_dir.split('_')[5]
-    
-    # Load HDF5 file data
+
     filename_h5 = "_".join([unique_id, id_version, 'postprocessing']) + ".h5"
-    with h5py.File(os.path.join(save_dir, filename_h5), "r") as f:
+    h5_filepath = os.path.join(save_dir, filename_h5)
 
-        time_stamps = f['Ca_imaging']['Time'][()]
-        dFoF0 = f['Ca_imaging']['full_trace']['dFoF0'][()]
-        
-        speed_corr = f['Behavioral']['Correlation']['speed_corr'][()]
-        facemotion_corr = f['Behavioral']['Correlation']['facemotion_corr'][()]
-        pupil_corr = f['Behavioral']['Correlation']['pupil_corr'][()]
-
-        speed = f['Behavioral']['Speed'][()]
-        facemotion = f['Behavioral']['FaceMotion'][()]
-        pupil = f['Behavioral']['Pupil'][()]
-        photodiode = f['Behavioral']['Photodiode'][()]
-
-        time_onset = f['Stimuli']['time_onset'][()]
-
-    # Load visual stimuli data
-    visual_stim_path = os.path.join(base_path, "visual-stim.npy")
-    visual_stim = np.load(visual_stim_path, allow_pickle=True).item()
-    duration = visual_stim['time_duration']
-    stim_time_period = [time_onset, list(time_onset + duration)]
-
-    dFoF0_norm = General_functions.scale_trace(dFoF0, axis=1)
+    visual_stim_filepath = os.path.join(base_path, "visual-stim.npy")
 
     app = QtWidgets.QApplication(sys.argv)
-    main_window = MainWindow(dFoF0_norm, time_stamps, speed, facemotion, pupil, photodiode, stim_time_period)
+    main_window = MainWindow(h5_filepath, visual_stim_filepath)
     main_window.show()
     sys.exit(app.exec_())
