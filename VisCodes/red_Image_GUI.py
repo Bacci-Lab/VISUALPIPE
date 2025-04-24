@@ -93,6 +93,8 @@ class RedGUI(QtWidgets.QMainWindow):
             out = self.categorize_ui.load_data_in_GUI()
             if out == -1:
                 self.tabWidget.setCurrentIndex(1)
+            
+            self.red_img_adjust_ui.reset_UI()
             return 0
         
         else :
@@ -635,6 +637,10 @@ class RedImageAdjust(object):
         if red_frame_path != '' :
             self.red_frame_path = red_frame_path
             self.image = GUI_functions.load_init_image(self.scene, self.red_frame_path)
+    
+    def reset_UI(self):
+        self.image = GUI_functions.load_init_image(self.scene, self.red_frame_path)
+        self.scene_mask.clear()
 
     def retranslateUi(self):
         _translate = QtCore.QCoreApplication.translate

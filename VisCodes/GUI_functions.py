@@ -79,6 +79,9 @@ def load_init_image(scene, image_path):
         item = QtWidgets.QGraphicsPixmapItem(pixmap)
         scene.addItem(item)
         return normalized_image
+    else :
+        scene.clear()
+        return None
     
 def load_mask_image(scene,image_contours):
     height, width, channel = image_contours.shape

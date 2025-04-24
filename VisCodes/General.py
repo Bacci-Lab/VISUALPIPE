@@ -15,7 +15,7 @@ from Ca_imaging import CaImagingDataManager
 from face_camera import FaceCamDataManager
 from visual_stim import VisualStim
 import General_functions
-from visualization_GUI import MainWindow
+from visualization_GUI import VisualizationGUI
 import Photodiode
 from inputUI import InputWindow
 import red_cell_function
@@ -412,12 +412,13 @@ settings = {"Date" : datetime.date.today(),
             "Compile folder" : compile_dir
             }
 file.save_analysis_settings(settings, save_dir)
+
 #---------------------------------- Second GUI ----------------------------------
-main_window = MainWindow(ca_img_dm.stat, protocol_validity_npz, 
-                         mean_speed_corr, mean_facemotion_corr, mean_pupil_corr, 
-                         computed_F_norm, ca_img_dm.time_stamps, 
-                         speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode, 
-                         stim_time_period, 
-                         red_image_path, save_dir)
+main_window = VisualizationGUI(save_dir, 
+                               ca_img_dm.stat, ca_img_dm.ops, background_image_path,
+                               protocol_validity_npz, 
+                               mean_speed_corr, mean_facemotion_corr, mean_pupil_corr, 
+                               computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode, stim_time_period, 
+                               red_image_path)
 main_window.show()
 app.exec_()
