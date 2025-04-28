@@ -131,7 +131,7 @@ print('Number of remaining neurons after F0 calculation  :', len(kept_ROI_F0))
 
 #---------------------------------- Calculation of dF over F0 ----------------------
 ca_img_dm.compute_dFoF0()
-computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=5)
+computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=3)
 
 #---------------------------------- Compute correlation ----------------------
 speed_corr_list = [pearsonr(speed, ROI)[0] for ROI in ca_img_dm.dFoF0]
@@ -231,11 +231,11 @@ for i in range(len(protocol_df)):
     if visual_stim.stim_cat[i] :
         trials.trial_average_rasterplot(i, save_fig_dir) #plot trial-average raster
         trials.trial_rasterplot(trial_zscores, pre_trial_zscores, post_trial_zscores, i, 'dFoF0', savepath=save_fig_dir) #plot trials raster
-        #trials.trial_rasterplot(trials.trial_zscores, trials.pre_trial_zscores, i, trials.post_trial_zscores, trials.ca_attr, savepath=save_fig_dir)
+        #trials.trial_rasterplot(trials.trial_zscores, trials.pre_trial_zscores, trials.post_trial_zscores, i, trials.ca_attr, savepath=save_fig_dir)
         for k in range(len(ca_img_dm._list_ROIs_idx)):
-            trials.plot_stim_response(i, k, save_dir, file_prefix="_".join([unique_id, id_version]))
+            trials.plot_stim_response(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
         trials.plot_stim_occurence(i, trial_zscores, pre_trial_zscores, real_time_states_sorted, F_Time_start_realigned,
-                                   save_dir, file_prefix="_".join([unique_id, id_version]))
+                                   save_dir, folder_prefix="_".join([unique_id, id_version]))
 
 filename = "_".join([unique_id, id_version, 'protocol_validity_2'])
 trials.save_protocol_validity(save_dir, filename)

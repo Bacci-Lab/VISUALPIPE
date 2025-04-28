@@ -123,7 +123,13 @@ class ResponsiveView(QGraphicsView):
         # Draw new objects based on the chosen protocol
         for i, cell in enumerate(self.cell_info):
             if Chosen_Protocol[i] == 1:
-                color = QColor(Qt.blue)
+                color = QColor("coral")
+                # color.setAlpha(5)
+                for x, y in zip(cell['xpix'], cell['ypix']):
+                    ellipse = scene.addEllipse(x, y, 1, 1, QPen(color), QBrush(color))
+                    ellipse.setData(0, i)
+            elif Chosen_Protocol[i] == -1:
+                color = QColor("mediumaquamarine")
                 # color.setAlpha(5)
                 for x, y in zip(cell['xpix'], cell['ypix']):
                     ellipse = scene.addEllipse(x, y, 1, 1, QPen(color), QBrush(color))
@@ -201,7 +207,7 @@ class MainVisUI(object):
 
         self.lineEdit_protocol = self.createLineEdit(self.frame_1, True)
         self.lineEdit_protocol.setEnabled(False)
-        self.lineEdit_protocol.setText(str(int(np.sum((self.selectedProtocol)))))
+        self.lineEdit_protocol.setText(str(int(np.sum(np.abs(self.selectedProtocol)))))
         self.lineEdit_protocol.setStyleSheet("color: white")
         self.verticalLayout_1.addWidget(self.lineEdit_protocol)
 
@@ -296,7 +302,7 @@ class MainVisUI(object):
         self.stim_view.setBackgroundImage()
         self.stim_view.drawObjects(self.stim_view.selected_protocol)
         self.stim_combobox.setCurrentText(self.stimuliNames[0])
-        self.lineEdit_protocol.setText(str(int(np.sum((self.selectedProtocol)))))
+        self.lineEdit_protocol.setText(str(int(np.sum(np.abs(self.selectedProtocol)))))
         
         self.corr_view.cell_info = self.cell_info
         self.corr_view.speed_corr = self.speed_corr
@@ -331,7 +337,7 @@ class MainVisUI(object):
         if hasattr(self, "protocol_validity") and self.protocol_validity :
             if protocol in self.stimuliNames:  # Ensure the key exists in the dictionary
                 self.selectedProtocol = self.protocol_validity[protocol]
-            self.lineEdit_protocol.setText(str(int(np.sum((self.selectedProtocol)))))
+            self.lineEdit_protocol.setText(str(int(np.sum(np.abs(self.selectedProtocol)))))
             self.stim_view.drawObjects(self.selectedProtocol)
         else:
             print("protocolValidity attr is not set or empty.")
@@ -732,7 +738,7 @@ if __name__ == "__main__":
     background_image_path = os.path.join(base_path, "Mean_image_grayscale.png")
 
     # Protocol validity filepath
-    filename_protocol = "_".join([unique_id, id_version, 'protocol_validity']) + ".npz"
+    filename_protocol = "_".join([unique_id, id_version, 'protocol_validity_2']) + ".npz"
     protocol_validity_filepath = os.path.join(save_folder, filename_protocol)
     
     # HDF5 filepath

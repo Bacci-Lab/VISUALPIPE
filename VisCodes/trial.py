@@ -12,7 +12,7 @@ from matplotlib.ticker import AutoLocator
 
 class Trial(object):
 
-    def __init__(self, ca_img: CaImagingDataManager, visual_stim: VisualStim, ca_onset_idxes, attr='fluorescence', dt_pre_stim=0.5, dt_post_stim=0, dt_post_stim_plot=None):
+    def __init__(self, ca_img: CaImagingDataManager, visual_stim: VisualStim, ca_onset_idxes, attr: str='fluorescence', dt_pre_stim:float=0.5, dt_post_stim:float=0, dt_post_stim_plot:float=None):
 
         self.ca_img = ca_img
         self.visual_stim = visual_stim
@@ -34,15 +34,19 @@ class Trial(object):
         self.trial_averaged_zscores, self.pre_trial_averaged_zscores, self.post_trial_averaged_zscores =\
               self.compute_trial_averaged_zscores(self.trial_fluorescence, self.post_trial_fluorescence, self.average_baselines)
         self.trial_zscores, self.pre_trial_zscores, self.post_trial_zscores = self.compute_trial_zscores_avb()
-        self.trial_response_bounds, self.responsive = self.find_responsive_rois()
+        self.trial_response_bounds_positive, self.trial_response_bounds_negative, self.responsive_positive, self.responsive_negative = self.find_responsive_rois()
         
-    def get_trials_trace(self, roi_id, stimulus_id, attr='fluorescence'):
+    def get_trials_trace(self, roi_id:int, stimulus_id:int, attr:str='fluorescence'):
         """
         For a fixed stimulus and neuron, get the calcium imaging baseline, trial trace and post-stimulus trace of each stimuli occurence.
 
-        roi_id: int - ROI id
-        stimulus_id: int - stimulus id
-        attr: string - attribute of calcium imaging ('raw_F', 'fluorescence' or 'dFoF0')
+        :param int roi_id: ROI index.
+        :param int stimulus_id: Stimulus imdex.
+        :param string attr: Attribute of calcium imaging ('raw_F', 'fluorescence' or 'dFoF0').
+
+        :return baseline (ndarray): Array of baselines for a given stimulus and ROI id.
+        :return trial trace (ndarray): Array of trials fluorescence traces for a given stimulus and ROI id.
+        :return post_trial_trace (ndarray): Array of post-trials fluorescence traces for a given stimulus and ROI id (for plotting purpose only).
         """
 
         if attr not in ['raw_F', 'fluorescence', 'dFoF0'] :
@@ -74,13 +78,7 @@ class Trial(object):
             ptrial_trace_list.append(trial_trace_i)
         
         return np.array(baseline_list), np.array(trial_trace_list), np.array(ptrial_trace_list)
-
-    def zscores(self, baselines, traces):
-        return np.array([(traces[i, :] - np.mean(baselines, axis=1)[i]) / np.std(baselines, axis=1)[i] for i in range(traces.shape[0])])
     
-    def zscores2(self, baselines, traces):
-        return np.array([(traces[i, :] - np.mean(baselines)) / np.std(baselines) for i in range(traces.shape[0])])
-
     def compute_trial(self, attr='fluorescence'):
 
         trial_fluorescence, pre_trial_fluorescence, post_trial_fluorescence = {}, {}, {}
@@ -175,22 +173,38 @@ class Trial(object):
 
         return trial_averaged_zscores, pre_trial_averaged_zscores, post_trial_averaged_zscores
 
-    def find_responsive_rois(self, dt_min=0.2, auc_min=5):
-
-        responsive = {}
-        trial_response_bounds = {}
+    def find_responsive_rois(self, dt_min:float=0.2, auc_min:float=5):
+        """
+        Find responsive neurons using the method from C.G. Sweeney, 2025.
+        
+        :param float dt_min: Time duration threshold
+        :param float auc_min: Area under the curve threshold.
+        
+        :return trial_response_bounds(positive and negative) (dict): Dictionnary with stimuli index as keys. It contains a list of boundaries defining the interval of the trace considered to compute the AUC.
+        :return responsive(positive and negative) (dict): Dictionnary with stimuli index as keys. It contains a list of boolean indicating whether or not a ROI is responsive (1 if yes, 0 if no).
+        """
+        responsive_positive = {}
+        responsive_negative = {}
+        trial_response_bounds_positive = {}
+        trial_response_bounds_negative = {}
         nb_frames_min = dt_min * self.ca_img.fs
 
         for i in self.trial_fluorescence.keys():
+
+            trial_response_bounds_roi_positive = []
+            trial_response_bounds_roi_negative = []
+            responsive_roi_positive = []
+            responsive_roi_negative = []
+
             stim_dt = self.visual_stim.protocol_df['duration'][i] + self.dt_post_stim
             if stim_dt < 2.5 :
                 auc_min = auc_min * stim_dt / 2.5
-            trial_response_bounds_roi = []
-            responsive_roi = []
 
             for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
                 roi_trial = self.trial_averaged_zscores[i][roi_idx]
                 max_val = np.max(roi_trial)
+                min_val = np.min(roi_trial)
+                positive = False
 
                 if max_val > 1 : 
                     start_idx, end_idx = self.find_bounds(np.argmax(roi_trial), roi_trial >= 0)
@@ -198,22 +212,58 @@ class Trial(object):
                         time = np.linspace(0, stim_dt, len(roi_trial))
                         auc = metrics.auc(time[start_idx:end_idx+1], roi_trial[start_idx:end_idx+1])
                         if auc >= auc_min :
-                            responsive_roi.append(1)
+                            responsive_roi_positive.append(1)
+                            positive = True
                         else :
-                            responsive_roi.append(0)
+                            responsive_roi_positive.append(0)
                     else :
-                        responsive_roi.append(0)
-                    trial_response_bounds_roi.append([start_idx, end_idx])
+                        responsive_roi_positive.append(0)
+                    trial_response_bounds_roi_positive.append([start_idx, end_idx])
                 else :
-                    responsive_roi.append(0)
-                    trial_response_bounds_roi.append([None, None])
+                    responsive_roi_positive.append(0)
+                    trial_response_bounds_roi_positive.append([None, None])
+                    
+                #In case the neuron is not activated/prolonged, check if it is supressed.
+                if not positive and min_val < -1 : 
+                    start_idx, end_idx = self.find_bounds(np.argmin(roi_trial), roi_trial <= 0)
+                    if end_idx - start_idx + 1 >= nb_frames_min :
+                        time = np.linspace(0, stim_dt, len(roi_trial))
+                        auc = metrics.auc(time[start_idx:end_idx+1], roi_trial[start_idx:end_idx+1])
+                        if np.abs(auc) >= auc_min :
+                            responsive_roi_negative.append(1)
+                        else :
+                            responsive_roi_negative.append(0)
+                    else :
+                        responsive_roi_negative.append(0)
+                    trial_response_bounds_roi_negative.append([start_idx, end_idx])
+                else :
+                    responsive_roi_negative.append(0)
+                    trial_response_bounds_roi_negative.append([None, None])
 
-            responsive.update({i : responsive_roi})
-            trial_response_bounds.update({i : trial_response_bounds_roi})
+            responsive_positive.update({i : responsive_roi_positive})
+            trial_response_bounds_positive.update({i : trial_response_bounds_roi_positive})
+            responsive_negative.update({i : responsive_roi_negative})
+            trial_response_bounds_negative.update({i : trial_response_bounds_roi_negative})
         
-        return trial_response_bounds, responsive
+        return trial_response_bounds_positive, trial_response_bounds_negative, responsive_positive, responsive_negative
 
-    def find_bounds(self, index, bool_array):
+    #--------------TOOL FUNCTIONS---------------
+    def zscores(self, baselines, traces):
+        return np.array([(traces[i, :] - np.mean(baselines, axis=1)[i]) / np.std(baselines, axis=1)[i] for i in range(traces.shape[0])])
+    
+    def zscores2(self, baselines, traces):
+        return np.array([(traces[i, :] - np.mean(baselines)) / np.std(baselines) for i in range(traces.shape[0])])
+
+    def find_bounds(self, index:int, bool_array:list):
+        """
+        Find the 'True' values interval boundaries surrounding the given index value.
+        
+        :param int index: Index to be considered.
+        :param list bool_array: List of bool.
+        
+        :return start_idx (int): Starting index of the interval.
+        :return end_idx (int): Ending index of the interval.
+        """
         n = len(bool_array)
         
         i = index - 1
@@ -228,8 +278,49 @@ class Trial(object):
 
         return start_idx, end_idx
 
-    def trial_average_rasterplot(self, stimuli_id, savepath='', sort=True) :
+    def get_period_states(self, real_time_states_sorted:list, t0:float, tf:float):
+        """
+        Get the behavioral states of the stimulus during a period of time (from t0 to tf).
         
+        :param list real_time_states_sorted: List of tuples in the format ([t_start_state, t_end_state], state_name) ordered by time.
+        :param float t0: Start time of the period to be considered.
+        :param float tf: End time of the period to be considered.
+        
+        :return l (list): List of tuples in the format ([t_start_state, t_end_state], state_name) ordered by time during the period [t0, tf].
+        """
+        l_el, l_key = [], []
+
+        k = 0
+        while k < len(real_time_states_sorted) and \
+            not (real_time_states_sorted[k][0][0] <=  t0 <= real_time_states_sorted[k][0][1]) and \
+                np.abs(real_time_states_sorted[k][0][0] - t0) > np.abs(real_time_states_sorted[k+1][0][0] - t0) :
+            k +=1
+        idx_interval_1 = int(k)
+
+        k = 0
+        while k < len(real_time_states_sorted) and \
+            not (real_time_states_sorted[k][0][0] <=  tf <= real_time_states_sorted[k][0][1]) and \
+                np.abs(real_time_states_sorted[k][0][1] - tf) > np.abs(real_time_states_sorted[k+1][0][1] - tf) :
+            k +=1
+        idx_interval_2 = int(k)
+
+        for i in range(idx_interval_1, idx_interval_2+1):
+            l_el.append([np.max([real_time_states_sorted[i][0][0], t0]), 
+                         np.min([real_time_states_sorted[i][0][1], tf])])
+            l_key.append(real_time_states_sorted[i][1])
+
+        return list(zip(l_el, l_key))
+
+    #--------------PLOTS FUNCTIONS---------------
+    def trial_average_rasterplot(self, stimuli_id:int, savepath:str='', sort:bool=True) :
+        """
+        Plot a rasterplot of all neurons trial-averaged response for a fixed stimulus.
+        
+        :param int stimuli_id: Index of the stimulus to consider.
+        :param str savepath: Saving directory.
+        :param bool sort: If True, shows traces sorted by mean fluorescence, if not show traces in ROIs index order.
+        """
+
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
@@ -261,8 +352,17 @@ class Trial(object):
             fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot.png"))
         plt.close(fig)
 
-    def trial_rasterplot(self, trial_zscores, pre_trial_zscores, post_trial_zscores, stimuli_id, attr='fluorescence', savepath='') :
+    def trial_rasterplot(self, trial_zscores, pre_trial_zscores, post_trial_zscores, stimuli_id:int, attr:str='fluorescence', savepath:str='') :
+        """
+        Plot a rasterplot of all neurons responses (not averaged) for a fixed stimulus.
         
+        :param dict trial_zscores: Dictionnary of trial zscores with stimuli ids as keys. It contains every trace for each stimuli, ROIs and trials.
+        :param dict pre_trial_zscores: Dictionnary of pre-trial (baselines) zscores with stimuli ids as keys. It contains every trace for each stimuli, ROIs and trials.
+        :param dict post_trial_zscores: Dictionnary of post-trial zscores with stimuli ids as keys. It contains every trace for each stimuli, ROIs and trials.
+        :param int stimuli_id: Index of the stimulus to consider.
+        :param string attr: Attribute of calcium imaging ('raw_F', 'fluorescence' or 'dFoF0').
+        :param str savepath: Saving directory.
+        """
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stimuli_onset = pre_trial_zscores[stimuli_id].shape[2]
@@ -291,8 +391,16 @@ class Trial(object):
         fig.savefig(os.path.join(savepath, stimuli_name + "_trial_rasterplot.png"))
         plt.close(fig)
 
-    def plot_stim_response(self, stimuli_id, neuron_idx, save_dir, file_prefix='', show_per_rois=False):
-
+    def plot_stim_response(self, stimuli_id:int, neuron_idx:int, save_dir:str, folder_prefix:str='', show_per_rois:bool=False):
+        """
+        Plot a neuron trial-averaged response for a fixed stimulus.
+        
+        :param int stimuli_id: Index of the stimulus to consider.
+        :param int neuron_idx: Index of the ROI to consider.
+        :param str save_dir: Saving directory.
+        :param str folder_prefix: Prefix of the created folder name.
+        :param bool show_per_rois: If True, shows traces of trials, if not show only the average trace.
+        """
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
@@ -318,9 +426,14 @@ class Trial(object):
             for i in range(trial_rois_zscores.shape[0]):
                 ax.plot(time, data[i], color=cmap(i), linewidth=0.5, alpha=0.5)
         ax.plot(time, data_av, color='black', label='Mean', linewidth=2)
-        if self.responsive[stimuli_id][neuron_idx] :
-            start = self.trial_response_bounds[stimuli_id][neuron_idx][0] + stimuli_onset
-            end = self.trial_response_bounds[stimuli_id][neuron_idx][1] + stimuli_onset + 1
+        if self.responsive_positive[stimuli_id][neuron_idx] :
+            start = self.trial_response_bounds_positive[stimuli_id][neuron_idx][0] + stimuli_onset
+            end = self.trial_response_bounds_positive[stimuli_id][neuron_idx][1] + stimuli_onset + 1
+            ax.plot(time[start:end], data_av[start:end], color='green', label='trial response', linewidth=2)
+            ax.axvspan(0, stim_dt + self.dt_post_stim, color='skyblue', alpha=0.2, label='trial period')
+        elif self.responsive_negative[stimuli_id][neuron_idx] :
+            start = self.trial_response_bounds_negative[stimuli_id][neuron_idx][0] + stimuli_onset
+            end = self.trial_response_bounds_negative[stimuli_id][neuron_idx][1] + stimuli_onset + 1
             ax.plot(time[start:end], data_av[start:end], color='green', label='trial response', linewidth=2)
             ax.axvspan(0, stim_dt + self.dt_post_stim, color='skyblue', alpha=0.2, label='trial period')
         else :
@@ -332,7 +445,7 @@ class Trial(object):
         ax.set_title(stimuli_name + '\n' + fig_name)
         ax.legend(bbox_to_anchor=(0, 1), loc='upper left', frameon=False)
         
-        foldername = "_".join(list(filter(None, [file_prefix, stimuli_name])))
+        foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
         save_folder = os.path.join(save_dir, foldername)
         if not os.path.exists(save_folder):
             os.mkdir(save_folder)
@@ -340,9 +453,20 @@ class Trial(object):
         fig.savefig(save_path)
         plt.close(fig)
 
-    def plot_stim_occurence(self, stimuli_id, trial_zscores, pre_trial_zscores, real_time_states_sorted,
-                            time_onset_aligned_on_ca_img, save_dir='', file_prefix=''):
+    def plot_stim_occurence(self, stimuli_id:int, trial_zscores:dict, pre_trial_zscores:dict, real_time_states_sorted:list,
+                            time_onset_aligned_on_ca_img:list, save_dir:str='', folder_prefix:str=''):
+        """
+        Plot all stimulus (defined by id) trials with the trace of all ROIs and the behavioral states.
         
+        :param int stimuli_id: Index of the stimulus to consider.
+        :param dict trial_zscores: Dictionnary of trial zscores with stimuli ids as keys. It contains every trace for each stimuli, ROIs and trials.
+        :param dict pre_trial_zscores: Dictionnary of pre-trial (baselines) zscores with stimuli ids as keys. It contains every trace for each stimuli, ROIs and trials.
+        :param list real_time_states_sorted: List of tuples in the format ([t_start_state, t_end_state], state_name) ordered by time.
+        :param list time_onset_aligned_on_ca_img: Times of stimuli onset aligned with calcium imaging time.
+        :param str save_dir: Saving directory.
+        :param str folder_prefix: Prefix of the folder name.
+        """
+
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         colors, positions = ['darkred', 'lightgray'], [0, 1]
@@ -355,7 +479,7 @@ class Trial(object):
             stim_onset_time = np.array(time_onset_aligned_on_ca_img)[stim_onset_idx]
             time = (np.arange(pre_trial_zscores[stimuli_id].shape[2] + trial_zscores[stimuli_id].shape[2]) -  pre_trial_zscores[stimuli_id].shape[2]) / self.ca_img.fs + stim_onset_time
             
-            stim_states = self.get_stim_states(real_time_states_sorted, time[0], time[-1])
+            stim_states = self.get_period_states(real_time_states_sorted, time[0], time[-1])
 
             fig = plt.figure(figsize=(24, 20))
             gs = fig.add_gridspec(2*trial_zscores[stimuli_id].shape[0], 1)
@@ -384,7 +508,7 @@ class Trial(object):
             fig.suptitle(stimuli_name + '\n' + f'Occurence {i} of stimulus')
 
             fig_name = stimuli_name + "_occ_" + str(i)
-            foldername = "_".join(list(filter(None, [file_prefix, stimuli_name])))
+            foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
             save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence')
             if not os.path.exists(save_folder):
                 os.mkdir(save_folder)
@@ -392,34 +516,10 @@ class Trial(object):
             fig.savefig(save_path)
             plt.close(fig)
 
-    def get_stim_states(self, real_time_states_sorted, t0, tf):
-
-        l_el, l_key = [], []
-
-        k = 0
-        while k < len(real_time_states_sorted) and \
-            not (real_time_states_sorted[k][0][0] <=  t0 <= real_time_states_sorted[k][0][1]) and \
-                np.abs(real_time_states_sorted[k][0][0] - t0) > np.abs(real_time_states_sorted[k+1][0][0] - t0) :
-            k +=1
-        idx_interval_1 = int(k)
-
-        k = 0
-        while k < len(real_time_states_sorted) and \
-            not (real_time_states_sorted[k][0][0] <=  tf <= real_time_states_sorted[k][0][1]) and \
-                np.abs(real_time_states_sorted[k][0][1] - tf) > np.abs(real_time_states_sorted[k+1][0][1] - tf) :
-            k +=1
-        idx_interval_2 = int(k)
-
-        for i in range(idx_interval_1, idx_interval_2+1):
-            l_el.append([np.max([real_time_states_sorted[i][0][0], t0]), 
-                         np.min([real_time_states_sorted[i][0][1], tf])])
-            l_key.append(real_time_states_sorted[i][1])
-
-        return list(zip(l_el, l_key))
-
+    #-------------SAVE FUNCTIONS---------------
     def save_protocol_validity(self, save_dir, filename):
         protocol_validity = []
-        for id in self.responsive.keys():
-            d = {self.visual_stim.protocol_names[id] : self.responsive[id]}
+        for id in self.responsive_positive.keys():
+            d = {self.visual_stim.protocol_names[id] : np.array(self.responsive_positive[id]) - np.array(self.responsive_negative[id])}
             protocol_validity.append(d)
         np.savez(os.path.join(save_dir, filename + ".npz" ), **{key: value for d in protocol_validity for key, value in d.items()})
