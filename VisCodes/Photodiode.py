@@ -69,7 +69,7 @@ def average_image(
     """
     print(protocol_name, chosen_protocol, protocol_duration_s)
     protocol_duration = int(protocol_duration_s * Photon_fre)
-    Valid_Neuron = np.zeros(len(F))
+    valid_neuron = []
     protocol_validity = None  # Initialize protocol_validity
 
     for Neuron_index in range(len(F)):
@@ -95,9 +95,10 @@ def average_image(
 
         # Check if neuron is valid
         if p_value <= 0.05:
-            Valid_Neuron[Neuron_index] = 1
+            valid_neuron.append((1, p_value))
             color_histo = "skyblue"
         else:
+            valid_neuron.append((0, p_value))
             color_histo = "thistle"
 
         # Generate figures
@@ -112,7 +113,7 @@ def average_image(
             std_F_specific_protocol, protocol_name, Neuron_index, save_dir, file_prefix
         )
     # Finalize protocol_validity
-    protocol_validity = {protocol_name: Valid_Neuron}
+    protocol_validity = {protocol_name: valid_neuron}
 
     return protocol_validity
 

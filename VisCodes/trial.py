@@ -4,7 +4,10 @@ from visual_stim import VisualStim
 import matplotlib.pyplot as plt
 import math
 import os
+import random
 from scipy.ndimage import gaussian_filter1d
+from statsmodels.stats.weightstats import ztest as ztest
+from scipy.stats import pearsonr
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn import metrics
 from matplotlib.lines import Line2D
@@ -34,7 +37,8 @@ class Trial(object):
         self.trial_averaged_zscores, self.pre_trial_averaged_zscores, self.post_trial_averaged_zscores =\
               self.compute_trial_averaged_zscores(self.trial_fluorescence, self.post_trial_fluorescence, self.average_baselines)
         self.trial_zscores, self.pre_trial_zscores, self.post_trial_zscores = self.compute_trial_zscores_avb()
-        self.trial_response_bounds_positive, self.trial_response_bounds_negative, self.responsive_positive, self.responsive_negative = self.find_responsive_rois()
+
+        self.trial_response_bounds, self.responsive, self.reliability = None, None, None
         
     def get_trials_trace(self, roi_id:int, stimulus_id:int, attr:str='fluorescence'):
         """
@@ -45,7 +49,7 @@ class Trial(object):
         :param string attr: Attribute of calcium imaging ('raw_F', 'fluorescence' or 'dFoF0').
 
         :return baseline (ndarray): Array of baselines for a given stimulus and ROI id.
-        :return trial trace (ndarray): Array of trials fluorescence traces for a given stimulus and ROI id.
+        :return trial_trace (ndarray): Array of trials fluorescence traces for a given stimulus and ROI id.
         :return post_trial_trace (ndarray): Array of post-trials fluorescence traces for a given stimulus and ROI id (for plotting purpose only).
         """
 
@@ -173,79 +177,155 @@ class Trial(object):
 
         return trial_averaged_zscores, pre_trial_averaged_zscores, post_trial_averaged_zscores
 
-    def find_responsive_rois(self, dt_min:float=0.2, auc_min:float=5):
+    def find_responsive_rois(self, save_dir, folder_prefix, dt_min:float=0.2, auc_min:float=5):
         """
-        Find responsive neurons using the method from C.G. Sweeney, 2025.
+        Find responsive neurons using the method from C.G. Sweeney (2025) and T.D. Marks (2021) for the reliability metric.
         
         :param float dt_min: Time duration threshold
         :param float auc_min: Area under the curve threshold.
         
-        :return trial_response_bounds(positive and negative) (dict): Dictionnary with stimuli index as keys. It contains a list of boundaries defining the interval of the trace considered to compute the AUC.
-        :return responsive(positive and negative) (dict): Dictionnary with stimuli index as keys. It contains a list of boolean indicating whether or not a ROI is responsive (1 if yes, 0 if no).
+        :return trial_response_bounds (dict): Dictionnary with stimuli index as keys. It contains a list of boundaries defining the interval of the trace considered to compute the AUC.
+        :return responsive (dict): Dictionnary with stimuli index as keys. It contains a list of integer (-1, 0, 1) indicating whether or not a ROI is responsive (1 if it is activated/prolonged, 0 if no and -1 if it is supressed).
+        :return reliability (dict): Dictionnary with stimuli index as keys. It contains a list of tuple of format (r, p) corresponding to a neuron with r the reliability metrics and p the p-value of the two-tailed one-sample t-test.
         """
-        responsive_positive = {}
-        responsive_negative = {}
-        trial_response_bounds_positive = {}
-        trial_response_bounds_negative = {}
+
+        responsive = {}
+        trial_response_bounds = {}
+        reliability = {}
+
         nb_frames_min = dt_min * self.ca_img.fs
+        positive = None
 
         for i in self.trial_fluorescence.keys():
 
-            trial_response_bounds_roi_positive = []
-            trial_response_bounds_roi_negative = []
-            responsive_roi_positive = []
-            responsive_roi_negative = []
+            responsive_roi = []
+            trial_response_bounds_roi = []
+            reliability_roi = []
 
+            # For stimuli of duration under 2.5s, decrease auc threshold with a cross-product
             stim_dt = self.visual_stim.protocol_df['duration'][i] + self.dt_post_stim
             if stim_dt < 2.5 :
                 auc_min = auc_min * stim_dt / 2.5
 
             for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
-                roi_trial = self.trial_averaged_zscores[i][roi_idx]
-                max_val = np.max(roi_trial)
-                min_val = np.min(roi_trial)
-                positive = False
+                roi_trial_average = self.trial_averaged_zscores[i][roi_idx]
+                roi_trial = self.trial_zscores[i][roi_idx]
+                max_val, min_val = np.max(roi_trial_average), np.min(roi_trial_average)
+                
+                # Compute ROI reliability
+                r, r_dist = self.compute_reliability(roi_trial, n_samples=1000)
+                reliability_roi.append(r)
 
-                if max_val > 1 : 
-                    start_idx, end_idx = self.find_bounds(np.argmax(roi_trial), roi_trial >= 0)
-                    if end_idx - start_idx + 1 >= nb_frames_min :
-                        time = np.linspace(0, stim_dt, len(roi_trial))
-                        auc = metrics.auc(time[start_idx:end_idx+1], roi_trial[start_idx:end_idx+1])
-                        if auc >= auc_min :
-                            responsive_roi_positive.append(1)
-                            positive = True
-                        else :
-                            responsive_roi_positive.append(0)
-                    else :
-                        responsive_roi_positive.append(0)
-                    trial_response_bounds_roi_positive.append([start_idx, end_idx])
+                if max_val > 1 and max_val > np.abs(min_val):
+                    positive = True
+                    start_idx, end_idx = self.find_bounds(np.argmax(roi_trial_average), roi_trial_average >= 0)
+                elif min_val < -1 :
+                    #In case the neuron is not activated/prolonged, check if it is supressed.
+                    positive = False
+                    start_idx, end_idx = self.find_bounds(np.argmin(roi_trial_average), roi_trial_average <= 0)
                 else :
-                    responsive_roi_positive.append(0)
-                    trial_response_bounds_roi_positive.append([None, None])
-                    
-                #In case the neuron is not activated/prolonged, check if it is supressed.
-                if not positive and min_val < -1 : 
-                    start_idx, end_idx = self.find_bounds(np.argmin(roi_trial), roi_trial <= 0)
-                    if end_idx - start_idx + 1 >= nb_frames_min :
-                        time = np.linspace(0, stim_dt, len(roi_trial))
-                        auc = metrics.auc(time[start_idx:end_idx+1], roi_trial[start_idx:end_idx+1])
-                        if np.abs(auc) >= auc_min :
-                            responsive_roi_negative.append(1)
-                        else :
-                            responsive_roi_negative.append(0)
-                    else :
-                        responsive_roi_negative.append(0)
-                    trial_response_bounds_roi_negative.append([start_idx, end_idx])
-                else :
-                    responsive_roi_negative.append(0)
-                    trial_response_bounds_roi_negative.append([None, None])
+                    start_idx, end_idx = 0, 0
 
-            responsive_positive.update({i : responsive_roi_positive})
-            trial_response_bounds_positive.update({i : trial_response_bounds_roi_positive})
-            responsive_negative.update({i : responsive_roi_negative})
-            trial_response_bounds_negative.update({i : trial_response_bounds_roi_negative})
+                trial_response_bounds_roi.append([start_idx, end_idx])
+                
+                if end_idx - start_idx + 1 >= nb_frames_min : #time duration constraint
+                    time = np.linspace(0, stim_dt, len(roi_trial_average))
+                    auc = metrics.auc(time[start_idx:end_idx+1], roi_trial_average[start_idx:end_idx+1])
+                    if np.abs(auc) >= auc_min : #AUC constraint
+                        r_null_distribution = self.generate_null_distribution(roi_trial)
+                        perc_th = np.percentile(r_null_distribution, 99)
+                        res = ztest(r_dist, value=perc_th, alternative='larger') #two-tailed one-sample t-test
+                        if res[1] <= 0.001 :
+                        #if perc_th <= r :
+                            if positive :
+                                responsive_roi.append((1, res[1]))
+                            else :
+                                responsive_roi.append((-1, res[1]))
+                            self.plot_hist_reliability(r_dist, r, r_null_distribution, perc_th, res[1], 'skyblue', i, roi_idx, save_dir, folder_prefix)
+                        else :
+                            responsive_roi.append((0, res[1]))
+                            self.plot_hist_reliability(r_dist, r, r_null_distribution, perc_th, res[1], 'thistle', i, roi_idx, save_dir, folder_prefix)
+                    else :
+                        responsive_roi.append((0, None))
+                else :
+                    responsive_roi.append((0, None))
+
+            responsive.update({i : responsive_roi})
+            trial_response_bounds.update({i : trial_response_bounds_roi})
+            reliability.update({i : reliability_roi})
         
-        return trial_response_bounds_positive, trial_response_bounds_negative, responsive_positive, responsive_negative
+        self.trial_response_bounds = trial_response_bounds
+        self.responsive = responsive
+        self.reliability = reliability
+        
+        return trial_response_bounds, responsive, reliability
+    
+    def compute_reliability(self, roi_trials_traces, n_samples=1):
+        """
+        Compute the reliability using the method from T.D. Marks (2021). To compute reliability, the function splits the trials randomly in two halves, trial-averages the two groups and calculates the Pearson's correlation. The process is done n_samples times and averaged.
+
+        :param list roi_trials_traces: List of trials traces of a specific ROI.
+        :param int n_samples: Number of samples.
+
+        :return r (float): Reliability R metric corresponding to the mean of the correlations.
+        :return corr_list (list): List of correlations.
+        """
+
+        corr_list = []
+        set_trials = list(range(len(roi_trials_traces)))
+
+        for k in range(n_samples):
+            # Divide randomly the trials in 2 groups
+            random.shuffle(set_trials)
+            group1 = set_trials[:len(set_trials)//2]
+            group2 = set_trials[len(set_trials)//2:]
+
+            averaged_group1 = np.mean(np.array(roi_trials_traces)[group1], axis=0)
+            averaged_group2 = np.mean(np.array(roi_trials_traces)[group2], axis=0)
+
+            corr = pearsonr(averaged_group1 , averaged_group2)[0]
+            corr_list.append(corr)
+
+        r = np.mean(corr_list)
+
+        return r, corr_list
+    
+    """ def compute_reliability_2(self, roi_trials_traces):
+
+        corr_list = []
+
+        for k in range(len(roi_trials_traces)) :
+            for j in range(k+1, len(roi_trials_traces)):
+                corr = pearsonr(roi_trials_traces[k] , roi_trials_traces[j])[0]
+                corr_list.append(corr)
+        
+        r = np.mean(corr_list)
+
+        return r """
+
+    def generate_null_distribution(self, roi_trials_traces, n_samples=1000):
+        """
+        Compute the null distribution of the reliability metric using the method from T.D. Marks (2021). The null distributio is generated by computing reliability on ciruclarly shuffled traces.
+
+        :param list roi_trials_traces: List of trials traces of a specific ROI.
+        :param int n_samples: Number of samples.
+
+        :return r_null_distribution (list): List of reliability metrics R of the null distribution.
+        """
+
+        r_null_distribution = []
+
+        for i in range(n_samples) :
+
+            # Shuffle circularly
+            time_shifts = np.random.choice(np.arange(0, roi_trials_traces.shape[1]), len(roi_trials_traces), replace=True)
+            shifted_traces = np.array([np.roll(roi_trials_traces[j], dt) for j, dt in enumerate(time_shifts)])
+
+            # Compute reliability
+            r, _ = self.compute_reliability(shifted_traces)
+            r_null_distribution.append(r)
+        
+        return r_null_distribution
 
     #--------------TOOL FUNCTIONS---------------
     def zscores(self, baselines, traces):
@@ -401,6 +481,10 @@ class Trial(object):
         :param str folder_prefix: Prefix of the created folder name.
         :param bool show_per_rois: If True, shows traces of trials, if not show only the average trace.
         """
+
+        if self.trial_response_bounds is None :
+            self.find_responsive_rois(save_dir, folder_prefix)
+        
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
@@ -426,14 +510,9 @@ class Trial(object):
             for i in range(trial_rois_zscores.shape[0]):
                 ax.plot(time, data[i], color=cmap(i), linewidth=0.5, alpha=0.5)
         ax.plot(time, data_av, color='black', label='Mean', linewidth=2)
-        if self.responsive_positive[stimuli_id][neuron_idx] :
-            start = self.trial_response_bounds_positive[stimuli_id][neuron_idx][0] + stimuli_onset
-            end = self.trial_response_bounds_positive[stimuli_id][neuron_idx][1] + stimuli_onset + 1
-            ax.plot(time[start:end], data_av[start:end], color='green', label='trial response', linewidth=2)
-            ax.axvspan(0, stim_dt + self.dt_post_stim, color='skyblue', alpha=0.2, label='trial period')
-        elif self.responsive_negative[stimuli_id][neuron_idx] :
-            start = self.trial_response_bounds_negative[stimuli_id][neuron_idx][0] + stimuli_onset
-            end = self.trial_response_bounds_negative[stimuli_id][neuron_idx][1] + stimuli_onset + 1
+        if np.abs(self.responsive[stimuli_id][neuron_idx][0]) :
+            start = self.trial_response_bounds[stimuli_id][neuron_idx][0] + stimuli_onset
+            end = self.trial_response_bounds[stimuli_id][neuron_idx][1] + stimuli_onset + 1
             ax.plot(time[start:end], data_av[start:end], color='green', label='trial response', linewidth=2)
             ax.axvspan(0, stim_dt + self.dt_post_stim, color='skyblue', alpha=0.2, label='trial period')
         else :
@@ -516,10 +595,34 @@ class Trial(object):
             fig.savefig(save_path)
             plt.close(fig)
 
+    def plot_hist_reliability(self, r_dist, r, r_null, perc, p_value, color:str, stimuli_id:int, neuron_idx:int, save_dir:str, folder_prefix:str=''):
+        stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.hist(r_null, bins=20, alpha=0.4, edgecolor='white', color='grey', label='null distribution')
+        ax.axvline(np.mean(r_null), color='grey', linestyle='--', label='mean of null dist')
+        ax.hist(r_dist, bins=20, alpha=0.4, edgecolor='white', color=color, label='R distribution')
+        ax.axvline(r, color=color, linestyle='--', label='r')
+        ax.axvline(perc, color='black', linestyle='--', label='99th perc of null dist')
+        ax.annotate(f'p-value = {p_value:.3f}', xy=(0.85, 0.98), xycoords='axes fraction', fontsize=9, va='top', ha='left')
+        ax.set_xlabel('Reliability R')
+        ax.set_ylabel('Count')
+        ax.set_title(f'Neuron {neuron_idx} ({stimuli_name})')
+        ax.legend(loc='upper left', prop={'size': 9})
+
+        fig_name = "r_null_" + stimuli_name + "_neuron_" + str(neuron_idx)
+        foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
+        save_folder = os.path.join(save_dir, foldername)
+        if not os.path.exists(save_folder):
+            os.mkdir(save_folder)
+        save_path = os.path.join(save_folder, fig_name)
+        fig.savefig(save_path)
+        plt.close(fig)
+
     #-------------SAVE FUNCTIONS---------------
     def save_protocol_validity(self, save_dir, filename):
         protocol_validity = []
-        for id in self.responsive_positive.keys():
-            d = {self.visual_stim.protocol_names[id] : np.array(self.responsive_positive[id]) - np.array(self.responsive_negative[id])}
+        for id in self.responsive.keys():
+            d = {self.visual_stim.protocol_names[id] : self.responsive[id]}
             protocol_validity.append(d)
         np.savez(os.path.join(save_dir, filename + ".npz" ), **{key: value for d in protocol_validity for key, value in d.items()})

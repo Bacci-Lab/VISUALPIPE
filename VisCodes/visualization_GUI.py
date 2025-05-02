@@ -146,16 +146,16 @@ class ResponsiveView(QGraphicsView):
 
 class MainVisUI(object):
     def __init__(self, centralwidget, cell_info, background_image_path,
-                 protocol_validity_npz, speed_corr, facemotion_corr, pupil_corr):
+                 protocol_validity, speed_corr, facemotion_corr, pupil_corr):
 
         self.centralwidget = centralwidget
 
         self.cell_info = cell_info
         self.background_image_path = background_image_path
 
-        self.protocol_validity = protocol_validity_npz
-        self.stimuliNames = protocol_validity_npz.files
-        self.selectedProtocol = protocol_validity_npz[self.stimuliNames[0]]
+        self.protocol_validity = protocol_validity
+        self.stimuliNames = protocol_validity.files
+        self.selectedProtocol = [self.protocol_validity[self.stimuliNames[0]][i][0] for i in range(len(self.protocol_validity[self.stimuliNames[0]]))]
         
         self.speed_corr = speed_corr
         self.facemotion_corr = facemotion_corr
@@ -171,7 +171,7 @@ class MainVisUI(object):
             pupil_corr = f['Behavioral']['Correlation']['pupil_corr'][()]
         
         cell_info = np.load(stat_filepath, allow_pickle=True)
-        protocol_validity = np.load(protocol_validity_filepath)
+        protocol_validity = np.load(protocol_validity_filepath, allow_pickle=True)
         
         return cls(centralwidget, cell_info, background_image_path,
                    protocol_validity, speed_corr, facemotion_corr, pupil_corr)
@@ -336,7 +336,7 @@ class MainVisUI(object):
         # Check if protocolValidity exists and process it
         if hasattr(self, "protocol_validity") and self.protocol_validity :
             if protocol in self.stimuliNames:  # Ensure the key exists in the dictionary
-                self.selectedProtocol = self.protocol_validity[protocol]
+                self.selectedProtocol = [self.protocol_validity[protocol][i][0] for i in range(len(self.protocol_validity[protocol]))]
             self.lineEdit_protocol.setText(str(int(np.sum(np.abs(self.selectedProtocol)))))
             self.stim_view.drawObjects(self.selectedProtocol)
         else:
@@ -446,7 +446,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
 
         cell_info = np.load(stat_filepath, allow_pickle=True)
         ops = np.load(ops_filepath, allow_pickle=True).item()
-        protocol_validity = np.load(protocol_validity_filepath)
+        protocol_validity = np.load(protocol_validity_filepath, allow_pickle=True)
 
         with h5py.File(h5_filepath, "r") as f:
             time_stamps = f['Ca_imaging']['Time'][()]
@@ -615,7 +615,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
 
         cell_info = np.load(stat_filepath, allow_pickle=True)
         ops = np.load(ops_filepath, allow_pickle=True).item()
-        protocol_validity = np.load(protocol_validity_filepath)
+        protocol_validity = np.load(protocol_validity_filepath, allow_pickle=True)
 
         with h5py.File(h5_filepath, "r") as f:
             time_stamps = f['Ca_imaging']['Time'][()]
@@ -661,7 +661,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         self.main_vis_ui.background_image_path = self.background_image_path
         self.main_vis_ui.protocol_validity = self.protocol_validity
         self.main_vis_ui.stimuliNames = self.protocol_validity.files
-        self.main_vis_ui.selectedProtocol = self.protocol_validity[self.main_vis_ui.stimuliNames[0]]
+        self.main_vis_ui.selectedProtocol = [self.protocol_validity[self.main_vis_ui.stimuliNames[0]][i][0] for i in range(len(self.protocol_validity[self.main_vis_ui.stimuliNames[0]]))]
         self.main_vis_ui.speed_corr = self.speed_corr
         self.main_vis_ui.facemotion_corr = self.facemotion_corr
         self.main_vis_ui.pupil_corr = self.pupil_corr
