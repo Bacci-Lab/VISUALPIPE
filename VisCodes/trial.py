@@ -196,6 +196,8 @@ class Trial(object):
         nb_frames_min = dt_min * self.ca_img.fs
         positive = None
 
+        min_nb_trials = 7
+
         for i in self.trial_fluorescence.keys():
 
             responsive_roi = []
@@ -213,8 +215,13 @@ class Trial(object):
                 max_val, min_val = np.max(roi_trial_average), np.min(roi_trial_average)
                 
                 # Compute ROI reliability
-                r, r_dist = self.compute_reliability(roi_trial, n_samples=1000)
-                reliability_roi.append(r)
+                if len(roi_trial) >= min_nb_trials :
+                    r, r_dist = self.compute_reliability(roi_trial, n_samples=1000)
+                    reliability_roi.append(r)
+                else :
+                    _, r_dist = self.compute_reliability(roi_trial, n_samples=50)
+                    r = np.mean(list(set(r_dist)))
+                    reliability_roi.append(r)
 
                 if max_val > 1 and max_val > np.abs(min_val):
                     positive = True
@@ -232,19 +239,26 @@ class Trial(object):
                     time = np.linspace(0, stim_dt, len(roi_trial_average))
                     auc = metrics.auc(time[start_idx:end_idx+1], roi_trial_average[start_idx:end_idx+1])
                     if np.abs(auc) >= auc_min : #AUC constraint
-                        r_null_distribution = self.generate_null_distribution(roi_trial)
-                        perc_th = np.percentile(r_null_distribution, 99)
-                        res = ztest(r_dist, value=perc_th, alternative='larger') #two-tailed one-sample t-test
-                        if res[1] <= 0.001 :
-                        #if perc_th <= r :
-                            if positive :
-                                responsive_roi.append((1, res[1]))
+
+                        if len(roi_trial) >= min_nb_trials :
+                            r_null_distribution = self.generate_null_distribution(roi_trial)
+                            perc_th = np.percentile(r_null_distribution, 99)
+                            res = ztest(r_dist, value=perc_th, alternative='larger') #two-tailed one-sample t-test
+                            if res[1] <= 0.001 :
+                            #if perc_th <= r :
+                                if positive :
+                                    responsive_roi.append((1, res[1]))
+                                else :
+                                    responsive_roi.append((-1, res[1]))
+                                self.plot_hist_reliability(r_dist, r, r_null_distribution, perc_th, res[1], 'skyblue', i, roi_idx, save_dir, folder_prefix)
                             else :
-                                responsive_roi.append((-1, res[1]))
-                            self.plot_hist_reliability(r_dist, r, r_null_distribution, perc_th, res[1], 'skyblue', i, roi_idx, save_dir, folder_prefix)
+                                responsive_roi.append((0, res[1]))
+                                self.plot_hist_reliability(r_dist, r, r_null_distribution, perc_th, res[1], 'thistle', i, roi_idx, save_dir, folder_prefix)
                         else :
-                            responsive_roi.append((0, res[1]))
-                            self.plot_hist_reliability(r_dist, r, r_null_distribution, perc_th, res[1], 'thistle', i, roi_idx, save_dir, folder_prefix)
+                            if positive :
+                                responsive_roi.append((1, None))
+                            else :
+                                responsive_roi.append((-1, None))
                     else :
                         responsive_roi.append((0, None))
                 else :
