@@ -403,6 +403,9 @@ else :
 hf.close()
 
 #---------------------------------- Outputs ----------------------------------
+filename = "_".join([unique_id, id_version, 'trials'])
+trials.save_trials(save_dir, filename)
+
 filename = "_".join([unique_id, id_version, 'stat.npy'])
 np.save(os.path.join(save_dir, filename), ca_img_dm.stat, allow_pickle=True)
 

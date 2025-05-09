@@ -640,3 +640,20 @@ class Trial(object):
             d = {self.visual_stim.protocol_names[id] : self.responsive[id]}
             protocol_validity.append(d)
         np.savez(os.path.join(save_dir, filename + ".npz" ), **{key: value for d in protocol_validity for key, value in d.items()})
+    
+    def save_trials(self, save_dir, filename):
+        trials_info = {
+            "ca_img_trace" : self.ca_attr,
+            "dt_pre_stim" : self.dt_pre_stim,
+            "dt_post_stim" : self.dt_post_stim,
+            "dt_post_stim_plot" : self.dt_post_stim_plot,
+            "trial_averaged_zscores" : self.trial_averaged_zscores,
+            "pre_trial_averaged_zscores" : self.pre_trial_averaged_zscores,
+            "post_trial_averaged_zscores" : self.post_trial_averaged_zscores,
+            "trial_zscores" : self.trial_zscores,
+            "pre_trial_zscores" : self.pre_trial_zscores,
+            "post_trial_zscores" : self.post_trial_zscores,
+            "trial_response_bounds" : self.trial_response_bounds,
+            "reliability" : self.reliability,
+                       }
+        np.save(os.path.join(save_dir, filename), trials_info, allow_pickle=True)
