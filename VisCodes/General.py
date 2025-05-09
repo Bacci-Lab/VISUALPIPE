@@ -305,20 +305,20 @@ if len(spont_stimuli_name) > 0 :
 
         # Correlation with dFoF0
         speed_spont = speed[start_spont_index:end_spont_index]
-        speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[i]]
-        speed_corr = [float(value) for value in speed_corr]
-        spont_speed_corr_list.append(speed_corr)
+        spont_speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[i]]
+        spont_speed_corr = [float(value) for value in spont_speed_corr]
+        spont_speed_corr_list.append(spont_speed_corr)
 
         facemotion_spont = facemotion[start_spont_index:end_spont_index]
-        facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[i]]
-        facemotion_corr = [float(value) for value in facemotion_corr]
-        spont_facemotion_corr_list.append(facemotion_corr)
+        spont_facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[i]]
+        spont_facemotion_corr = [float(value) for value in spont_facemotion_corr]
+        spont_facemotion_corr_list.append(spont_facemotion_corr)
 
         pupil_spont = pupil[start_spont_index:end_spont_index]
         if analyze_pupil_order[id] :
-            pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[i]]
-            pupil_corr = [float(value) for value in pupil_corr]
-            spont_pupil_corr_list.append(pupil_corr)
+            spont_pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[i]]
+            spont_pupil_corr = [float(value) for value in spont_pupil_corr]
+            spont_pupil_corr_list.append(spont_pupil_corr)
 
         time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
         print(f"Spontaneous activity time {i}: from {time_stamps_spont[0]} s to {time_stamps_spont[-1]} s")
@@ -337,16 +337,16 @@ if len(spont_stimuli_name) > 0 :
         ax3.set_xlabel('Time (s)')
         plt.show() """
 
-    mean_speed_corr = np.mean(spont_speed_corr_list, axis=0)
-    mean_facemotion_corr = np.mean(spont_facemotion_corr_list, axis=0)
+    speed_corr = np.mean(spont_speed_corr_list, axis=0)
+    facemotion_corr = np.mean(spont_facemotion_corr_list, axis=0)
     if len(spont_pupil_corr_list) > 0 :
-        mean_pupil_corr = np.mean(spont_pupil_corr_list, axis=0)
+        pupil_corr = np.mean(spont_pupil_corr_list, axis=0)
     else :
         nb_rois = len(ca_img_dm.dFoF0)
-        mean_pupil_corr = list(np.zeros(nb_rois))
+        pupil_corr = list(np.zeros(nb_rois))
 else : 
     nb_rois = len(ca_img_dm.dFoF0)
-    mean_speed_corr, mean_facemotion_corr, mean_pupil_corr = np.mean(speed_corr_list), np.mean(facemotion_corr_list), np.mean(pupil_corr_list)
+    speed_corr, facemotion_corr, pupil_corr = speed_corr_list, facemotion_corr_list, pupil_corr_list
 
 ################################
 
@@ -416,7 +416,7 @@ if COMPILE :
                 'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.nanstd(facemotion),
                 'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.nanstd(pupil),
                 'Spontaneous' : True if len(spont_stimuli_name) > 0 else False,
-                'Mean_speed_corr' : np.nanmean(mean_speed_corr), 'Mean_fmotion_corr' : np.nanmean(mean_facemotion_corr), 'Mean_pupil_corr' : np.nanmean(mean_pupil_corr), 
+                'Mean_speed_corr' : np.nanmean(speed_corr), 'Mean_fmotion_corr' : np.nanmean(facemotion_corr), 'Mean_pupil_corr' : np.nanmean(pupil_corr), 
                 'Mean_dFoF0' : np.nanmean(ca_img_dm.dFoF0), 
                 'Run % (pupil)' : run_ratio_pupil, 'AS % (pupil)' : as_ratio_pupil, 'Rest % (pupil)' : rest_ratio_pupil,
                 'Run % (motion)' : run_ratio_facemotion, 'AS % (motion)' : as_ratio_facemotion, 'Rest % (motion)' : rest_ratio_facemotion,
@@ -441,7 +441,7 @@ file.save_analysis_settings(settings, save_dir)
 main_window = VisualizationGUI(save_dir, 
                                ca_img_dm.stat, ca_img_dm.ops, background_image_path,
                                protocol_validity_npz, 
-                               mean_speed_corr, mean_facemotion_corr, mean_pupil_corr, 
+                               speed_corr, facemotion_corr, pupil_corr, 
                                computed_F_norm, ca_img_dm.time_stamps, speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode, stim_time_period, 
                                red_image_path)
 main_window.show()
