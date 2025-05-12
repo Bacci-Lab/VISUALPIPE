@@ -524,42 +524,47 @@ def stage_plot_locomotion(speed, dF, real_time, Real_Time_states:dict, states_wi
     fig2.savefig(save_path)
     plt.close(fig2)
 
-def find_intervals(selected_ids:list, interval:int, RealTime, exclude_S=0, min_inter_interval_time=0):
+def find_intervals(x, min_window_size, time, exclude=0, min_inter_interval_size=0):
     """
-    PARAMS
-    - selected_ids: list or array of indexes of interest to divide in intervals
-    - interval: minimum number of frames for each interval
-    - RealTime: array of time to divide in intervals
-    - exclude_S: frames that should be removed at the beginning of window
+    :param x: list or array of indexes of interest to divide in intervals
+    :param int min_window_size: minimum number of frames for each state interval
+    :param time: list array of time to divide in intervals
+    :param int exclude: frames that should be removed at the beginning of window. Default is 0.
+    :param int min_inter_interval_size: minimum number of frames separating two intervals. Default is 0.
     """
-    Real_TIME_W = []
-    motion_window = []
-    motion_index =[]
+    time_bounds = []
+    index_bounds = []
+    index_intervals =[]
     window = []
 
-    for i in range(len(selected_ids)):
-        if (selected_ids[i] + 1) in selected_ids:
-            window.append(selected_ids[i])
-        elif i < len(selected_ids)-1 and (selected_ids[i+1] - selected_ids[i]) < min_inter_interval_time:
-            window.extend(np.arange(selected_ids[i], selected_ids[i+1]))
+    if exclude > min_window_size :
+        exclude = 0
+        print("Minimum window size is under 1s. No frames will be removed at the beginning of the window.")
+
+    for i in range(len(x)):
+        if (x[i] + 1) in x:
+            window.append(x[i])
+        elif i < len(x)-1 and (x[i+1] - x[i]) < min_inter_interval_size:
+            window.extend(np.arange(x[i], x[i+1]))
         else :
-            window.append(selected_ids[i])
-            if len(window) >= interval:
-                motion_index.append(window[exclude_S:])
+            window.append(x[i])
+            if len(window) >= min_window_size:
+                index_intervals.append(window[exclude:])
             window = []
-    for interval in motion_index:
-        real_time_W = []
-        S_E = []
+    
+    for interval in index_intervals:
+        time_bounds_temp = []
+        index_bounds_temp = []
 
-        S_E.append(interval[0])
-        S_E.append(interval[-1])
-        real_time_W.append(RealTime[interval[0]])
-        real_time_W.append(RealTime[interval[-1]])
+        index_bounds_temp.append(interval[0])
+        index_bounds_temp.append(interval[-1])
+        time_bounds_temp.append(time[interval[0]])
+        time_bounds_temp.append(time[interval[-1]])
 
-        motion_window.append(S_E)
-        Real_TIME_W.append(real_time_W)
+        index_bounds.append(index_bounds_temp)
+        time_bounds.append(time_bounds_temp)
 
-    return motion_index, motion_window, Real_TIME_W
+    return index_intervals, index_bounds, time_bounds
 
 def state_duration(state_real_time):
     general_time = 0
