@@ -411,7 +411,7 @@ np.save(os.path.join(save_dir, filename), ca_img_dm.stat, allow_pickle=True)
 
 if COMPILE :
     data_df = pd.DataFrame({
-                "Session_id": unique_id, "Protocol": global_protocol, "Experimenter": experimenter, "Mouse_id": subject_id_anibio,
+                "Session_id": unique_id, "Output_id": id_version,"Protocol": global_protocol, "Experimenter": experimenter, "Mouse_id": subject_id_anibio,
                 'Mean_speed' : np.nanmean(speed), 'Std_speed' : np.nanstd(speed),
                 'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.nanstd(facemotion),
                 'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.nanstd(pupil),

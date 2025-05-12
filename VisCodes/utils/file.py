@@ -25,22 +25,28 @@ def compile_xlsx_file(df : pd.DataFrame, filepath, filename="compile_per_Tseries
     else : 
         if verbose :
             print("Excel sheet already exists")
-        df_existing = pd.read_excel(path_compile).set_index("Session_id")
+        df_existing = pd.read_excel(path_compile)
+        
+        same_recording_list = [id for id in df_existing.index if df_existing.loc[id]["Session_id"] == df.index[0]]
+        for el in same_recording_list :
+            if df_existing.loc[el]["Output_id"] == df.iloc[0]["Output_id"] :
+                # Remove row
+                df_existing.drop(index=el, inplace=True)
+                if verbose :
+                    print("Row with the same session id and output id already exists in the Excel file. Removing old row.")
+        
+        # Set index to Session_id
+        df_existing.set_index("Session_id", inplace=True)
 
-        if df.index[0] not in df_existing.index:
-            # Append new data
-            df_combined = pd.concat([df_existing, df], ignore_index=False)
-
-            # Save the combined data to Excel
-            df_combined.to_excel(path_compile)
-            
-            if verbose :
-                print("New row added successfully.")
-            return df_combined
-        else:
-            if verbose :
-                print("Row with the same session id already exists in the Excel file. Row not added.")
-            return df_existing
+        # Append new data
+        df_combined = pd.concat([df_existing, df], ignore_index=False)
+        
+        # Save the combined data to Excel
+        df_combined.to_excel(path_compile)
+        
+        if verbose :
+            print("New row added successfully.")
+        return df_combined
 
 def get_mouse_id(path, filename):
     excel_path = os.path.join(path, filename+'.xlsx')
