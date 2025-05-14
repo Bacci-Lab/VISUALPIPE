@@ -341,6 +341,19 @@ class Trial(object):
         
         return r_null_distribution
 
+    def compute_cmi(self):
+        id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
+        id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
+        cmi = []
+
+        for i in range(len(self.ca_img._list_ROIs_idx)) :
+            cross = np.mean(self.trial_fluorescence[id_srm_cross][i])
+            iso = np.mean(self.trial_fluorescence[id_srm_iso][i])
+            cmi_roi = (cross - iso) / (cross + iso)
+            cmi.append(cmi_roi)
+    
+        return cmi
+    
     #--------------TOOL FUNCTIONS---------------
     def zscores(self, baselines, traces):
         return np.array([(traces[i, :] - np.mean(baselines, axis=1)[i]) / np.std(baselines, axis=1)[i] for i in range(traces.shape[0])])

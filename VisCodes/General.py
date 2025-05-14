@@ -230,6 +230,12 @@ trials.find_responsive_rois(save_dir, folder_prefix="_".join([unique_id, id_vers
 filename = "_".join([unique_id, id_version, 'protocol_validity_2'])
 trials.save_protocol_validity(save_dir, filename)
 
+# Compute contextual modulation index
+if "center-surround-cross" in visual_stim.protocol_names :
+    cmi = trials.compute_cmi()
+else :
+    cmi = None
+
 # Compute the trial zscores not based on the averaged baseline but the baseline of the trace
 trial_zscores, pre_trial_zscores, post_trial_zscores = trials.compute_trial_zscores('dFoF0')
 
@@ -389,6 +395,8 @@ file.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, c
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
 file.create_H5_dataset(stimuli_group, [visual_stim.real_time_onset, F_Time_start_realigned, F_stim_init_indexes], 
                                     ['time_onset', 'time_onset_caimg_timescale', 'idx_onset_caimg_timescale'])
+if cmi is not None :
+    file.create_H5_dataset(stimuli_group, [cmi], ['cmi'])
 file.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
                                     ['0_original', '1_neuropil', '2_alpha', '3_F0'])
 if not face_cam_dm.no_face_data :
