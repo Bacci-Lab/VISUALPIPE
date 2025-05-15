@@ -94,7 +94,7 @@ class VisualStim(object):
                    '-13': 'up-left', 
                    '13':'down-right', 
                    '-59':'down-left'}
-            qsm_loc = [map[str(int(value))] if id == id_qsm else None for id, value in zip(visual_stim['protocol_id'], np.array(visual_stim['x-center']) + np.array(visual_stim['y-center']))]
+            qsm_loc = [map[str(int(value))] if id == id_qsm else None for id, value in zip(visual_stim['protocol_id'], np.array(visual_stim['x-center'], dtype=float) + np.array(visual_stim['y-center'], dtype=float))]
         else :
             qsm_loc = None
             qsm_names = None
@@ -115,7 +115,7 @@ class VisualStim(object):
         if 'surround' in self.protocol_names :
             s_names = ["iso_ctrl", "cross_ctrl"]
             id_s = self.protocol_df[self.protocol_df['name'] == 'surround'].index[0]
-            surround_type = ['iso_ctrl' if angle_s == angle and id == id_s else 'cross_ctrl' if id == id_s else None for id, angle, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle'], visual_stim['angle-surround'])]
+            surround_type = ['iso_ctrl' if angle_s == 0 and id == id_s else 'cross_ctrl' if id == id_s else None for id, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle-surround'])]
         else :
             surround_type = None
             s_names = None
