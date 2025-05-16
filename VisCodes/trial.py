@@ -617,7 +617,7 @@ class Trial(object):
             foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
             save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence')
             if not os.path.exists(save_folder):
-                os.mkdir(save_folder)
+                os.makedirs(save_folder)
             save_path = os.path.join(save_folder, fig_name)
             fig.savefig(save_path)
             plt.close(fig)
