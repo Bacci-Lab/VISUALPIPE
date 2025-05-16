@@ -187,35 +187,24 @@ class VisualStim(object):
         """
         protocol_nb_frames = []
         stimuli_ids_order = []
-        nb_stimuli = 0
 
-        for id in chosen_protocols :
-            protocol_duration = self.protocol_df['duration'][id]
-            protocol_nb_frames.append(int(protocol_duration * freq))
-            nb_stimuli += self.order.count(id)
+        idx_lim_protocol = []
+        var_protocol = []
 
-        if nb_stimuli > 0 :
-            idx_lim_protocol = []
-            var_protocol = []
-            stim = 0
-
-            for i in range(len(self.order)):
+        for i in range(len(self.order)):
+            
+            if self.order[i] in chosen_protocols:
+                stimuli_ids_order.append(self.order[i])
+                start_spon_index = int(F_stim_init_indexes[i])
+                protocol_nb_frames = int(self.protocol_df.loc[self.order[i]]["duration"] * freq)
+                idx_lim_protocol.append([start_spon_index, start_spon_index + protocol_nb_frames])
                 
-                if self.order[i] in chosen_protocols:
-                    stimuli_ids_order.append(self.order[i])
-                    start_spon_index = int(F_stim_init_indexes[i])
-                    idx_lim_protocol.append([start_spon_index, start_spon_index + protocol_nb_frames[stim]])
-                    
-                    if tseries is not None :
-                        temp = np.ones((len(tseries), protocol_nb_frames[stim]))
-                        for neuron in range(len(tseries)):
-                            F_spontaneous_i = tseries[neuron, start_spon_index: start_spon_index + protocol_nb_frames[stim]]
-                            temp[neuron] = F_spontaneous_i
-                        var_protocol.append(temp)
-                    stim += 1
-        
-        else :
-            raise Exception("0 stimuli of the chosen protocol has been found")
+                if tseries is not None :
+                    temp = np.ones((len(tseries), protocol_nb_frames))
+                    for neuron in range(len(tseries)):
+                        F_spontaneous_i = tseries[neuron, start_spon_index: start_spon_index + protocol_nb_frames]
+                        temp[neuron] = F_spontaneous_i
+                    var_protocol.append(temp)
         
         if tseries is not None :
             return idx_lim_protocol, stimuli_ids_order, var_protocol

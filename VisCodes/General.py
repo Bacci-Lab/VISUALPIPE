@@ -22,6 +22,7 @@ import red_cell_function
 import utils.file as file
 from trial import Trial
 import behavioral_states
+import spontaneous as spont
 
 COMPILE = False
 
@@ -281,78 +282,81 @@ np.savez(os.path.join(save_dir, filename_protocol), **{key: value for d in proto
 print(protocol_validity)
 
 #---------------------------------- Spontaneous behaviour ----------------------------------
-spont_speed_corr_list = []
-spont_facemotion_corr_list = []
-spont_pupil_corr_list = []
-spont_stimuli_name = []
-spont_stimuli_id = []
-analyze_pupil = []
-for stimuli_name in visual_stim.protocol_names :
-    if 'grey' in stimuli_name :
-        if stimuli_name not in spont_stimuli_name :
-            spont_stimuli_name.append(stimuli_name)
-            analyze_pupil.append(1)
-    elif 'black' in stimuli_name :
-        if stimuli_name not in spont_stimuli_name :
-            spont_stimuli_name.append(stimuli_name)
-            analyze_pupil.append(0)
+spont_stimuli_id, analyze_pupil = spont.get_spont_stim(visual_stim)
 
-if len(spont_stimuli_name) > 0 :
-    for el in spont_stimuli_name :
-        id_spont = protocol_df[protocol_df['name'] == el].index[0]
-        spont_stimuli_id.append(id_spont)
-
+if len(spont_stimuli_id) > 0 :
+    spont_speed_corr_list = []
+    spont_facemotion_corr_list = []
+    spont_pupil_corr_list = []
+    valid_neurons_speed_list = []
+    valid_neurons_facemotion_list = []
+    valid_neurons_pupil_list = []
+    
     idx_lim_protocol, spont_stimuli_id_order, F_spontaneous = visual_stim.get_protocol_onset_index(spont_stimuli_id, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.dFoF0)
 
     analyze_pupil_order = dict(zip(spont_stimuli_id, analyze_pupil))
 
     for i, id  in zip(range(len(spont_stimuli_id_order)), spont_stimuli_id_order):
         [start_spont_index, end_spont_index] = idx_lim_protocol[i]
-
-        # Correlation with dFoF0
-        speed_spont = speed[start_spont_index:end_spont_index]
-        spont_speed_corr = [pearsonr(speed_spont, ROI)[0] for ROI in F_spontaneous[i]]
-        spont_speed_corr = [float(value) for value in spont_speed_corr]
-        spont_speed_corr_list.append(spont_speed_corr)
-
-        facemotion_spont = facemotion[start_spont_index:end_spont_index]
-        spont_facemotion_corr = [pearsonr(facemotion_spont, ROI)[0] for ROI in F_spontaneous[i]]
-        spont_facemotion_corr = [float(value) for value in spont_facemotion_corr]
-        spont_facemotion_corr_list.append(spont_facemotion_corr)
-
-        pupil_spont = pupil[start_spont_index:end_spont_index]
-        if analyze_pupil_order[id] :
-            spont_pupil_corr = [pearsonr(pupil_spont, ROI)[0] for ROI in F_spontaneous[i]]
-            spont_pupil_corr = [float(value) for value in spont_pupil_corr]
-            spont_pupil_corr_list.append(spont_pupil_corr)
+        name_stimuli = protocol_df.loc[spont_stimuli_id_order[i]]['name']
+        save_spont_dir = os.path.join(save_dir, "_".join([unique_id, 'spontaneous']))
+        save_spont_dir_i = os.path.join(save_spont_dir, name_stimuli)
+        if not os.path.exists(save_spont_dir_i) : os.makedirs(save_spont_dir_i)
 
         time_stamps_spont = new_time_stamps[start_spont_index:end_spont_index]
-        print(f"Spontaneous activity time {i}: from {time_stamps_spont[0]} s to {time_stamps_spont[-1]} s")
+        print(f"Spontaneous activity time {name_stimuli} {i}: from {time_stamps_spont[0]} s to {time_stamps_spont[-1]} s")
 
-        """ ax1 = plt.subplot(311)
-        ax1.plot(time_stamps_spont, speed_spont, color='goldenrod')
-        ax1.set_title('speed')
-        ax1.set_xticks([])
-        ax2 = plt.subplot(312)
-        ax2.plot(time_stamps_spont, facemotion_spont, color='gray')
-        ax2.set_title('facemotion')
-        ax2.set_xticks([])
-        ax3 = plt.subplot(313)
-        ax3.plot(time_stamps_spont, pupil_spont, color='black')
-        ax3.set_title('pupil')
-        ax3.set_xlabel('Time (s)')
-        plt.show() """
+        # Speed correlation
+        speed_spont = speed[start_spont_index:end_spont_index]
+        spont_speed_corr, valid_neurons_temp = spont.compute_spont_corr(speed_spont, F_spontaneous[i], time_stamps_spont, 'speed', save_spont_dir_i)
+        spont_speed_corr_list.append(spont_speed_corr)
+        valid_neurons_speed_list.append(valid_neurons_temp)
+        spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], speed_spont, valid_neurons_temp, spont_speed_corr, sigma=10, label='speed', save_path=save_spont_dir_i)
+
+        # Facemotion correlation
+        facemotion_spont = facemotion[start_spont_index:end_spont_index]
+        spont_facemotion_corr, valid_neurons_temp = spont.compute_spont_corr(facemotion_spont, F_spontaneous[i], time_stamps_spont, 'facemotion', save_spont_dir_i)
+        spont_facemotion_corr_list.append(spont_facemotion_corr)
+        valid_neurons_facemotion_list.append(valid_neurons_temp)
+        spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], facemotion_spont, valid_neurons_temp, spont_facemotion_corr, sigma=10, label='facemotion', save_path=save_spont_dir_i)
+
+        # Pupil correlation
+        pupil_spont = pupil[start_spont_index:end_spont_index]
+        if analyze_pupil_order[id] :
+            spont_pupil_corr, valid_neurons_temp = spont.compute_spont_corr(pupil_spont, F_spontaneous[i], time_stamps_spont, 'pupil', save_spont_dir_i)
+            spont_pupil_corr_list.append(spont_pupil_corr)
+            valid_neurons_pupil_list.append(valid_neurons_temp)
+            spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], pupil_spont, valid_neurons_temp, spont_pupil_corr, sigma=10, label='pupil', save_path=save_spont_dir_i)
 
     speed_corr = np.mean(spont_speed_corr_list, axis=0)
+    valid_neurons_speed = spont.get_valid_neurons(valid_neurons_speed_list)
+    spont.pie_plot(len(valid_neurons_speed), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_speed), save_spont_dir, 'speed')
+    valid_neurons_speed_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_speed_list)))
+    for i in range(len(valid_neurons_speed_list)) : 
+        valid_neurons_speed_list2[valid_neurons_speed_list[i], i] = 1
+
     facemotion_corr = np.mean(spont_facemotion_corr_list, axis=0)
+    valid_neurons_facemotion = spont.get_valid_neurons(valid_neurons_facemotion_list)
+    spont.pie_plot(len(valid_neurons_facemotion), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_facemotion), save_spont_dir, 'facemotion')
+    valid_neurons_facemotion_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_facemotion_list)))
+    for i in range(len(valid_neurons_facemotion_list)) : 
+        valid_neurons_facemotion_list2[valid_neurons_facemotion_list[i], i] = 1
+
     if len(spont_pupil_corr_list) > 0 :
         pupil_corr = np.mean(spont_pupil_corr_list, axis=0)
+        valid_neurons_pupil = spont.get_valid_neurons(valid_neurons_pupil_list)
+        spont.pie_plot(len(valid_neurons_pupil), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_pupil), save_spont_dir, 'pupil')
+        valid_neurons_pupil_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_pupil_list)))
+        for i in range(len(valid_neurons_pupil_list)) : 
+            valid_neurons_pupil_list2[valid_neurons_pupil_list[i], i] = 1
     else :
-        nb_rois = len(ca_img_dm.dFoF0)
+        nb_rois = len(ca_img_dm._list_ROIs_idx)
         pupil_corr = list(np.zeros(nb_rois))
+        valid_neurons_pupil = None
+    
 else : 
-    nb_rois = len(ca_img_dm.dFoF0)
     speed_corr, facemotion_corr, pupil_corr = np.array(speed_corr_list), np.array(facemotion_corr_list), np.array(pupil_corr_list)
+    valid_neurons_speed_list2, valid_neurons_facemotion_list2, valid_neurons_pupil_list2 = None, None, None
 
 ################################
 
@@ -388,8 +392,10 @@ else :
 
 file.create_H5_dataset(behavioral_group, [speedAndTimeSt, fmotionAndTimeSt, pupilAndTimeSt, photodiode], ['Speed', 'FaceMotion', 'Pupil', 'Photodiode'])
 file.create_H5_dataset(correlation, [speed_corr_list, facemotion_corr_list, pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
-if len(spont_stimuli_name) > 0 :
+if len(spont_stimuli_id) > 0 :
     file.create_H5_dataset(spont_correlation, [spont_speed_corr_list, spont_facemotion_corr_list, spont_pupil_corr_list], ['speed_corr', 'facemotion_corr', 'pupil_corr'])
+    spont_valid_rois = spont_correlation.create_group("Valid_ROIs")
+    file.create_H5_dataset(spont_valid_rois, [valid_neurons_speed_list2, valid_neurons_facemotion_list2, valid_neurons_pupil_list2], ['speed', 'facemotion', 'pupil'])
 caImg_group.create_dataset('Time', data=ca_img_dm.time_stamps)
 file.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, ca_img_dm.fluorescence, ca_img_dm.f0, ca_img_dm.dFoF0], 
                                     ['raw_F', 'raw_Fneu', 'F', 'F0', 'dFoF0'])
@@ -423,7 +429,7 @@ if COMPILE :
                 'Mean_speed' : np.nanmean(speed), 'Std_speed' : np.nanstd(speed),
                 'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.nanstd(facemotion),
                 'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.nanstd(pupil),
-                'Spontaneous' : True if len(spont_stimuli_name) > 0 else False,
+                'Spontaneous' : True if len(spont_stimuli_id) > 0 else False,
                 'Mean_speed_corr' : np.nanmean(speed_corr), 'Mean_fmotion_corr' : np.nanmean(facemotion_corr), 'Mean_pupil_corr' : np.nanmean(pupil_corr), 
                 'Mean_dFoF0' : np.nanmean(ca_img_dm.dFoF0), 
                 'Run % (pupil)' : run_ratio_pupil, 'AS % (pupil)' : as_ratio_pupil, 'Rest % (pupil)' : rest_ratio_pupil,
