@@ -27,6 +27,7 @@ class InputWindow(QtWidgets.QMainWindow):
             "speed_th": self.ui.speed_th,
             "facemotion_th": self.ui.motion_th,
             "pupil_th": self.ui.pupil_th,
+            "pupil_th_type" : self.ui.pupil_th_type,
             "min_run_window": self.ui.min_run_window,
             "min_as_window": self.ui.min_as_window,
             "min_rest_window": self.ui.min_rest_window,
@@ -108,35 +109,37 @@ class Ui_MainWindow(object):
     def setup_third_grid(self):
         self.third_grid = QGridLayout()
 
-        self.speed_th_label = self.create_label("Speed threshold (cm/s)", self.third_grid, 0, 0)
-        self.speed_th_lineEdit = self.create_line_edit(self.third_grid, 1, 0)
+        self.speed_th_label = self.create_label("Speed threshold (cm/s)", self.third_grid, 0, 0, colspan=2)
+        self.speed_th_lineEdit = self.create_line_edit(self.third_grid, 1, 0, colspan=2)
         self.speed_th_lineEdit.setValidator(QDoubleValidator())
         self.speed_th_lineEdit.setText("0.5")
 
-        self.motion_th_label = self.create_label("Facemotion threshold (std)", self.third_grid, 0, 1)
-        self.motion_th_lineEdit = self.create_line_edit(self.third_grid, 1, 1)
+        self.motion_th_label = self.create_label("Facemotion threshold (std)", self.third_grid, 0, 2, colspan=2)
+        self.motion_th_lineEdit = self.create_line_edit(self.third_grid, 1, 2, colspan=2)
         self.motion_th_lineEdit.setValidator(QDoubleValidator())
         self.motion_th_lineEdit.setText("2.0")
 
-        self.pupil_th_label = self.create_label("Pupil threshold (std)", self.third_grid, 0, 2)
-        self.pupil_th_lineEdit = self.create_line_edit(self.third_grid, 1, 2)
-        self.pupil_th_lineEdit.setValidator(QDoubleValidator())
-        self.pupil_th_lineEdit.setText("2.0")
+        self.pupil_th_label = self.create_label("Pupil threshold", self.third_grid, 0, 4, colspan=2)
+        self.pupil_th_spinbox = self.create_spin_box(0.5, self.third_grid, 1, 4, double=True)
+        self.pupil_th_spinbox.setMaximum(1.)
+        self.pupil_th_spinbox.setMinimum(0.)
+        self.comboBox_pupil_th_type = self.create_combo_box(["quantile", "std"], self.third_grid, 1, 5)
+        self.comboBox_pupil_th_type.currentTextChanged.connect(self.on_change_pupil_th_type)
 
         verticalSpacer = QtWidgets.QSpacerItem(0, 5, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        self.third_grid.addItem(verticalSpacer, 2, 0, columnSpan=3)
+        self.third_grid.addItem(verticalSpacer, 2, 0, columnSpan=6)
 
-        self.min_run_window_label = self.create_label("Run min duration (s)", self.third_grid, 3, 0)
-        self.min_run_window_spinbox = self.create_spin_box(3.5, self.third_grid, 4, 0, double=True)
+        self.min_run_window_label = self.create_label("Run min duration (s)", self.third_grid, 3, 0, colspan=2)
+        self.min_run_window_spinbox = self.create_spin_box(3.5, self.third_grid, 4, 0, double=True, colspan=2)
 
-        self.min_as_window_label = self.create_label("AS min duration (s)", self.third_grid, 3, 1)
-        self.min_as_window_spinbox = self.create_spin_box(2.5, self.third_grid, 4, 1, double=True)
+        self.min_as_window_label = self.create_label("AS min duration (s)", self.third_grid, 3, 2, colspan=2)
+        self.min_as_window_spinbox = self.create_spin_box(2.5, self.third_grid, 4, 2, double=True, colspan=2)
 
-        self.min_rest_window_label = self.create_label("Rest min duration (s)", self.third_grid, 3, 2)
-        self.min_rest_window_spinbox = self.create_spin_box(1.5, self.third_grid, 4, 2, double=True)
+        self.min_rest_window_label = self.create_label("Rest min duration (s)", self.third_grid, 3, 4, colspan=2)
+        self.min_rest_window_spinbox = self.create_spin_box(1.5, self.third_grid, 4, 4, double=True, colspan=2)
 
         verticalSpacer = QtWidgets.QSpacerItem(0, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        self.third_grid.addItem(verticalSpacer, 5, 0, columnSpan=3)
+        self.third_grid.addItem(verticalSpacer, 5, 0, columnSpan=6)
 
     def setup_second_grid(self):
         self.second_grid = QGridLayout()
@@ -168,7 +171,8 @@ class Ui_MainWindow(object):
 
         self.speed_th = float(self.speed_th_lineEdit.text())
         self.motion_th = float(self.motion_th_lineEdit.text())
-        self.pupil_th = float(self.pupil_th_lineEdit.text())
+        self.pupil_th = self.pupil_th_spinbox.value()
+        self.pupil_th_type = str(self.comboBox_pupil_th_type.currentText())
         self.min_run_window = self.min_run_window_spinbox.value()
         self.min_as_window = self.min_as_window_spinbox.value()
         self.min_rest_window = self.min_rest_window_spinbox.value()
@@ -233,6 +237,16 @@ class Ui_MainWindow(object):
         red_path = QFileDialog.getOpenFileName(None, "Select red channel TIF file", filter="Images (*.tif *.tiff )")
         self.lineEdit_red_tif_path.setText(red_path[0])
 
+    def on_change_pupil_th_type(self, text):
+        if text == 'quantile' :
+            self.pupil_th_spinbox.setMaximum(1.)
+            self.pupil_th_spinbox.setValue(0.5)
+        elif text =='std' :
+            self.pupil_th_spinbox.setMaximum(99.)
+            self.pupil_th_spinbox.setValue(2.)
+        else :
+            raise Exception(f"Pupil threshold type incorrect: {text}. Should be quantile or std.")
+        
     def create_label(self, text, layout, row, col, rowspan=1, colspan=1):
         label = QLabel(text, self.centralwidget)
         layout.addWidget(label, row, col, rowspan, colspan)

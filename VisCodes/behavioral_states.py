@@ -11,7 +11,7 @@ from scipy.stats import zscore
 from sklearn.preprocessing import MinMaxScaler
 
 def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, real_time, min_states_window:dict, 
-                 fs:float, method='pupil', speed_filter_kernel=0, behav_filter_kernel=0):
+                 fs:float, method='std', speed_filter_kernel=0, behav_filter_kernel=0):
     """
     October 2023 - Bacci Lab - faezeh.rabbani97@gmail.com
 
@@ -32,7 +32,7 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     :param real_time: real time stamps extracted from xml file
     :param min_states_window: dictionnary with minimum dt in s for each states
     :param fs: sample frequency of data
-    :param method: string indicating which threshold using between 'facemotion' or 'pupil'
+    :param method: string indicating which threshold to use between 'quantile' or 'std'
     :param speed_filter_kernel: kernel size for filtering speed trace
     :param behav_filter_kernel: kernel size for filtering behavioral trace
 
@@ -48,13 +48,13 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     if behav_filter_kernel > 0 :
         behavior = gaussian_filter1d(behavior, behav_filter_kernel)
     
-    if method == 'facemotion' :
+    scaler = MinMaxScaler()
+    behavior = scaler.fit_transform(behavior.reshape(-1, 1)).reshape(-1)
+    
+    if method == 'std' :
         behav_threshold = behav_threshold*(np.std(behavior))
-    elif method == "pupil" :
-        scaler = MinMaxScaler()
-        behavior = scaler.fit_transform(behavior.reshape(-1, 1)).reshape(-1)
-        #behav_threshold = np.quantile(behavior, behav_threshold)
-        behav_threshold = behav_threshold*(np.std(behavior))
+    elif method == "quantile" :
+        behav_threshold = np.quantile(behavior, behav_threshold)
     
     ###------------------------------ Calculate active movement state -----------------------------###
     # default param: duration > 60 frames and speed > 0.5 s/m
@@ -222,7 +222,7 @@ def split_stages_locomotion(speed, speed_threshold:float, real_time, min_states_
     return Real_Time_states, states_window
 
 def stage_plot(speed, motion, pupil, dF, real_time, Real_Time_states:dict, states_window:dict, 
-               save_dir:str, speed_th:float, behav_th:float, method='pupil', 
+               save_dir:str, speed_th:float, behav_th:float, method='std', threshold_on="pupil",
                speed_filter_kernel=0, motion_filter_kernel=0,  pupil_filter_kernel=0, dFoF_filter_kernel=0, svg=False):
     
     marker_idx = []
@@ -242,12 +242,17 @@ def stage_plot(speed, motion, pupil, dF, real_time, Real_Time_states:dict, state
     scaler_pupil = MinMaxScaler()
     normalized_motion = scaler_motion.fit_transform(motion.reshape(-1, 1)).reshape(-1)
     normalized_pupil = scaler_pupil.fit_transform(pupil.reshape(-1, 1)).reshape(-1)
-
-    if method == 'facemotion' :
-        behav_th = behav_th*(np.std(normalized_motion))
-    elif method == "pupil" :
-        #behav_th = np.quantile(normalized_pupil, behav_th)
-        behav_th = behav_th*(np.std(normalized_pupil))
+    
+    if method == 'std' :
+        if threshold_on == 'facemotion' :
+            behav_th = behav_th*(np.std(normalized_motion))
+        elif threshold_on == "pupil" :
+            behav_th = behav_th*(np.std(normalized_pupil))
+    elif method == 'quantile' :
+        if threshold_on == 'facemotion' :
+            behav_th = np.quantile(normalized_motion, behav_th)
+        elif threshold_on == "pupil" :
+            behav_th = np.quantile(normalized_pupil, behav_th)
 
     colors, positions = ['darkred', 'lightgray'], [0, 1]
     cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=3)
@@ -292,12 +297,12 @@ def stage_plot(speed, motion, pupil, dF, real_time, Real_Time_states:dict, state
     axs[2].plot(real_time, tr, color = '#555555', linestyle='--', label='running th')
 
     # Facemotion threshold
-    if method == 'facemotion' :
+    if threshold_on == 'facemotion' :
         axs[1].axhline(behav_th, color = '#555555', linestyle='--', label='motion th')
         axs[1].legend(loc='upper left', bbox_to_anchor=(1.0, 1.0), prop={'size': 9})
 
     # Pupil threshold
-    elif method == 'pupil':
+    elif threshold_on == 'pupil':
         axs[0].axhline(behav_th, color = '#555555', linestyle='--', label='pupil th')
         axs[0].legend(loc='upper left', bbox_to_anchor=(1.0, 1.0), prop={'size': 9})
     
@@ -321,10 +326,10 @@ def stage_plot(speed, motion, pupil, dF, real_time, Real_Time_states:dict, state
                  loc='lower left', bbox_to_anchor=(1.0, 0.0), prop={'size': 9})
     
     if svg == True:
-        save_direction_svg = os.path.join(save_dir, "activity_states_" + method +".svg")
+        save_direction_svg = os.path.join(save_dir, "activity_states_" + threshold_on +".svg")
         fig.savefig(save_direction_svg,format = 'svg')
 
-    save_path = os.path.join(save_dir, "activity_states_" + method)
+    save_path = os.path.join(save_dir, "activity_states_" + threshold_on)
     fig.savefig(save_path)
     plt.close(fig)
 
@@ -399,10 +404,10 @@ def stage_plot(speed, motion, pupil, dF, real_time, Real_Time_states:dict, state
     
     #------------------
     if svg == True:
-        save_direction_svg = os.path.join(save_dir, "activity_states2_" + method + ".svg")
+        save_direction_svg = os.path.join(save_dir, "activity_states2_" + threshold_on + ".svg")
         fig2.savefig(save_direction_svg,format = 'svg')
 
-    save_path = os.path.join(save_dir, "activity_states2_" + method)
+    save_path = os.path.join(save_dir, "activity_states2_" + threshold_on)
     fig2.savefig(save_path)
     plt.close(fig2)
 

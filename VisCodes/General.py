@@ -53,6 +53,7 @@ num_samples = int(inputs["bootstrap_nb_samples"])
 speed_threshold = inputs["speed_th"]
 facemotion_threshold = inputs["facemotion_th"]
 pupil_threshold = inputs["pupil_th"]
+pupil_threshold_type = inputs["pupil_th_type"]
 min_run_window = inputs["min_run_window"]
 min_as_window = inputs["min_as_window"]
 min_rest_window = inputs["min_rest_window"]
@@ -177,11 +178,11 @@ if not face_cam_dm.no_face_data :
     real_time_states_facemotion, states_window_facemotion =\
         behavioral_states.split_stages(speed, facemotion, speed_threshold, facemotion_threshold, 
                                        ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
-                                       'facemotion', speed_filter_kernel, motion_filter_kernel)
+                                       'std', speed_filter_kernel, motion_filter_kernel)
 
     behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
                                  ca_img_dm.time_stamps, real_time_states_facemotion, states_window_facemotion, 
-                                 save_fig_dir, speed_threshold, facemotion_threshold,'facemotion', 
+                                 save_fig_dir, speed_threshold, facemotion_threshold,'std', 'facemotion', 
                                  speed_filter_kernel, motion_filter_kernel, pupil_filter_kernel, dFoF_filter_kernel,
                                  svg=False)
 
@@ -193,11 +194,11 @@ if not face_cam_dm.no_face_data :
     real_time_states_pupil, states_window_pupil =\
         behavioral_states.split_stages(speed, pupil, speed_threshold, pupil_threshold, 
                                        ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
-                                       'pupil', speed_filter_kernel, pupil_filter_kernel)
+                                       pupil_threshold_type, speed_filter_kernel, pupil_filter_kernel)
 
     behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
                                  ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, 
-                                 save_fig_dir, speed_threshold, pupil_threshold, 'pupil', 
+                                 save_fig_dir, speed_threshold, pupil_threshold, pupil_threshold_type, 'pupil', 
                                  speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
                                  svg=False)
 
@@ -465,6 +466,16 @@ settings = {"Date" : datetime.date.today(),
             "F0 calculateion method" : F0_method,
             "2p starting delay" : starting_delay_2p,
             "Bootstrapping nb of samples" : num_samples,
+            "Speed threshold" : speed_threshold + " (cm/s)",
+            "Facemotion threshold" : facemotion_threshold + " (std)",
+            "Pupil threshold" : pupil_threshold + f" ({pupil_threshold_type})",
+            "Minimum running window" : min_run_window,
+            "Minimum AS window" : min_as_window,
+            "Minimum rest window" : min_rest_window,
+            "Speed filter kernel" : speed_filter_kernel,
+            "Motion filter kernel" : motion_filter_kernel,
+            "Pupil filter kernel" : pupil_filter_kernel,
+            "Fluorescence filter kernel" : dFoF_filter_kernel,
             "Analyzed folder" : base_path,
             "Saving folder" : save_dir,
             "Compile folder" : compile_dir
