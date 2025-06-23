@@ -377,7 +377,7 @@ fmotionAndTimeSt  = (new_time_stamps, facemotion)
 speedAndTimeSt = (new_time_stamps, speed)
 background_image_path = os.path.join(base_path, "Mean_image_grayscale.png")
 filename_protocol = "_".join([unique_id, id_version, 'protocol_validity_2']) + ".npz"
-protocol_validity_npz = np.load(os.path.join(save_dir, filename_protocol))
+protocol_validity_npz = np.load(os.path.join(save_dir, filename_protocol), allow_pickle=True)
 
 #---------------------------------- HDF5 files ----------------------------------
 filename = "_".join([unique_id, id_version, 'postprocessing']) + ".h5"
