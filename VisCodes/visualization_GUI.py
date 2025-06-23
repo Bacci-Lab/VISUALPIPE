@@ -422,6 +422,13 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         
         super().__init__(flags=Qt.WindowStaysOnTopHint)
 
+        if speed_corr is None :
+            speed_corr = np.zeros(len(fluorescence))
+        if facemotion_corr is None:
+            facemotion_corr = np.zeros(len(fluorescence))
+        if pupil_corr is None:
+            pupil_corr = np.zeros(len(fluorescence))
+
         self.save_folder = save_folder
         self.cell_info = cell_info
         self.ops = ops
@@ -463,6 +470,14 @@ class VisualizationGUI(QtWidgets.QMainWindow):
             facemotion_corr = f['Behavioral']['Correlation']['facemotion_corr'][()]
             pupil_corr = f['Behavioral']['Correlation']['pupil_corr'][()]
         
+        if np.sum(np.isnan(speed_corr)) == len(dFoF0):
+            speed_corr = np.zeros(len(dFoF0))
+        if np.sum(np.isnan(facemotion_corr)) == len(dFoF0):
+            facemotion_corr = np.zeros(len(dFoF0))
+        if np.sum(np.isnan(pupil_corr)) == len(dFoF0):
+            pupil_corr = np.zeros(len(dFoF0))
+
+        print(facemotion_corr)
         # Load visual stimuli data
         visual_stim = np.load(visual_stim_filepath, allow_pickle=True).item()
         duration = visual_stim['time_duration']
