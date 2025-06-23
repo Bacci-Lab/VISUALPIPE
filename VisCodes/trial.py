@@ -15,12 +15,13 @@ from matplotlib.ticker import AutoLocator
 
 class Trial(object):
 
-    def __init__(self, ca_img: CaImagingDataManager, visual_stim: VisualStim, ca_onset_idxes, attr: str='fluorescence', dt_pre_stim:float=0.5, dt_post_stim:float=0, dt_post_stim_plot:float=None):
+    def __init__(self, ca_img: CaImagingDataManager, visual_stim: VisualStim, ca_onset_idxes, attr: str='fluorescence', dt_pre_stim:float=0.5, dt_post_stim:float=0, dt_post_stim_plot:float=None, auc_thr:float=5.):
 
         self.ca_img = ca_img
         self.visual_stim = visual_stim
         self.ca_onset_idxes = np.array(ca_onset_idxes)
         self.ca_attr = attr
+        self.auc_thr = auc_thr
         self.dt_pre_stim = dt_pre_stim
         max_post_stim = np.min(visual_stim.interstim) - dt_pre_stim
         if dt_post_stim <= max_post_stim :
@@ -177,12 +178,11 @@ class Trial(object):
 
         return trial_averaged_zscores, pre_trial_averaged_zscores, post_trial_averaged_zscores
 
-    def find_responsive_rois(self, save_dir, folder_prefix, dt_min:float=0.2, auc_min:float=5):
+    def find_responsive_rois(self, save_dir, folder_prefix, dt_min:float=0.2):
         """
         Find responsive neurons using the method from C.G. Sweeney (2025) and T.D. Marks (2021) for the reliability metric.
         
         :param float dt_min: Time duration threshold
-        :param float auc_min: Area under the curve threshold.
         
         :return trial_response_bounds (dict): Dictionnary with stimuli index as keys. It contains a list of boundaries defining the interval of the trace considered to compute the AUC.
         :return responsive (dict): Dictionnary with stimuli index as keys. It contains a list of integer (-1, 0, 1) indicating whether or not a ROI is responsive (1 if it is activated/prolonged, 0 if no and -1 if it is supressed).
@@ -207,7 +207,7 @@ class Trial(object):
             # For stimuli of duration under 2.5s, decrease auc threshold with a cross-product
             stim_dt = self.visual_stim.protocol_df['duration'][i] + self.dt_post_stim
             if stim_dt < 2.5 :
-                auc_min = auc_min * stim_dt / 2.5
+                self.auc_thr = self.auc_thr * stim_dt / 2.5
 
             for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
                 roi_trial_average = self.trial_averaged_zscores[i][roi_idx]
@@ -238,7 +238,7 @@ class Trial(object):
                 if end_idx - start_idx + 1 >= nb_frames_min : #time duration constraint
                     time = np.linspace(0, stim_dt, len(roi_trial_average))
                     auc = metrics.auc(time[start_idx:end_idx+1], roi_trial_average[start_idx:end_idx+1])
-                    if np.abs(auc) >= auc_min : #AUC constraint
+                    if np.abs(auc) >= self.auc_thr : #AUC constraint
 
                         if len(roi_trial) >= min_nb_trials :
                             r_null_distribution = self.generate_null_distribution(roi_trial)
