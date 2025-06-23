@@ -313,20 +313,21 @@ if len(spont_stimuli_id) > 0 :
         valid_neurons_speed_list.append(valid_neurons_temp)
         spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], speed_spont, valid_neurons_temp, spont_speed_corr, sigma=10, label='speed', save_path=save_spont_dir_i)
 
-        # Facemotion correlation
-        facemotion_spont = facemotion[start_spont_index:end_spont_index]
-        spont_facemotion_corr, valid_neurons_temp = spont.compute_spont_corr(facemotion_spont, F_spontaneous[i], time_stamps_spont, 'facemotion', save_spont_dir_i)
-        spont_facemotion_corr_list.append(spont_facemotion_corr)
-        valid_neurons_facemotion_list.append(valid_neurons_temp)
-        spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], facemotion_spont, valid_neurons_temp, spont_facemotion_corr, sigma=10, label='facemotion', save_path=save_spont_dir_i)
+        if not face_cam_dm.no_face_data :
+            # Facemotion correlation
+            facemotion_spont = facemotion[start_spont_index:end_spont_index]
+            spont_facemotion_corr, valid_neurons_temp = spont.compute_spont_corr(facemotion_spont, F_spontaneous[i], time_stamps_spont, 'facemotion', save_spont_dir_i)
+            spont_facemotion_corr_list.append(spont_facemotion_corr)
+            valid_neurons_facemotion_list.append(valid_neurons_temp)
+            spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], facemotion_spont, valid_neurons_temp, spont_facemotion_corr, sigma=10, label='facemotion', save_path=save_spont_dir_i)
 
-        # Pupil correlation
-        pupil_spont = pupil[start_spont_index:end_spont_index]
-        if analyze_pupil_order[id] :
-            spont_pupil_corr, valid_neurons_temp = spont.compute_spont_corr(pupil_spont, F_spontaneous[i], time_stamps_spont, 'pupil', save_spont_dir_i)
-            spont_pupil_corr_list.append(spont_pupil_corr)
-            valid_neurons_pupil_list.append(valid_neurons_temp)
-            spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], pupil_spont, valid_neurons_temp, spont_pupil_corr, sigma=10, label='pupil', save_path=save_spont_dir_i)
+            # Pupil correlation
+            pupil_spont = pupil[start_spont_index:end_spont_index]
+            if analyze_pupil_order[id] :
+                spont_pupil_corr, valid_neurons_temp = spont.compute_spont_corr(pupil_spont, F_spontaneous[i], time_stamps_spont, 'pupil', save_spont_dir_i)
+                spont_pupil_corr_list.append(spont_pupil_corr)
+                valid_neurons_pupil_list.append(valid_neurons_temp)
+                spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], pupil_spont, valid_neurons_temp, spont_pupil_corr, sigma=10, label='pupil', save_path=save_spont_dir_i)
 
     speed_corr = np.mean(spont_speed_corr_list, axis=0)
     valid_neurons_speed = spont.get_valid_neurons(valid_neurons_speed_list)
@@ -335,25 +336,35 @@ if len(spont_stimuli_id) > 0 :
     for i in range(len(valid_neurons_speed_list)) : 
         valid_neurons_speed_list2[valid_neurons_speed_list[i], i] = 1
 
-    facemotion_corr = np.mean(spont_facemotion_corr_list, axis=0)
-    valid_neurons_facemotion = spont.get_valid_neurons(valid_neurons_facemotion_list)
-    spont.pie_plot(len(valid_neurons_facemotion), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_facemotion), save_spont_dir, 'facemotion')
-    valid_neurons_facemotion_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_facemotion_list)))
-    for i in range(len(valid_neurons_facemotion_list)) : 
-        valid_neurons_facemotion_list2[valid_neurons_facemotion_list[i], i] = 1
+    if not face_cam_dm.no_face_data :
+        facemotion_corr = np.mean(spont_facemotion_corr_list, axis=0)
+        valid_neurons_facemotion = spont.get_valid_neurons(valid_neurons_facemotion_list)
+        spont.pie_plot(len(valid_neurons_facemotion), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_facemotion), save_spont_dir, 'facemotion')
+        valid_neurons_facemotion_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_facemotion_list)))
+        for i in range(len(valid_neurons_facemotion_list)) : 
+            valid_neurons_facemotion_list2[valid_neurons_facemotion_list[i], i] = 1
 
-    if len(spont_pupil_corr_list) > 0 :
-        pupil_corr = np.mean(spont_pupil_corr_list, axis=0)
-        valid_neurons_pupil = spont.get_valid_neurons(valid_neurons_pupil_list)
-        spont.pie_plot(len(valid_neurons_pupil), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_pupil), save_spont_dir, 'pupil')
-        valid_neurons_pupil_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_pupil_list)))
-        for i in range(len(valid_neurons_pupil_list)) : 
-            valid_neurons_pupil_list2[valid_neurons_pupil_list[i], i] = 1
+        if len(spont_pupil_corr_list) > 0 :
+            pupil_corr = np.mean(spont_pupil_corr_list, axis=0)
+            valid_neurons_pupil = spont.get_valid_neurons(valid_neurons_pupil_list)
+            spont.pie_plot(len(valid_neurons_pupil), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_pupil), save_spont_dir, 'pupil')
+            valid_neurons_pupil_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_pupil_list)))
+            for i in range(len(valid_neurons_pupil_list)) : 
+                valid_neurons_pupil_list2[valid_neurons_pupil_list[i], i] = 1
+        else :
+            nb_rois = len(ca_img_dm._list_ROIs_idx)
+            nan_array = np.empty(nb_rois)
+            nan_array.fill(np.nan)
+            pupil_corr = nan_array
+            valid_neurons_pupil_list2 = []
+    
     else :
         nb_rois = len(ca_img_dm._list_ROIs_idx)
-        pupil_corr = list(np.zeros(nb_rois))
-        valid_neurons_pupil = None
-    
+        nan_array = np.empty(nb_rois)
+        nan_array.fill(np.nan)
+        facemotion_corr, pupil_corr = nan_array, nan_array
+        valid_neurons_facemotion_list2, valid_neurons_pupil_list2 = [], []
+        
 else : 
     speed_corr, facemotion_corr, pupil_corr = np.array(speed_corr_list), np.array(facemotion_corr_list), np.array(pupil_corr_list)
     valid_neurons_speed_list2, valid_neurons_facemotion_list2, valid_neurons_pupil_list2 = None, None, None
@@ -365,6 +376,7 @@ pupilAndTimeSt  = (new_time_stamps, pupil)
 fmotionAndTimeSt  = (new_time_stamps, facemotion)
 speedAndTimeSt = (new_time_stamps, speed)
 background_image_path = os.path.join(base_path, "Mean_image_grayscale.png")
+filename_protocol = "_".join([unique_id, id_version, 'protocol_validity_2']) + ".npz"
 protocol_validity_npz = np.load(os.path.join(save_dir, filename_protocol))
 
 #---------------------------------- HDF5 files ----------------------------------
@@ -425,15 +437,23 @@ np.save(os.path.join(save_dir, filename), ca_img_dm.stat, allow_pickle=True)
 
 if COMPILE :
     data_df = pd.DataFrame({
-                "Session_id": unique_id, "Output_id": id_version,"Protocol": global_protocol, "Experimenter": experimenter, "Mouse_id": subject_id_anibio,
+                "Session_id": unique_id, "Output_id": id_version, "Protocol": global_protocol, "Experimenter": experimenter, "Mouse_id": subject_id_anibio,
                 'Mean_speed' : np.nanmean(speed), 'Std_speed' : np.nanstd(speed),
                 'Mean_fmotion' : np.nanmean(facemotion), 'Std_fmotion' : np.nanstd(facemotion),
                 'Mean_pupil' : np.nanmean(pupil), 'Std_pupil' : np.nanstd(pupil),
                 'Spontaneous' : True if len(spont_stimuli_id) > 0 else False,
-                'Mean_speed_corr' : np.nanmean(speed_corr), 'Mean_fmotion_corr' : np.nanmean(facemotion_corr), 'Mean_pupil_corr' : np.nanmean(pupil_corr), 
+                'Mean_speed_corr' : np.nanmean(speed_corr), 
+                'Mean_fmotion_corr' : np.nanmean(facemotion_corr),
+                'Mean_pupil_corr' : np.nanmean(pupil_corr), 
                 'Mean_dFoF0' : np.nanmean(ca_img_dm.dFoF0), 
-                'Run % (pupil)' : run_ratio_pupil, 'AS % (pupil)' : as_ratio_pupil, 'Rest % (pupil)' : rest_ratio_pupil,
-                'Run % (motion)' : run_ratio_facemotion, 'AS % (motion)' : as_ratio_facemotion, 'Rest % (motion)' : rest_ratio_facemotion,
+                'Run % (pupil)' : run_ratio_pupil if not face_cam_dm.no_face_data else None, 
+                'AS % (pupil)' : as_ratio_pupil if not face_cam_dm.no_face_data else None,
+                'Rest % (pupil)' : rest_ratio_pupil if not face_cam_dm.no_face_data else None,
+                'Run % (motion)' : run_ratio_facemotion if not face_cam_dm.no_face_data else None, 
+                'AS % (motion)' : as_ratio_facemotion if not face_cam_dm.no_face_data else None, 
+                'Rest % (motion)' : rest_ratio_facemotion if not face_cam_dm.no_face_data else None,
+                'Run %' : run_ratio if face_cam_dm.no_face_data else None, 
+                'Rest %' : rest_ratio if face_cam_dm.no_face_data else None, 
                 }, index=[0]).set_index("Session_id")
     file.compile_xlsx_file(data_df, compile_dir)
 
