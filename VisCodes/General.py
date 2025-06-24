@@ -430,6 +430,9 @@ else :
 hf.close()
 
 #---------------------------------- Outputs ----------------------------------
+filename = "_".join([unique_id, id_version, 'visual_stim_info']) + ".xlsx"
+visual_stim.export_df_to_excel(save_dir, filename)
+
 filename = "_".join([unique_id, id_version, 'trials'])
 trials.save_trials(save_dir, filename)
 

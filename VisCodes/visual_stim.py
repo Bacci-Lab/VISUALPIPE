@@ -81,6 +81,14 @@ class VisualStim(object):
         
         self.build_df()
 
+        if qsm_loc is not None :
+            self.add_column_df('x-center', visual_stim['x-center'])
+            self.add_column_df('y-center', visual_stim['y-center'])
+
+        if cs_type is not None or surround_type is not None:
+            self.add_column_df('angle',visual_stim['angle'])
+            self.add_column_df('angle-surround', visual_stim['angle-surround'])
+
     def get_qsm_loc(self, visual_stim) :
         if 'grating' in self.protocol_names or 'quick-spatial-mapping' in self.protocol_names:
             id_qsm = self.protocol_df.loc[(self.protocol_df['name'] == 'grating') | (self.protocol_df['name'] == 'quick-spatial-mapping')].index[0]
@@ -217,6 +225,21 @@ class VisualStim(object):
                 self.stim_cat.append(0)
             else :
                 self.stim_cat.append(1)
+        self.add_column_df('visual_stim', self.stim_cat)
+
+    def add_column_df(self, column_name, data:list):
+        if len(data) == self.protocol_df.shape[0]:
+            self.protocol_df[column_name] = data
+        elif len(data) == len(self.order) :
+            self.protocol_df.reset_index(inplace=True)
+            new_df = pd.DataFrame({ "id" : self.order, column_name : data}).groupby(by="id").mean()
+            self.protocol_df = self.protocol_df.join(new_df, on="id", how="inner").set_index("id")
+        else : 
+            raise Exception("Can't add new column. Size of data list incorrect.")
+
+    def export_df_to_excel(self, save_folder, filename):
+        save_path = os.path.join(save_folder, filename)
+        self.protocol_df.to_excel(save_path)
 
 if __name__ == "__main__":
     import Photodiode
