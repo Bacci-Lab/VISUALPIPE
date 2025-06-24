@@ -69,6 +69,9 @@ class VisualStim(object):
     def add_subtype_stimuli(self, visual_stim):
         qsm_loc, qsm_names, id_qsm = self.get_qsm_loc(visual_stim)
         cs_type, surround_type, cs_names, surround_names, id_cs, id_s = self.get_surround_mod_type(visual_stim)
+        dg_contrast, dg_names, id_dg = self.get_drift_grat_contrast(visual_stim)
+        sp_angle, sp_names, id_sp = self.get_stat_patch_angle(visual_stim)
+        cg_contrast_angle, cg_names, id_cg = self.get_cg_contrast_angle(visual_stim)
 
         if qsm_loc is not None :
             self.separate_subtype_stimuli(qsm_loc, qsm_names, id_qsm)
@@ -79,16 +82,31 @@ class VisualStim(object):
         if surround_type is not None :
             self.separate_subtype_stimuli(surround_type, surround_names, id_s)
         
+        if dg_contrast is not None :
+            self.separate_subtype_stimuli(dg_contrast, dg_names, id_dg)
+        
+        if sp_angle is not None :
+            self.separate_subtype_stimuli(sp_angle, sp_names, id_sp)
+        
+        if cg_contrast_angle is not None :
+            self.separate_subtype_stimuli(cg_contrast_angle, cg_names, id_cg)
+        
         self.build_df()
 
         if qsm_loc is not None :
             self.add_column_df('x-center', visual_stim['x-center'])
             self.add_column_df('y-center', visual_stim['y-center'])
 
-        if cs_type is not None or surround_type is not None:
-            self.add_column_df('angle',visual_stim['angle'])
+        if cs_type is not None or surround_type is not None or sp_angle is not None or\
+              cg_contrast_angle is not None:
+            self.add_column_df('angle', visual_stim['angle'])
+        
+        if surround_type is not None :
             self.add_column_df('angle-surround', visual_stim['angle-surround'])
 
+        if dg_contrast is not None or cg_contrast_angle is not None :
+            self.add_column_df('contrast', visual_stim['contrast'])
+        
     def get_qsm_loc(self, visual_stim) :
         if 'grating' in self.protocol_names or 'quick-spatial-mapping' in self.protocol_names:
             id_qsm = self.protocol_df.loc[(self.protocol_df['name'] == 'grating') | (self.protocol_df['name'] == 'quick-spatial-mapping')].index[0]
@@ -130,6 +148,57 @@ class VisualStim(object):
             id_s = None
 
         return cs_type, surround_type, cs_names, s_names, id_cs, id_s
+
+    def get_drift_grat_contrast(self, visual_stim):
+        if 'drifting-grating' in self.protocol_names :
+            id_dg = self.protocol_df[self.protocol_df['name'] == 'drifting-grating'].index[0]
+            dg_contrast = [str(round(contrast*10)/10) if id == id_dg else None for id, contrast in zip(visual_stim['protocol_id'], visual_stim['contrast'])]
+            dg_names = list(set(dg_contrast))
+            if None in dg_names:
+                dg_names.remove(None)
+            
+            if len(dg_names) < 2 :
+                dg_contrast = None
+        else :
+            dg_contrast = None
+            dg_names = None
+            id_dg = None
+
+        return dg_contrast, dg_names, id_dg
+
+    def get_stat_patch_angle(self, visual_stim):
+        if 'static-patch' in self.protocol_names :
+            id_sp = self.protocol_df[self.protocol_df['name'] == 'static-patch'].index[0]
+            sp_angle = [str(int(angle)) if id == id_sp else None for id, angle in zip(visual_stim['protocol_id'], visual_stim['angle'])]
+            sp_names = list(set(sp_angle))
+            if None in sp_names:
+                sp_names.remove(None)
+
+            if len(sp_names) < 2 :
+                sp_angle = None
+        else :
+            sp_angle = None
+            sp_names = None
+            id_sp = None
+
+        return sp_angle, sp_names, id_sp
+
+    def get_cg_contrast_angle(self, visual_stim):
+        if 'center-grating' in self.protocol_names :
+            id_cg = self.protocol_df[self.protocol_df['name'] == 'center-grating'].index[0]
+            cg_contrast_angle = [f"{round(contrast*100)/100}-{angle}" if id == id_cg else None for id, contrast, angle in zip(visual_stim['protocol_id'], visual_stim['contrast'], visual_stim['angle'])]
+            cg_names = list(set(cg_contrast_angle))
+            if None in cg_names:
+                cg_names.remove(None)
+
+            if len(cg_names) < 2 :
+                cg_contrast_angle = None
+        else :
+            cg_contrast_angle = None
+            cg_names = None
+            id_cg = None
+
+        return cg_contrast_angle, cg_names, id_cg
 
     def separate_subtype_stimuli(self, subtype_stim_order, subtype_stim_names, id_stim) :
         protocol_name = self.protocol_names[id_stim]

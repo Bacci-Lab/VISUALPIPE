@@ -556,7 +556,7 @@ class Trial(object):
         if not os.path.exists(save_folder):
             os.mkdir(save_folder)
         save_path = os.path.join(save_folder, fig_name)
-        fig.savefig(save_path)
+        fig.savefig(save_path + ".png")
         plt.close(fig)
 
     def plot_stim_occurence(self, stimuli_id:int, trial_zscores:dict, pre_trial_zscores:dict, real_time_states_sorted:list,
@@ -619,7 +619,7 @@ class Trial(object):
             if not os.path.exists(save_folder):
                 os.makedirs(save_folder)
             save_path = os.path.join(save_folder, fig_name)
-            fig.savefig(save_path)
+            fig.savefig(save_path + ".png")
             plt.close(fig)
 
     def plot_hist_reliability(self, r_dist, r, r_null, perc, p_value, color:str, stimuli_id:int, neuron_idx:int, save_dir:str, folder_prefix:str=''):
@@ -637,13 +637,13 @@ class Trial(object):
         ax.set_title(f'Neuron {neuron_idx} ({stimuli_name})')
         ax.legend(loc='upper left', prop={'size': 9})
 
-        fig_name = "r_null_" + stimuli_name + "_neuron_" + str(neuron_idx)
+        fig_name = "r_null_" + stimuli_name + "_neuron_" + str(neuron_idx) 
         foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
         save_folder = os.path.join(save_dir, foldername)
         if not os.path.exists(save_folder):
             os.mkdir(save_folder)
         save_path = os.path.join(save_folder, fig_name)
-        fig.savefig(save_path)
+        fig.savefig(save_path + ".png")
         plt.close(fig)
 
     #-------------SAVE FUNCTIONS---------------
