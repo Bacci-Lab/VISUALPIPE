@@ -273,10 +273,9 @@ class Trial(object):
 
                         if len(roi_trial) >= min_nb_trials :
                             r_null_distribution = self.generate_null_distribution(roi_trial)
-                            perc_th = np.percentile(r_null_distribution, 99)
-                            res = ztest(r_dist, value=perc_th, alternative='larger') #two-tailed one-sample t-test
-                            if res[1] <= 0.001 :
-                            #if perc_th <= r :
+                            perc_th = np.percentile(r_null_distribution, 95)
+                            res = ztest(x1=r_dist, x2=r_null_distribution, value=perc_th-np.mean(r_null_distribution), alternative='larger') #one-tailed two-sample z-test
+                            if res[1] <= 0.05 :
                                 if positive :
                                     responsive_roi.append((1, res[1]))
                                 else :
@@ -661,7 +660,7 @@ class Trial(object):
         ax.axvline(np.mean(r_null), color='grey', linestyle='--', label='mean of null dist')
         ax.hist(r_dist, bins=20, alpha=0.4, edgecolor='white', color=color, label='R distribution')
         ax.axvline(r, color=color, linestyle='--', label='r')
-        ax.axvline(perc, color='black', linestyle='--', label='99th perc of null dist')
+        ax.axvline(perc, color='black', linestyle='--', label='95th perc of null dist')
         ax.annotate(f'p-value = {p_value:.3f}', xy=(0.85, 0.98), xycoords='axes fraction', fontsize=9, va='top', ha='left')
         ax.set_xlabel('Reliability R')
         ax.set_ylabel('Count')
