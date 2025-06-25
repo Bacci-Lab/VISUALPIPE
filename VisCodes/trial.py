@@ -702,10 +702,6 @@ class Trial(object):
             ax.axvspan(0, stim_dt + self.dt_post_stim, color='thistle', alpha=0.2, label='trial period')
         ax.fill_between(time, data_av - std_av, data_av + std_av, color='gray', alpha=0.3, label='std')
         ax.plot(time, data_av, color='black', label='Mean', linewidth=2)
-        if np.abs(self.responsive[stimuli_id][neuron_idx][0]) :
-            start = self.trial_response_bounds[stimuli_id][neuron_idx][0] + stimuli_onset
-            end = self.trial_response_bounds[stimuli_id][neuron_idx][1] + stimuli_onset + 1
-            ax.plot(time[start:end], data_av[start:end], color='green', label='trial response', linewidth=2)
         ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
         if self.dt_post_stim + self.dt_post_stim_plot > 0 :
             ax.axvline(x=stim_dt, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
@@ -715,7 +711,6 @@ class Trial(object):
         ax.set_ylabel(self.ca_attr)
         ax.set_title(stimuli_name + '\n' + fig_name)
         ax.legend(bbox_to_anchor=(0, 1), loc='upper left', frameon=False)
-        
 
         self.trial_fluorescence, self.pre_trial_fluorescence, self.post_trial_fluorescence
 
