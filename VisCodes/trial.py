@@ -34,7 +34,10 @@ class Trial(object):
             self.dt_post_stim_plot = np.min([max_post_stim - dt_post_stim, dt_post_stim_plot])
         
         self.trial_fluorescence, self.pre_trial_fluorescence, self.post_trial_fluorescence = self.compute_trial(self.ca_attr)
-        self.average_baselines = self.compute_average_baselines(self.pre_trial_fluorescence)
+        self.trial_average_fluorescence, self.average_baselines, self.post_trial_average_fluorescence = self.compute_average_traces()
+
+        self.trial_average_fluorescence_norm, self.pre_trial_average_fluorescence_norm, self.post_trial_average_fluorescence_norm = self.normalize_with_baseline()
+
         self.trial_averaged_zscores, self.pre_trial_averaged_zscores, self.post_trial_averaged_zscores =\
               self.compute_trial_averaged_zscores(self.trial_fluorescence, self.post_trial_fluorescence, self.average_baselines)
         self.trial_zscores, self.pre_trial_zscores, self.post_trial_zscores = self.compute_trial_zscores_avb()
@@ -107,14 +110,42 @@ class Trial(object):
 
         return trial_fluorescence, pre_trial_fluorescence, post_trial_fluorescence
     
-    def compute_average_baselines(self, pre_trial_fluorescence) :
+    def compute_average_traces(self) :
         average_baselines = {}
+        trial_average_fluorescence = {}
+        post_trial_average_fluorescence = {}
 
         for i in self.trial_fluorescence.keys() :
-            average_baseline_i = np.mean(pre_trial_fluorescence[i], axis=1)
+            average_baseline_i = np.mean(self.pre_trial_fluorescence[i], axis=1)
             average_baselines.update({i: average_baseline_i})
 
-        return average_baselines
+            trial_average_fluorescence_i = np.mean(self.trial_fluorescence[i], axis=1)
+            trial_average_fluorescence.update({i: trial_average_fluorescence_i})
+
+            post_average_fluorescence_i = np.mean(self.post_trial_fluorescence[i], axis=1)
+            post_trial_average_fluorescence.update({i: post_average_fluorescence_i})
+        
+        return trial_average_fluorescence, average_baselines, post_trial_average_fluorescence
+
+    def normalize_with_baseline(self) :
+        pre_trial_average_fluorescence_norm = {}
+        trial_average_fluorescence_norm = {}
+        post_trial_average_fluorescence_norm = {}
+
+        for i in self.trial_fluorescence.keys() :
+            mean_baseline_i = np.dot(np.mean(self.average_baselines[i], axis=1).reshape(-1,1), np.ones((1, self.average_baselines[i].shape[1])))
+            pre_average_fluorescence_norm_i = self.average_baselines[i] - mean_baseline_i
+            pre_trial_average_fluorescence_norm.update({i: pre_average_fluorescence_norm_i})
+
+            mean_baseline_i = np.dot(np.mean(self.average_baselines[i], axis=1).reshape(-1,1), np.ones((1, self.trial_average_fluorescence[i].shape[1])))
+            trial_average_fluorescence_norm_i = self.trial_average_fluorescence[i] - mean_baseline_i
+            trial_average_fluorescence_norm.update({i: trial_average_fluorescence_norm_i})
+
+            mean_baseline_i = np.dot(np.mean(self.average_baselines[i], axis=1).reshape(-1,1), np.ones((1, self.post_trial_average_fluorescence[i].shape[1])))
+            post_average_fluorescence_norm_i = self.post_trial_average_fluorescence[i] - mean_baseline_i
+            post_trial_average_fluorescence_norm.update({i: post_average_fluorescence_norm_i})
+        
+        return trial_average_fluorescence_norm, pre_trial_average_fluorescence_norm, post_trial_average_fluorescence_norm
 
     def compute_trial_zscores(self, attr='fluorescence'):
 
@@ -646,6 +677,57 @@ class Trial(object):
         fig.savefig(save_path + ".png")
         plt.close(fig)
 
+    def plot_norm_trials(self, stimuli_id:int, neuron_idx:int, save_dir:str, folder_prefix:str=''):
+
+        if self.trial_response_bounds is None :
+            self.find_responsive_rois(save_dir, folder_prefix)
+        
+        stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
+        stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
+        stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
+        trial_average = np.array(self.trial_average_fluorescence_norm[stimuli_id][neuron_idx])
+        pre_trial_average = np.array(self.pre_trial_average_fluorescence_norm[stimuli_id][neuron_idx])
+        post_trial_average = np.array(self.post_trial_average_fluorescence_norm[stimuli_id][neuron_idx])
+        trial_std = np.std(self.trial_fluorescence[stimuli_id][neuron_idx], axis=0)
+        pre_trial_std = np.std(self.pre_trial_fluorescence[stimuli_id][neuron_idx], axis=0)
+        post_trial_std = np.std(self.post_trial_fluorescence[stimuli_id][neuron_idx], axis=0)
+        
+        data_av = np.concatenate((pre_trial_average, trial_average, post_trial_average))
+        std_av = np.concatenate((pre_trial_std, trial_std, post_trial_std))
+        time = (np.arange(data_av.shape[0]) - stimuli_onset) / self.ca_img.fs
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        if np.abs(self.responsive[stimuli_id][neuron_idx][0]) :
+            ax.axvspan(0, stim_dt + self.dt_post_stim, color='skyblue', alpha=0.2, label='trial period')
+        else :
+            ax.axvspan(0, stim_dt + self.dt_post_stim, color='thistle', alpha=0.2, label='trial period')
+        ax.fill_between(time, data_av - std_av, data_av + std_av, color='gray', alpha=0.3, label='std')
+        ax.plot(time, data_av, color='black', label='Mean', linewidth=2)
+        if np.abs(self.responsive[stimuli_id][neuron_idx][0]) :
+            start = self.trial_response_bounds[stimuli_id][neuron_idx][0] + stimuli_onset
+            end = self.trial_response_bounds[stimuli_id][neuron_idx][1] + stimuli_onset + 1
+            ax.plot(time[start:end], data_av[start:end], color='green', label='trial response', linewidth=2)
+        ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
+        if self.dt_post_stim + self.dt_post_stim_plot > 0 :
+            ax.axvline(x=stim_dt, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
+        fig_name = "norm_" + stimuli_name + "_neuron_" + str(neuron_idx)
+        ax.margins(x=0)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel(self.ca_attr)
+        ax.set_title(stimuli_name + '\n' + fig_name)
+        ax.legend(bbox_to_anchor=(0, 1), loc='upper left', frameon=False)
+        
+
+        self.trial_fluorescence, self.pre_trial_fluorescence, self.post_trial_fluorescence
+
+        foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
+        save_folder = os.path.join(save_dir, foldername)
+        if not os.path.exists(save_folder):
+            os.mkdir(save_folder)
+        save_path = os.path.join(save_folder, fig_name)
+        fig.savefig(save_path + ".png")
+        plt.close(fig)
+
     #-------------SAVE FUNCTIONS---------------
     def save_protocol_validity(self, save_dir, filename):
         protocol_validity = []
@@ -661,9 +743,11 @@ class Trial(object):
             "dt_post_stim" : self.dt_post_stim,
             "dt_post_stim_plot" : self.dt_post_stim_plot,
             "averaged_baselines" : self.average_baselines,
-            "trial_ca_trace" : self.trial_fluorescence, 
-            "pre_trial_ca_trace" : self.pre_trial_fluorescence, 
-            "post_trial_ca_trace" : self.post_trial_fluorescence,
+            "trial_averaged_ca_trace" : self.trial_average_fluorescence, 
+            "post_trial_averaged_ca_trace" : self.post_trial_average_fluorescence,
+            "norm_averaged_baselines" : self.pre_trial_average_fluorescence_norm,
+            "norm_trial_averaged_ca_trace" : self.trial_average_fluorescence_norm,
+            "norm_post_trial_averaged_ca_trace" : self.post_trial_average_fluorescence_norm,
             "trial_averaged_zscores" : self.trial_averaged_zscores,
             "pre_trial_averaged_zscores" : self.pre_trial_averaged_zscores,
             "post_trial_averaged_zscores" : self.post_trial_averaged_zscores,

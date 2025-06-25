@@ -265,6 +265,7 @@ for i in range(len(protocol_df)):
         #plot trial-averaged z-score traces
         for k in range(len(ca_img_dm._list_ROIs_idx)):
             trials.plot_stim_response(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
+            trials.plot_norm_trials(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
         
         #plot trials with behavioral states
         trials.plot_stim_occurence(i, trial_zscores, pre_trial_zscores, real_time_states_sorted, F_Time_start_realigned, save_dir, folder_prefix="_".join([unique_id, id_version]))
