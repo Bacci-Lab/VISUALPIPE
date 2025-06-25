@@ -21,6 +21,7 @@ class VisualStim(object):
         self.dt_shift: list = None
         self.stimuli_idx: dict = {}
         self.stim_cat: list = []
+        self.analyze_pupil: list = []
 
         self.get_protocol(base_path)
         self.build_df()
@@ -292,9 +293,15 @@ class VisualStim(object):
         for stimuli_name in self.protocol_names :
             if 'grey' in stimuli_name or 'black' in stimuli_name:
                 self.stim_cat.append(0)
+                if 'black' in stimuli_name :
+                    self.analyze_pupil.append(0)
+                else :
+                    self.analyze_pupil.append(1)
             else :
                 self.stim_cat.append(1)
+                self.analyze_pupil.append(1)
         self.add_column_df('visual_stim', self.stim_cat)
+        self.add_column_df('analyze_pupil', self.analyze_pupil)
 
     def add_column_df(self, column_name, data:list):
         if len(data) == self.protocol_df.shape[0]:
