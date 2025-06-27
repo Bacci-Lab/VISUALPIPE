@@ -6,15 +6,15 @@ import os
 from scipy.stats import wilcoxon
 
 #--------------------INPUTS------------------#
-data_path = r"Y:\raw-imaging\Nathan\PYR\110 male\Visual\03_03_2025\TSeries-03032025-006\2025_03_03_17-14-33_output_4"
-validity_file = '2025_03_03_17-14-33_4_protocol_validity_2.npz'
-trials_file = '2025_03_03_17-14-33_4_trials.npy'
+data_path = r"Y:\raw-imaging\Nathan\PYR\108 male\Visual\03_03_2025\TSeries-03032025-013\2025_03_03_18-43-25_output_1"
+validity_file = '2025_03_03_18-43-25_1_protocol_validity_2.npz'
+trials_file = '2025_03_03_18-43-25_1_trials.npy'
 save_path = data_path
 file_name = 'test'
-#This is the protocol you choose to select responsive neurons
-protocol_validity = 'Natural-Images-4-repeats'
+#This is the list of stimuli you want to use to select the responsive neurons. A responsive neurons is responsive in at least one of these stimuli
+protocol_validity = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-0.46-90.0', 'center-grating-0.59-90.0', 'center-grating-0.73-90.0', 'center-grating-0.86-90.0', 'center-grating-1.0-90.0']  
 # Write the protocols you want to plot
-protocols = ['Natural-Images-4-repeats']
+protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-0.46-90.0', 'center-grating-0.59-90.0', 'center-grating-0.73-90.0', 'center-grating-0.86-90.0', 'center-grating-1.0-90.0']
 #-----------------------------------------------------------------------------#
 
 
@@ -23,19 +23,28 @@ protocols = ['Natural-Images-4-repeats']
 
 # Load the npz file
 validity = np.load(os.path.join(data_path, validity_file), allow_pickle=True)
+print(validity.files)
 all_protocols = validity.files
 
 # Load NPY file containing averaged z_scores before during and after stim presentation
 trials = np.load(os.path.join(data_path,trials_file), allow_pickle=True).item()
 
+# Select the responsive neurons based on the validity file
+keys = list(validity.files)  # Get all keys from the validity file
+valid_data = {}  # Dictionary to store responsive neurons for each protocol
+for protocol in protocol_validity:
+    if protocol in keys:
+        valid_data[protocol] = validity[protocol]
+    else:
+        print(f"{protocol} does not exist in validity file.")
+valid_neuron_lists = [np.where(data[:, 0] == 1,)[0] for data in valid_data.values()] # change to -1 if you want negative responsive neurons
+valid_neurons = np.unique(np.concatenate(valid_neuron_lists))  # Get unique indices of valid neurons
 
 
-print(validity.files)
 
-valid_data = validity[protocol_validity]
-valid_neurons = np.where(valid_data[:, 0] == 1)[0]
 
-proportion_valid = len(valid_neurons)/len(valid_data[:,0])
+
+proportion_valid = 100 * len(valid_neurons)/trials['trial_averaged_zscores'][0].shape[0]
 
 print(f"Number of neurons responsive in {protocol_validity}: {len(valid_neurons)}")
 print(f"Proportion of neurons responsive in {protocol_validity}: {proportion_valid:.2%}")
@@ -163,7 +172,7 @@ plt.xlabel("Time (s)")
 plt.ylabel(f"Average Z-score for neurons responsive to {protocol_validity}")
 plt.title("Mean z-score ± SEM")
 # Add text box with median and p-value
-textstr = f'Nb center-responsive = {len(valid_neurons)}\n% of center-responsive= {100*proportion_valid:.1f}'
+textstr = f'Nb responsive neurons = {len(valid_neurons)}\n% of responsive neurons= {proportion_valid:.1f}'
 
 # Position text somewhere visible (top right corner)
 plt.gca().text(0.95, 0.95, textstr, transform=plt.gca().transAxes,
@@ -195,6 +204,16 @@ plt.show()
 
 
 # -------- Calculate the CMI for this session -------#
+accepted_protocols = ['center', 'center-surround-iso', 'center-surround-cross', 'surround-iso_ctrl', 'surround-cross_ctrl']
+if len(protocols) > 2:
+    print("You can only compute CMI for two protocols at a time. Please select two protocols from the accepted list.")
+    print(f"Accepted protocols: {accepted_protocols}")
+    exit()
+for protocol in protocols:
+    if protocol not in accepted_protocols:
+        print("You can only compute CMI for stimuli in the accepted list.")
+        print(f"Accepted protocols: {accepted_protocols}")
+        exit()
 cmi = []
 protocol1 = protocols[0]
 protocol2 = protocols[1]
@@ -270,58 +289,3 @@ plt.show()
 
 
 
-
-# --------------------- To adapt -----------------------#
-def compute_cmi():
-    id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[
-        0]
-    id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
-    cmi = []
-
-    for i in range(len(self.ca_img._list_ROIs_idx)):
-        cross = np.mean(self.trial_fluorescence[id_srm_cross][i])
-        iso = np.mean(self.trial_fluorescence[id_srm_iso][i])
-        cmi_roi = (cross - iso) / (cross + iso)
-        cmi.append(cmi_roi)
-
-    return cmi
-
-def compute_trial(self, attr='fluorescence'):
-
-    trial_fluorescence, pre_trial_fluorescence, post_trial_fluorescence = {}, {}, {}
-
-    for i in self.visual_stim.protocol_ids:
-
-        if self.visual_stim.stim_cat[i]:
-
-            trial_fluorescence_i, baselines_i, post_trial_fluorescence_i = [], [], []
-
-            for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
-                roi_baselines, roi_trial_fluorescence, roi_post_trial_fluorescence = self.get_trials_trace(roi_idx,
-                                                                                                           i, attr)
-
-                baselines_i.append(roi_baselines)
-                trial_fluorescence_i.append(roi_trial_fluorescence)
-                post_trial_fluorescence_i.append(roi_post_trial_fluorescence)
-
-            trial_fluorescence.update({i: np.array(trial_fluorescence_i)})
-            pre_trial_fluorescence.update({i: np.array(baselines_i)})
-            post_trial_fluorescence.update({i: np.array(post_trial_fluorescence_i)})
-
-    return trial_fluorescence, pre_trial_fluorescence, post_trial_fluorescence
-
-
-def compute_trial_averaged_zscores(self, trial_fluorescence, post_trial_fluorescence, average_baselines):
-
-    trial_averaged_zscores, pre_trial_averaged_zscores, post_trial_averaged_zscores = {}, {}, {}
-
-    for i in self.trial_fluorescence.keys() :
-        average_baseline = average_baselines[i]
-        average_trial = np.mean(trial_fluorescence[i], axis=1)
-        average_post_trial = np.mean(post_trial_fluorescence[i], axis=1)
-
-        trial_averaged_zscores.update({i : self.zscores(average_baseline, average_trial)})
-        pre_trial_averaged_zscores.update({i : self.zscores(average_baseline, average_baseline)})
-        post_trial_averaged_zscores.update({i : self.zscores(average_baseline, average_post_trial)})
-
-    return trial_averaged_zscores, pre_trial_averaged_zscores, post_trial_averaged_zscores
