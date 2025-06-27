@@ -169,6 +169,10 @@ stim_time_period = [visual_stim.real_time_onset, stim_time_end]
 F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(visual_stim.real_time_onset, ca_img_dm.time_stamps)
 
 #---------------------------------- Compute behavioral states -----------------
+# Calculate index boundaries of dark stimulus
+idx_dark = np.argwhere(np.array(visual_stim.analyze_pupil) == 0)
+idx_lim_dark, _ = visual_stim.get_protocol_onset_index(idx_dark, F_stim_init_indexes, ca_img_dm.fs)
+
 min_states_window = {'run' : round(min_run_window * ca_img_dm.fs), 
                      'AS' : round(min_as_window * ca_img_dm.fs), 
                      'rest' : round(min_rest_window * ca_img_dm.fs)}
@@ -191,16 +195,31 @@ if not face_cam_dm.no_face_data :
                                    save_fig_dir,figname="states_duration_pie_facemotion")
 
     # Pupil threshold
-    real_time_states_pupil, states_window_pupil =\
-        behavioral_states.split_stages(speed, pupil, speed_threshold, pupil_threshold, 
-                                       ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
-                                       pupil_threshold_type, speed_filter_kernel, pupil_filter_kernel)
+    if len(idx_lim_dark) == 0 :
+        real_time_states_pupil, states_window_pupil =\
+            behavioral_states.split_stages(speed, pupil, speed_threshold, pupil_threshold, 
+                                        ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
+                                        pupil_threshold_type, speed_filter_kernel, pupil_filter_kernel)
 
-    behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
-                                 ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, 
-                                 save_fig_dir, speed_threshold, pupil_threshold, pupil_threshold_type, 'pupil', 
-                                 speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
-                                 svg=False)
+        behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
+                                    ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, 
+                                    save_fig_dir, speed_threshold, pupil_threshold, pupil_threshold_type, 'pupil', 
+                                    speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
+                                    svg=False)
+    else :
+        real_time_states_pupil, states_window_pupil =\
+            behavioral_states.split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
+                                                 speed_threshold, pupil_threshold, facemotion_threshold,
+                                                 ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
+                                                 pupil_threshold_type, 'std',
+                                                 speed_filter_kernel, pupil_filter_kernel, motion_filter_kernel)
+        
+        behavioral_states.stage_plot_mixed(speed, facemotion, pupil, ca_img_dm.dFoF0, 
+                                            ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, idx_lim_dark, ca_img_dm.fs,
+                                            save_fig_dir, speed_threshold, pupil_threshold, facemotion_threshold, 
+                                            pupil_threshold_type, 'std', 
+                                            speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
+                                            svg=False)
 
     run_ratio_pupil, as_ratio_pupil, rest_ratio_pupil =\
         behavioral_states.time_pie(real_time_states_pupil, total_duration, 
