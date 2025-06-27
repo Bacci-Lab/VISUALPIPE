@@ -430,14 +430,14 @@ class Trial(object):
         k = 0
         while k < len(real_time_states_sorted) and \
             not (real_time_states_sorted[k][0][0] <=  t0 <= real_time_states_sorted[k][0][1]) and \
-                np.abs(real_time_states_sorted[k][0][0] - t0) > np.abs(real_time_states_sorted[k+1][0][0] - t0) :
+                (k==0 or not (real_time_states_sorted[k-1][0][1] <=  tf <= real_time_states_sorted[k][0][0])) :
             k +=1
         idx_interval_1 = int(k)
 
-        k = 0
+        k = idx_interval_1
         while k < len(real_time_states_sorted) and \
             not (real_time_states_sorted[k][0][0] <=  tf <= real_time_states_sorted[k][0][1]) and \
-                np.abs(real_time_states_sorted[k][0][1] - tf) > np.abs(real_time_states_sorted[k+1][0][1] - tf) :
+                (k == len(real_time_states_sorted)-1 or not(real_time_states_sorted[k][0][1] <=  tf <= real_time_states_sorted[k+1][0][0])) :
             k +=1
         idx_interval_2 = int(k)
 
