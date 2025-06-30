@@ -265,6 +265,9 @@ if not face_cam_dm.no_face_data :
 else :
     real_time_states_sorted = behavioral_states.sort_dict_el(real_time_states)
 
+# Sort trials by arousal states (output in trials.npy)
+trials.sort_trials_by_states(F_Time_start_realigned, real_time_states_sorted)
+
 # Plot trials related figures
 for i in range(len(protocol_df)):    
     if visual_stim.stim_cat[i] :
@@ -281,9 +284,11 @@ for i in range(len(protocol_df)):
         #plot trials z-score raster with averaged baseline
         #trials.trial_rasterplot(trials.trial_zscores, trials.pre_trial_zscores, trials.post_trial_zscores, i, trials.ca_attr, savepath=save_fig_dir)
         
-        #plot trial-averaged z-score traces
         for k in range(len(ca_img_dm._list_ROIs_idx)):
+            #plot trial-averaged z-score traces
             trials.plot_stim_response(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
+
+            #plot trial-averaged normalized with baseline traces
             trials.plot_norm_trials(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
         
         #plot trials with behavioral states

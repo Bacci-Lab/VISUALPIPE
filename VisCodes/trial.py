@@ -32,7 +32,8 @@ class Trial(object):
             self.dt_post_stim_plot = max_post_stim - dt_post_stim
         else :
             self.dt_post_stim_plot = np.min([max_post_stim - dt_post_stim, dt_post_stim_plot])
-        
+        self.arousal_states = None
+
         self.trial_fluorescence, self.pre_trial_fluorescence, self.post_trial_fluorescence = self.compute_trial(self.ca_attr)
         self.trial_average_fluorescence, self.average_baselines, self.post_trial_average_fluorescence = self.compute_average_traces()
 
@@ -384,6 +385,39 @@ class Trial(object):
     
         return cmi
     
+    def sort_trials_by_states(self, time_onset_aligned_on_ca_img:list, real_time_states_sorted:list):
+        d = {}
+        for i in range(len(self.visual_stim.protocol_ids)):    
+            if self.visual_stim.stim_cat[i] :
+                l = []
+                stim_dt_i = self.visual_stim.protocol_df['duration'][i]
+                stimuli_idx_i = self.visual_stim.stimuli_idx[i]
+                for j in range(len(stimuli_idx_i)) :
+                    time_onset_j = time_onset_aligned_on_ca_img[stimuli_idx_i[j]]
+                    time = [time_onset_j - self.dt_pre_stim, time_onset_j + stim_dt_i +self.dt_post_stim]
+                    stim_states = self.get_period_states(real_time_states_sorted, time[0], time[1])
+                    states_names = np.array([x[1] for x in stim_states])
+                    undefined_state_duration = 0
+                    undefined_states = np.argwhere(np.array(states_names) == 'undefined').T
+                    if len(undefined_states) > 0:
+                        for el in undefined_states[0] :
+                            undefined_state_duration += stim_states[el][0][1] - stim_states[el][0][0]
+                    
+                    if "run" in states_names :
+                        l.append("run")
+                    elif undefined_state_duration / (time[-1] - time[0]) > 1/3 :
+                        l.append("undefined")
+                    elif "AS" in states_names :
+                        l.append("AS")
+                    elif "rest" in states_names :
+                        l.append("rest")
+                    else :
+                        raise Exception(f"No states found: stimulus {i}, trial {j}, {stim_states}")
+                d.update({i : l})
+        
+        self.arousal_states = d
+        return d
+    
     #--------------TOOL FUNCTIONS---------------
     def zscores(self, baselines, traces):
         return np.array([(traces[i, :] - np.mean(baselines, axis=1)[i]) / np.std(baselines, axis=1)[i] for i in range(traces.shape[0])])
@@ -645,7 +679,10 @@ class Trial(object):
 
             fig_name = stimuli_name + "_occ_" + str(i)
             foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
-            save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence')
+            if self.arousal_states is None :
+                save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence')
+            else : 
+                save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence', self.arousal_states[stimuli_id][i])
             if not os.path.exists(save_folder):
                 os.makedirs(save_folder)
             save_path = os.path.join(save_folder, fig_name)
@@ -750,5 +787,6 @@ class Trial(object):
             "post_trial_zscores" : self.post_trial_zscores,
             "trial_response_bounds" : self.trial_response_bounds,
             "reliability" : self.reliability,
+            "arousal_states" : self.arousal_states,
                        }
         np.save(os.path.join(save_dir, filename), trials_info, allow_pickle=True)
