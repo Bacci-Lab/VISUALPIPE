@@ -42,6 +42,8 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
 
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
+    exclude_start_session = round(1 * fs)
+    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest'], min_states_window['AS']/2]))
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
@@ -58,20 +60,21 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     
     ###------------------------------ Calculate active movement state -----------------------------###
     # default param: duration > 60 frames and speed > 0.5 s/m
-    id_above_thr_speed = np.extract(speed >= speed_threshold, ids)
-    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['run']/4]))
+    id_above_thr_speed = np.extract(speed[exclude_start_session:] >= speed_threshold, ids[exclude_start_session:])
+    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(0.3 * fs), min_inter_interval_size)
+    
     Aroused_Running_index_check1 = []
     for i in Aroused_Running_index:
-        if i[0] > 45:
-            ST = np.arange(i[0] - 45, i[-1]+1)
+        if i[-1] < len(speed) - round(1 * fs) :
+            ST = np.arange(i[0], i[-1] + round(1 * fs))
         else:
-            ST = np.arange(0, i[-1]+1)
+            ST = np.arange(i[0], len(speed))
         Aroused_Running_index_check1.append(ST)
     Aroused_Running_index_check = list(chain(*Aroused_Running_index_check1))
 
     ###------------------------------Calculate AS state-----------------------------###
-    id_AS = np.extract(np.array(behavior >= behav_threshold) * np.array(speed < speed_threshold), ids)
-    Aroused_stationary_index_temp, _, _  = find_intervals(id_AS, np.min([round(0.5 * fs), min_states_window['AS']]), real_time)
+    id_AS = np.extract(np.array(behavior[exclude_start_session:] >= behav_threshold) * np.array(speed[exclude_start_session:] < speed_threshold), ids[exclude_start_session:])
+    Aroused_stationary_index_temp, _, _  = find_intervals(id_AS, np.min([round(0.3 * fs), min_states_window['AS']]), real_time)
 
     #delete idx belonging to running state
     delet_Running_IDX = []
@@ -82,21 +85,21 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     mask = np.isin(Aroused_stationary_index_check, delet_Running_IDX, invert=True)
     result = np.extract(mask, Aroused_stationary_index_check)
 
-    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['AS']/4]))
+    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, round(0.3 * fs), min_inter_interval_size)
 
     Aroused_stationary_index_check1 = []
     for i in Aroused_stationary_index:
-        if i[0]>45:
-            ST = np.arange(i[0] - 45, i[-1]+1)
+        if i[-1] < len(speed) - round(0.7 * fs) :
+            ST = np.arange(i[0], i[-1] + round(0.7 * fs))
         else:
-            ST = np.arange(0, i[-1]+1)
+            ST = np.arange(i[0], len(speed))
         Aroused_stationary_index_check1.append(ST)
     Aroused_stationary_index_check = list(chain(*Aroused_stationary_index_check1))
 
     ###------------------------------Calculate Rest state-----------------------------###
     id_rest = np.extract(np.array(behavior < behav_threshold) * np.array(speed < speed_threshold), ids)
-    Rest_index_temp, _, _  = find_intervals(id_rest, np.min([round(0.5 * fs), min_states_window['rest']]), real_time)
-    
+    Rest_index_temp, _, _  = find_intervals(id_rest, np.min([round(0.3 * fs), min_states_window['rest']]), real_time)
+
     delet_IDX = []
     rest_index_check = list(chain(*Rest_index_temp))
     for i in rest_index_check:
@@ -105,7 +108,7 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     mask = np.isin(rest_index_check, delet_IDX, invert=True)
     result = np.extract(mask, rest_index_check)
 
-    rest_index, rest_window, Real_Time_rest = find_intervals(result, min_states_window['rest'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['rest']/4]))
+    rest_index, rest_window, Real_Time_rest = find_intervals(result, min_states_window['rest'], real_time, 0, min_inter_interval_size)
 
     ###------------------------------Undefined states-----------------------------###
     to_delete__idx = []
@@ -173,6 +176,8 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
 
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
+    exclude_start_session = round(1 * fs)
+    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest'], min_states_window['AS']/2]))
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
@@ -200,22 +205,23 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     
     ###------------------------------ Calculate active movement state -----------------------------###
     # default param: duration > 60 frames and speed > 0.5 s/m
-    id_above_thr_speed = np.extract(speed >= speed_threshold, ids)
-    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['run']/4]))
+    id_above_thr_speed = np.extract(speed[exclude_start_session:] >= speed_threshold, ids[exclude_start_session:])
+    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(0.3 * fs), min_inter_interval_size)
+    
     Aroused_Running_index_check1 = []
     for i in Aroused_Running_index:
-        if i[0] > 45:
-            ST = np.arange(i[0] - 45, i[-1]+1)
+        if i[-1] < len(speed) - round(1 * fs) :
+            ST = np.arange(i[0], i[-1] + round(1 * fs))
         else:
-            ST = np.arange(0, i[-1]+1)
+            ST = np.arange(i[0], len(speed))
         Aroused_Running_index_check1.append(ST)
     Aroused_Running_index_check = list(chain(*Aroused_Running_index_check1))
 
     ###------------------------------Calculate AS state-----------------------------###
     pupil_modified = [pupil[i] if dark_mask[i] else 0 for i in range(pupil.shape[0])]
     facemotion_modified = [facemotion[i] if not dark_mask[i] else 0 for i in range(len(facemotion))]
-    id_AS = np.extract((np.array(pupil_modified >= pupil_threshold) | np.array(facemotion_modified >= facemotion_threshold)) * np.array(speed < speed_threshold), ids)
-    Aroused_stationary_index_temp, _, _  = find_intervals(id_AS, np.min([round(0.5 * fs), min_states_window['AS']]), real_time)
+    id_AS = np.extract((np.array(pupil_modified[exclude_start_session:] >= pupil_threshold) | np.array(facemotion_modified[exclude_start_session:] >= facemotion_threshold)) * np.array(speed[exclude_start_session:] < speed_threshold), ids[exclude_start_session:])
+    Aroused_stationary_index_temp, _, _  = find_intervals(id_AS, np.min([round(0.3 * fs), min_states_window['AS']]), real_time)
 
     #delete idx belonging to running state
     delet_Running_IDX = []
@@ -226,14 +232,14 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     mask = np.isin(Aroused_stationary_index_check, delet_Running_IDX, invert=True)
     result = np.extract(mask, Aroused_stationary_index_check)
 
-    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['AS']/4]))
+    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, round(0.3 * fs), min_inter_interval_size)
 
     Aroused_stationary_index_check1 = []
     for i in Aroused_stationary_index:
-        if i[0]>45:
-            ST = np.arange(i[0] - 45, i[-1]+1)
+        if i[-1] < len(speed) - round(0.7 * fs) :
+            ST = np.arange(i[0], i[-1] + round(0.7 * fs))
         else:
-            ST = np.arange(0, i[-1]+1)
+            ST = np.arange(i[0], len(speed))
         Aroused_stationary_index_check1.append(ST)
     Aroused_stationary_index_check = list(chain(*Aroused_stationary_index_check1))
 
@@ -241,7 +247,7 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     pupil_modified = [pupil[i] if dark_mask[i] else 1 for i in range(pupil.shape[0])]
     facemotion_modified = [facemotion[i] if not dark_mask[i] else 1 for i in range(len(facemotion))]
     id_rest = np.extract((np.array(pupil_modified < pupil_threshold) | np.array(facemotion_modified < facemotion_threshold)) * np.array(speed < speed_threshold), ids)
-    Rest_index_temp, _, _  = find_intervals(id_rest, np.min([round(0.5 * fs), min_states_window['rest']]), real_time)
+    Rest_index_temp, _, _  = find_intervals(id_rest, np.min([round(0.3 * fs), min_states_window['rest']]), real_time)
     
     delet_IDX = []
     rest_index_check = list(chain(*Rest_index_temp))
@@ -251,7 +257,7 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     mask = np.isin(rest_index_check, delet_IDX, invert=True)
     result = np.extract(mask, rest_index_check)
 
-    rest_index, rest_window, Real_Time_rest = find_intervals(result, min_states_window['rest'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['rest']/4]))
+    rest_index, rest_window, Real_Time_rest = find_intervals(result, min_states_window['rest'], real_time, 0, min_inter_interval_size)
 
     ###------------------------------Undefined states-----------------------------###
     to_delete__idx = []
@@ -309,26 +315,29 @@ def split_stages_locomotion(speed, speed_threshold:float, real_time, min_states_
 
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
+    exclude_start_session = round(1 * fs)
+    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest'], min_states_window['AS']/2]))
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
     
     ###------------------------------ Calculate active movement state -----------------------------###
     # default param: duration > 60 frames and speed > 0.5 s/m
-    id_above_thr_speed = np.extract(speed >= speed_threshold, ids)
-    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['run']/4]))
+    id_above_thr_speed = np.extract(speed[exclude_start_session:] >= speed_threshold, ids[exclude_start_session:])
+    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(0.3 * fs), min_inter_interval_size)
+    
     Aroused_Running_index_check1 = []
     for i in Aroused_Running_index:
-        if i[0] > 45:
-            ST = np.arange(i[0] - 45, i[-1]+1)
+        if i[-1] < len(speed) - round(1 * fs) :
+            ST = np.arange(i[0], i[-1] + round(1 * fs))
         else:
-            ST = np.arange(0, i[-1]+1)
+            ST = np.arange(i[0], len(speed))
         Aroused_Running_index_check1.append(ST)
     Aroused_Running_index_check = list(chain(*Aroused_Running_index_check1))
 
     ###------------------------------Calculate Rest state-----------------------------###
     id_rest = np.extract(np.array(speed < speed_threshold), ids)
-    Rest_index_temp, _, _  = find_intervals(id_rest, np.min([round(0.5 * fs), min_states_window['rest']]), real_time)
+    Rest_index_temp, _, _  = find_intervals(id_rest, np.min([round(0.3 * fs), min_states_window['rest']]), real_time)
     
     delet_IDX = []
     rest_index_check = list(chain(*Rest_index_temp))
@@ -338,7 +347,7 @@ def split_stages_locomotion(speed, speed_threshold:float, real_time, min_states_
     mask = np.isin(rest_index_check, delet_IDX, invert=True)
     result = np.extract(mask, rest_index_check)
 
-    rest_index, rest_window, Real_Time_rest = find_intervals(result, min_states_window['rest'], real_time, round(1 * fs), np.max([round(0.75 * fs), min_states_window['rest']/4]))
+    rest_index, rest_window, Real_Time_rest = find_intervals(result, min_states_window['rest'], real_time, 0, min_inter_interval_size)
 
     ###------------------------------Undefined states-----------------------------###
     to_delete__idx = []
@@ -872,7 +881,7 @@ def stage_plot_locomotion(speed, dF, real_time, Real_Time_states:dict, states_wi
     fig2.savefig(save_path)
     plt.close(fig2)
 
-def find_intervals(x, min_window_size, time, exclude=0, min_inter_interval_size=0):
+def find_intervals(x, min_window_size, time, exclude_start=0, min_inter_interval_size=0, include_end=0):
     """
     :param x: list or array of indexes of interest to divide in intervals
     :param int min_window_size: minimum number of frames for each state interval
@@ -885,19 +894,19 @@ def find_intervals(x, min_window_size, time, exclude=0, min_inter_interval_size=
     index_intervals =[]
     window = []
 
-    if exclude > min_window_size :
-        exclude = 0
+    if exclude_start > min_window_size :
+        exclude_start = 0
         print("Minimum window size is under 1s. No frames will be removed at the beginning of the window.")
 
     for i in range(len(x)):
         if (x[i] + 1) in x:
             window.append(x[i])
-        elif i < len(x)-1 and (x[i+1] - x[i]) < min_inter_interval_size:
+        elif i < len(x)-1 and (x[i+1] - x[i] - include_end) < min_inter_interval_size:
             window.extend(np.arange(x[i], x[i+1]))
         else :
-            window.append(x[i])
+            window.extend(np.arange(x[i], x[i]+1+include_end))
             if len(window) >= min_window_size:
-                index_intervals.append(window[exclude:])
+                index_intervals.append(window[exclude_start:])
             window = []
     
     for interval in index_intervals:
