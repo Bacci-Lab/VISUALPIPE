@@ -273,10 +273,13 @@ for i in range(len(protocol_df)):
     if visual_stim.stim_cat[i] :
 
         #plot trial-averaged z-score raster sorted
-        trials.trial_average_rasterplot(i, save_fig_dir) 
+        trials.trial_average_rasterplot(i, savepath=save_fig_dir) 
 
         #plot trial-averaged z-score raster not sorted
-        trials.trial_average_rasterplot(i, save_fig_dir, sort=False)
+        trials.trial_average_rasterplot(i, savepath=save_fig_dir, sort=False)
+
+        #plot trial-averaged z-score raster sorted and normalized
+        trials.trial_average_rasterplot(i, savepath=save_fig_dir, normalize=True)
 
         #plot trials z-score raster with paired baseline
         trials.trial_rasterplot(trial_zscores, pre_trial_zscores, post_trial_zscores, i, 'dFoF0', savepath=save_fig_dir)

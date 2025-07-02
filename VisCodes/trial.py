@@ -483,21 +483,54 @@ class Trial(object):
         return list(zip(l_el, l_key))
 
     #--------------PLOTS FUNCTIONS---------------
-    def trial_average_rasterplot(self, stimuli_id:int, savepath:str='', sort:bool=True) :
+    def trial_average_rasterplot(self, stimuli_id:int, trace:str='z-score', savepath:str='', sort:bool=True, normalize:bool=False) :
         """
         Plot a rasterplot of all neurons trial-averaged response for a fixed stimulus.
         
         :param int stimuli_id: Index of the stimulus to consider.
+        :param str trace: Choose between displaying averaged-trial z-score ('z-score') or the trial averaged calcium imaging traces substracted by the stimuli baseline ('baseline substracted')
         :param str savepath: Saving directory.
         :param bool sort: If True, shows traces sorted by mean fluorescence, if not show traces in ROIs index order.
+        :param bool normalize: If True, normalize traces.
         """
+
+        pre_colorbar_title = ''
+        post_fig_title = ''
+
+        if trace == 'z-score' : 
+            pre_trial_averaged = self.pre_trial_averaged_zscores[stimuli_id]
+            trial_averaged = self.trial_averaged_zscores[stimuli_id]
+            post_trial_averaged = self.post_trial_averaged_zscores[stimuli_id]
+        elif trace == 'baseline substracted' :
+            pre_trial_averaged = self.pre_trial_average_fluorescence_norm[stimuli_id]
+            trial_averaged = self.trial_average_fluorescence_norm[stimuli_id]
+            post_trial_averaged = self.post_trial_average_fluorescence_norm[stimuli_id]
+        else :
+            raise Exception("Trace not recognized: choose 'z-score' or 'baseline_substracted'.")
+
+        if normalize :
+
+            pre_colorbar_title = 'normalized '
+            post_fig_title = '_normalized'
+
+            # Concatenate full trace per neuron before normalization
+            full_trace = np.concatenate((pre_trial_averaged,
+                                         trial_averaged,
+                                         post_trial_averaged), axis=1)
+
+            # Normalize the full trace per neuron
+            max_abs = np.max(np.abs(full_trace), axis=1, keepdims=True)
+
+            pre_trial_averaged = pre_trial_averaged / max_abs
+            trial_averaged = trial_averaged / max_abs
+            post_trial_averaged = post_trial_averaged / max_abs
 
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
-        stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
-        data = np.concatenate((self.pre_trial_averaged_zscores[stimuli_id], self.trial_averaged_zscores[stimuli_id], self.post_trial_averaged_zscores[stimuli_id]), axis=1)
+        stimuli_onset = pre_trial_averaged.shape[1]
+        data = np.concatenate((pre_trial_averaged, trial_averaged, post_trial_averaged), axis=1)
         if sort :
-            idx_sorted = np.argsort(np.mean(self.trial_averaged_zscores[stimuli_id], axis=1))
+            idx_sorted = np.argsort(np.mean(trial_averaged, axis=1))
             data = data[idx_sorted]
         time = (np.arange(data.shape[1]) - stimuli_onset) / self.ca_img.fs
 
@@ -509,7 +542,7 @@ class Trial(object):
 
         fig = plt.figure(figsize=(10, 6))
         im = plt.pcolormesh(time, np.arange(data.shape[0]), data, cmap='RdBu_r', vmin=-lim, vmax=lim)
-        plt.colorbar(im, label=self.ca_attr + " z-score")
+        plt.colorbar(im, label=pre_colorbar_title + self.ca_attr + " " + trace)
         plt.axvline(0, color='black', linestyle='--')
         if self.dt_post_stim + self.dt_post_stim_plot > 0 :
             plt.axvline(stim_dt, color='black', linestyle='--')
@@ -518,9 +551,9 @@ class Trial(object):
         plt.title(stimuli_name)
 
         if sort :
-            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot_sorted.png"))
+            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot_sorted"+ post_fig_title +".png"))
         else :
-            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot.png"))
+            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot"+ post_fig_title +".png"))
         plt.close(fig)
 
     def trial_rasterplot(self, trial_zscores, pre_trial_zscores, post_trial_zscores, stimuli_id:int, attr:str='fluorescence', savepath:str='') :
