@@ -43,7 +43,7 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
     exclude_start_session = round(1 * fs)
-    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest'], min_states_window['AS']/2]))
+    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest']/2, min_states_window['AS']/2]))
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
@@ -177,7 +177,7 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
     exclude_start_session = round(1 * fs)
-    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest'], min_states_window['AS']/2]))
+    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest']/2, min_states_window['AS']/2]))
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
@@ -316,7 +316,7 @@ def split_stages_locomotion(speed, speed_threshold:float, real_time, min_states_
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
     exclude_start_session = round(1 * fs)
-    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest'], min_states_window['AS']/2]))
+    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest']/2, min_states_window['AS']/2]))
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
