@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import pearsonr
+from scipy.stats import spearmanr
 import sys
 from PyQt5 import QtWidgets
 import os
@@ -136,9 +136,9 @@ ca_img_dm.compute_dFoF0()
 computed_F_norm = ca_img_dm.normalize_time_series("dFoF0", lower=0, upper=3)
 
 #---------------------------------- Compute correlation ----------------------
-speed_corr_list = [pearsonr(speed, ROI)[0] for ROI in ca_img_dm.dFoF0]
-facemotion_corr_list = [pearsonr(facemotion, ROI)[0] for ROI in ca_img_dm.dFoF0]
-pupil_corr_list = [pearsonr(pupil, ROI)[0] for ROI in ca_img_dm.dFoF0]
+speed_corr_list = [spearmanr(speed, ROI)[0] for ROI in ca_img_dm.dFoF0]
+facemotion_corr_list = [spearmanr(facemotion, ROI)[0] for ROI in ca_img_dm.dFoF0]
+pupil_corr_list = [spearmanr(pupil, ROI)[0] for ROI in ca_img_dm.dFoF0]
 
 #---------------------------------- Plot calcium imaging traces ----------------------
 ca_img_dm.plot('f0', sigma=0, mean=True, save_dir=save_fig_dir, legend=True)
@@ -311,7 +311,7 @@ np.savez(os.path.join(save_dir, filename_protocol), **{key: value for d in proto
 print(protocol_validity)
 
 #---------------------------------- Spontaneous behaviour ----------------------------------
-spont_stimuli_id, analyze_pupil = spont.get_spont_stim(visual_stim)
+spont_stimuli_id, _ = spont.get_spont_stim(visual_stim)
 
 if len(spont_stimuli_id) > 0 :
     spont_speed_corr_list = []
@@ -323,11 +323,11 @@ if len(spont_stimuli_id) > 0 :
     
     idx_lim_protocol, spont_stimuli_id_order, F_spontaneous = visual_stim.get_protocol_onset_index(spont_stimuli_id, F_stim_init_indexes, ca_img_dm.fs, tseries=ca_img_dm.dFoF0)
 
-    analyze_pupil_order = dict(zip(spont_stimuli_id, analyze_pupil))
+    spont_df = protocol_df.loc[spont_stimuli_id_order]
 
     for i, id  in zip(range(len(spont_stimuli_id_order)), spont_stimuli_id_order):
         [start_spont_index, end_spont_index] = idx_lim_protocol[i]
-        name_stimuli = protocol_df.loc[spont_stimuli_id_order[i]]['name']
+        name_stimuli = spont_df.loc[spont_stimuli_id_order[i]]['name']
         save_spont_dir = os.path.join(save_dir, "_".join([unique_id, 'spontaneous']))
         save_spont_dir_i = os.path.join(save_spont_dir, name_stimuli)
         if not os.path.exists(save_spont_dir_i) : os.makedirs(save_spont_dir_i)
@@ -352,13 +352,13 @@ if len(spont_stimuli_id) > 0 :
 
             # Pupil correlation
             pupil_spont = pupil[start_spont_index:end_spont_index]
-            if analyze_pupil_order[id] :
+            if spont_df.loc[id].analyze_pupil :
                 spont_pupil_corr, valid_neurons_temp = spont.compute_spont_corr(pupil_spont, F_spontaneous[i], time_stamps_spont, 'pupil', save_spont_dir_i)
                 spont_pupil_corr_list.append(spont_pupil_corr)
                 valid_neurons_pupil_list.append(valid_neurons_temp)
                 spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], pupil_spont, valid_neurons_temp, spont_pupil_corr, sigma=10, label='pupil', save_path=save_spont_dir_i)
 
-    speed_corr = np.mean(spont_speed_corr_list, axis=0)
+    speed_corr = np.dot(np.array(spont_speed_corr_list).T, spont_df.duration/np.sum(spont_df.duration))
     valid_neurons_speed = spont.get_valid_neurons(valid_neurons_speed_list)
     spont.pie_plot(len(valid_neurons_speed), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_speed), save_spont_dir, 'speed')
     valid_neurons_speed_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_speed_list)))
@@ -366,7 +366,7 @@ if len(spont_stimuli_id) > 0 :
         valid_neurons_speed_list2[valid_neurons_speed_list[i], i] = 1
 
     if not face_cam_dm.no_face_data :
-        facemotion_corr = np.mean(spont_facemotion_corr_list, axis=0)
+        facemotion_corr = np.dot(np.array(spont_facemotion_corr_list).T, spont_df.duration/np.sum(spont_df.duration))
         valid_neurons_facemotion = spont.get_valid_neurons(valid_neurons_facemotion_list)
         spont.pie_plot(len(valid_neurons_facemotion), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_facemotion), save_spont_dir, 'facemotion')
         valid_neurons_facemotion_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_facemotion_list)))
@@ -374,7 +374,8 @@ if len(spont_stimuli_id) > 0 :
             valid_neurons_facemotion_list2[valid_neurons_facemotion_list[i], i] = 1
 
         if len(spont_pupil_corr_list) > 0 :
-            pupil_corr = np.mean(spont_pupil_corr_list, axis=0)
+            spont_dt_pupil = spont_df[spont_df.analyze_pupil == 1].duration
+            pupil_corr = np.dot(np.array(spont_pupil_corr_list).T, spont_dt_pupil/np.sum(spont_dt_pupil))
             valid_neurons_pupil = spont.get_valid_neurons(valid_neurons_pupil_list)
             spont.pie_plot(len(valid_neurons_pupil), len(ca_img_dm._list_ROIs_idx) - len(valid_neurons_pupil), save_spont_dir, 'pupil')
             valid_neurons_pupil_list2 = np.zeros((len(ca_img_dm._list_ROIs_idx), len(valid_neurons_pupil_list)))
