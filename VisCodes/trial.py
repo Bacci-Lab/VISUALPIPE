@@ -464,7 +464,7 @@ class Trial(object):
         k = 0
         while k < len(real_time_states_sorted) and \
             not (real_time_states_sorted[k][0][0] <=  t0 <= real_time_states_sorted[k][0][1]) and \
-                (k==0 or not (real_time_states_sorted[k-1][0][1] <=  tf <= real_time_states_sorted[k][0][0])) :
+                (k==0 or not (real_time_states_sorted[k-1][0][1] <=  t0 <= real_time_states_sorted[k][0][0])) :
             k +=1
         idx_interval_1 = int(k)
 
