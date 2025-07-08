@@ -7,7 +7,7 @@ import os
 import random
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.stats.weightstats import ztest as ztest
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn import metrics
 from matplotlib.lines import Line2D
@@ -328,7 +328,7 @@ class Trial(object):
             averaged_group1 = np.mean(np.array(roi_trials_traces)[group1], axis=0)
             averaged_group2 = np.mean(np.array(roi_trials_traces)[group2], axis=0)
 
-            corr = pearsonr(averaged_group1 , averaged_group2)[0]
+            corr = spearmanr(averaged_group1 , averaged_group2)[0]
             corr_list.append(corr)
 
         r = np.mean(corr_list)
@@ -341,7 +341,7 @@ class Trial(object):
 
         for k in range(len(roi_trials_traces)) :
             for j in range(k+1, len(roi_trials_traces)):
-                corr = pearsonr(roi_trials_traces[k] , roi_trials_traces[j])[0]
+                corr = spearmanr(roi_trials_traces[k] , roi_trials_traces[j])[0]
                 corr_list.append(corr)
         
         r = np.mean(corr_list)
@@ -626,6 +626,8 @@ class Trial(object):
             colors, positions = ['midnightblue', 'paleturquoise'], [0, 1]
             cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=trial_rois_zscores.shape[0])
         
+        rc = {'axes.facecolor':'white','axes.grid' : False}
+        plt.rcParams.update(rc)
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
         if self.dt_post_stim + self.dt_post_stim_plot > 0 :
@@ -643,6 +645,10 @@ class Trial(object):
             ax.axvspan(0, stim_dt + self.dt_post_stim, color='thistle', alpha=0.2, label='trial period')
         fig_name = stimuli_name + "_neuron_" + str(neuron_idx)
         ax.margins(x=0)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
         ax.set_xlabel("Time (s)")
         ax.set_ylabel(self.ca_attr + " z-score")
         ax.set_title(stimuli_name + '\n' + fig_name)
@@ -670,6 +676,8 @@ class Trial(object):
         :param str folder_prefix: Prefix of the folder name.
         """
 
+        rc = {'axes.facecolor':'white','axes.grid' : False}
+        plt.rcParams.update(rc)
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         colors, positions = ['darkred', 'lightgray'], [0, 1]
@@ -699,6 +707,10 @@ class Trial(object):
                         ax.axvspan(stim_states[k][0][0], stim_states[k][0][1], color=color_dict[stim_states[k][1]], alpha=0.4)
                 ax.set_xticks([])
                 ax.margins(x=0)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['left'].set_visible(False)
                 ax.set_ylabel(f'ROI {roi_id}')
             
             run_legend = Line2D([0], [0], color=color_dict['run'], linewidth=5)
@@ -708,6 +720,7 @@ class Trial(object):
                       loc='lower left', bbox_to_anchor=(1.0, 0.0), prop={'size': 9})
             ax.set_xlabel("Time (s)")
             ax.xaxis.set_major_locator(AutoLocator())
+            plt.subplots_adjust(wspace=0, hspace=0)
             fig.suptitle(stimuli_name + '\n' + f'Occurence {i} of stimulus')
 
             fig_name = stimuli_name + "_occ_" + str(i)
