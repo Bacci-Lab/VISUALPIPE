@@ -509,6 +509,8 @@ class Trial(object):
         else :
             raise Exception("Trace not recognized: choose 'z-score' or 'baseline_substracted'.")
 
+        trial_averaged_sort = trial_averaged
+
         if normalize :
 
             pre_colorbar_title = 'normalized '
@@ -531,7 +533,7 @@ class Trial(object):
         stimuli_onset = pre_trial_averaged.shape[1]
         data = np.concatenate((pre_trial_averaged, trial_averaged, post_trial_averaged), axis=1)
         if sort :
-            idx_sorted = np.argsort(np.mean(trial_averaged, axis=1))
+            idx_sorted = np.argsort(np.mean(trial_averaged_sort, axis=1))
             data = data[idx_sorted]
         time = (np.arange(data.shape[1]) - stimuli_onset) / self.ca_img.fs
 
