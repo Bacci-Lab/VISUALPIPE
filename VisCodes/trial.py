@@ -12,6 +12,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from sklearn import metrics
 from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoLocator
+import seaborn as sns
 
 class Trial(object):
 
@@ -378,8 +379,8 @@ class Trial(object):
         cmi = []
 
         for i in range(len(self.ca_img._list_ROIs_idx)) :
-            cross = np.mean(self.trial_fluorescence[id_srm_cross][i])
-            iso = np.mean(self.trial_fluorescence[id_srm_iso][i])
+            cross = np.mean(self.trial_fluorescence[id_srm_cross][i, :, round(0.5*self.ca_img.fs):])
+            iso = np.mean(self.trial_fluorescence[id_srm_iso][i, :, round(0.5*self.ca_img.fs):])
             cmi_roi = (cross - iso) / (cross + iso)
             cmi.append(cmi_roi)
     
@@ -803,6 +804,28 @@ class Trial(object):
             os.mkdir(save_folder)
         save_path = os.path.join(save_folder, fig_name)
         fig.savefig(save_path + ".png")
+        plt.close(fig)
+
+    def plot_cmi_hist(self, cmi, save_dir:str):
+        edgecolor='black'
+        cmi_plot = [el if np.abs(el) < 1.5 else 2 if el > 1.5 else -2 for el in cmi]
+        
+        fig, ax = plt.subplots(figsize=(6, 5))
+        sns.histplot(cmi_plot, bins=12, binrange=(-1.5, 1.5), color='white', edgecolor=edgecolor, element='step', ax=ax)
+        sns.histplot(cmi_plot, bins=1, binrange=(1.875, 2.125), color='white', edgecolor=edgecolor, ax=ax)
+        sns.histplot(cmi_plot, bins=1, binrange=(-2.125, -1.875), color='white', edgecolor=edgecolor, ax=ax)
+        ax.set_xticks([-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2], labels=['<-1.5', '-1.5', '-1', '-0.5', '0', '0.5', '1', '1.5', '>1.5'])
+        ax.set_ylabel('Count of neurons')
+        ax.set_title('Contextual Modulation Index')
+        ax.axvline(np.median(cmi), color='black', linestyle='--', linewidth=1.5, label='median') # Add vertical dashed line at median position
+        plt.gca().spines[['right', 'top']].set_visible(False)
+        plt.gca().spines[['left', 'bottom']].set_visible(True)
+        ax.legend()
+        textstr = f'{len(cmi)} neurons'
+        plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                        fontsize=12, verticalalignment='top', horizontalalignment='left')
+        
+        fig.savefig(os.path.join(save_dir, 'cmi_histogram.png'), dpi=300)
         plt.close(fig)
 
     #-------------SAVE FUNCTIONS---------------
