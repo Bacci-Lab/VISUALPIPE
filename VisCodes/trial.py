@@ -376,13 +376,11 @@ class Trial(object):
     def compute_cmi(self):
         id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
         id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
-        cmi = []
+        
+        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.5*self.ca_img.fs):], axis=1)
+        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.5*self.ca_img.fs):], axis=1)
 
-        for i in range(len(self.ca_img._list_ROIs_idx)) :
-            cross = np.mean(self.trial_fluorescence[id_srm_cross][i, :, round(0.5*self.ca_img.fs):])
-            iso = np.mean(self.trial_fluorescence[id_srm_iso][i, :, round(0.5*self.ca_img.fs):])
-            cmi_roi = (cross - iso) / (cross + iso)
-            cmi.append(cmi_roi)
+        cmi = (cross - iso) / (cross + iso)
     
         return cmi
     
@@ -828,6 +826,34 @@ class Trial(object):
                         fontsize=12, verticalalignment='top', horizontalalignment='left')
         
         fig.savefig(os.path.join(save_dir, 'cmi_histogram.png'), dpi=300)
+        plt.close(fig)
+
+    def plot_iso_vs_cross(self, save_dir:str) :
+
+        id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
+        id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
+        
+        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.5*self.ca_img.fs):], axis=1)
+        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.5*self.ca_img.fs):], axis=1)
+
+        min = np.min((cross, iso))
+        max = np.max((cross, iso))
+
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.axhline(0, color='black', linestyle='--', linewidth=1)
+        ax.axvline(0, color='black', linestyle='--', linewidth=1)
+        ax.plot([min, max], [min, max], linestyle='--', color='black', linewidth=1)
+        sns.scatterplot(x=cross, y=iso, color='grey', alpha=0.5, s=70, ax=ax)
+        plt.gca().spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+        ax.set_xlabel(r'Cross [$\Delta$F/F]', fontsize=12)
+        ax.set_ylabel(r'Iso [$\Delta$F/F]', fontsize=12)
+        ax.set_title('Iso vs cross')
+
+        textstr = f'{len(cross)} neurons'
+        plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                       fontsize=10, verticalalignment='top', horizontalalignment='left')
+        
+        fig.savefig(os.path.join(save_dir, 'iso_vs_cross.png'), dpi=300, bbox_inches='tight')
         plt.close(fig)
 
     #-------------SAVE FUNCTIONS---------------
