@@ -6,19 +6,24 @@ import os
 from scipy.stats import wilcoxon
 
 #--------------------INPUTS------------------#
-data_path = r"Y:\raw-imaging\Nathan\PYR\108 male\Visual\03_03_2025\TSeries-03032025-013\2025_03_03_18-43-25_output_1"
-validity_file = '2025_03_03_18-43-25_1_protocol_validity_2.npz'
-trials_file = '2025_03_03_18-43-25_1_trials.npy'
+data_path = r"Y:\raw-imaging\Nathan\PYR\109 male\Visual\2025_03_04\TSeries-03042025-007\2025_03_04_13-55-39_output_1"
+validity_file = '2025_03_04_13-55-39_1_protocol_validity_2.npz'
+trials_file = '2025_03_04_13-55-39_1_trials.npy'
 save_path = data_path
-file_name = 'test'
+file_name = 'mapping'
 #This is the list of stimuli you want to use to select the responsive neurons. A responsive neurons is responsive in at least one of these stimuli
-protocol_validity = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-0.46-90.0', 'center-grating-0.59-90.0', 'center-grating-0.73-90.0', 'center-grating-0.86-90.0', 'center-grating-1.0-90.0']  
+protocol_validity = ['grating-center']  
 # Write the protocols you want to plot
-protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-0.46-90.0', 'center-grating-0.59-90.0', 'center-grating-0.73-90.0', 'center-grating-0.86-90.0', 'center-grating-1.0-90.0']
+protocols = ['grating-center']
+# Decide if you want to plot the dFoF0 baseline substraced or the z-scores
+attr = 'z_scores'  # 'dFoF0-baseline' or 'z_scores'
 #-----------------------------------------------------------------------------#
 
 
-
+if attr == 'dFoF0-baseline':
+    z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
+elif attr == 'z_scores':
+    z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
 
 
 # Load the npz file
@@ -43,20 +48,23 @@ valid_neurons = np.unique(np.concatenate(valid_neuron_lists))  # Get unique indi
 
 
 
+if attr == 'dFoF0-baseline':
+    # Calculate the proportion of valid neurons
+    proportion_valid = 100 * len(valid_neurons) / trials['norm_trial_averaged_ca_trace'][0].shape[0]
+elif attr == 'z_scores':
+    # Calculate the proportion of valid neurons
+    proportion_valid = 100 * len(valid_neurons) / trials['trial_averaged_zscores'][0].shape[0]
 
-proportion_valid = 100 * len(valid_neurons)/trials['trial_averaged_zscores'][0].shape[0]
 
 print(f"Number of neurons responsive in {protocol_validity}: {len(valid_neurons)}")
 print(f"Proportion of neurons responsive in {protocol_validity}: {proportion_valid:.2%}")
 
 
 # ----------------------------------Plot average z_scores during specific protocols for all neurons of that session-----------------------------------------#
-file1 = f"average_{file_name}_allneurons.jpeg"
+file1 = f"average_{file_name}_{attr}_allneurons.jpeg"
 
-
-z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
 x_labels = ['Pre-stim', 'Stim', 'Post-stim']
-total_time = trials['trial_averaged_zscores'][0].shape[1] + trials['pre_trial_averaged_zscores'][0].shape[1] + trials['post_trial_averaged_zscores'][0].shape[1]
+total_time = trials[z_score_periods[0]][0].shape[1] + trials[z_score_periods[1]][0].shape[1] + trials[z_score_periods[2]][0].shape[1]
 print(total_time)
 # print(f" Total time:{total_time}")
 
@@ -104,8 +112,8 @@ for protocol in protocols:
                      alpha=0.3)
 plt.xticks(np.arange(-1, time[-1] + 1, 1))
 plt.xlabel("Time (s)")
-plt.ylabel("Average z-score for all neurons")
-plt.title("Mean z-score ± SEM")
+plt.ylabel(f"Average {attr} for all neurons")
+plt.title(f"Mean {attr} ± SEM")
 plt.legend()
 plt.savefig(os.path.join(save_path, file1), dpi=300)
 
@@ -118,7 +126,7 @@ plt.show()
 
 # ----------------------------------f"Plot average z_scores during specific protocols for all neurons responsive in the {protocol_validity}-----------------------------------------#
 # save_path = r"P:\raw-imaging\Nathan\PYR\110 male\Visual\25_02_2025\TSeries-02252025-002\2025_02_25_14-12-40_output_4"
-file2 = f"average_{file_name}_responsive.jpeg"
+file2 = f"average_{file_name}_{attr}_responsive.jpeg"
 
 
 
@@ -146,7 +154,7 @@ for protocol in protocols:
         avg_trace.append(avg_zscore)
         sem_trace.append(sem_period)
         #Compute the magnitude of the response for each neuron as the mean z-score during the stimulus period
-        if period == 'trial_averaged_zscores':
+        if period == 'trial_averaged_zscores' or period == 'norm_trial_averaged_ca_trace':
             for n in range(0,neurons):
                 zneuron = zscores[n, int(frame_rate*0.5):] # exclude the first 0.5 seconds because of GCaMP's slow kinetics
                 magnitude[protocol].append(np.mean(zneuron))
@@ -169,8 +177,8 @@ for protocol in protocols:
                      alpha=0.3)
 plt.xticks(np.arange(-1, time[-1] + 1, 1))
 plt.xlabel("Time (s)")
-plt.ylabel(f"Average Z-score for neurons responsive to {protocol_validity}")
-plt.title("Mean z-score ± SEM")
+plt.ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
+plt.title(f"Mean {attr} ± SEM")
 # Add text box with median and p-value
 textstr = f'Nb responsive neurons = {len(valid_neurons)}\n% of responsive neurons= {proportion_valid:.1f}'
 
@@ -193,8 +201,8 @@ print(data)
 plt.figure(figsize=(6,6))
 plt.boxplot(data, labels=[protocol for protocol in protocols], patch_artist=True)
 
-plt.ylabel('Response magnitude (peak z-score)')
-plt.title('Distribution of neuron response magnitudes by protocol')
+plt.ylabel(f'Response magnitude (peak of {attr})')
+plt.title(f'Distribution of neuron response magnitudes of {attr} by protocol')
 plt.grid(axis='y')
 
 plt.tight_layout()
@@ -228,7 +236,7 @@ print(f"Median CMI:{median_cmi}")
 
 # ------ Plot the distribution of CMIs in this session ----#
 
-file3 = f"barplot_{file_name}_responsive"
+file3 = f"barplot_{file_name}_{attr}_responsive"
 # CMI list
 cmi_array = np.array(cmi)
 
