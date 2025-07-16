@@ -374,6 +374,13 @@ class Trial(object):
         return r_null_distribution
 
     def compute_cmi(self):
+        """
+        Compute the CMI (Contextual Modulation Index).
+
+        CMI is a metric that evaluates the contextual modulation of a neuron. It is computed as the difference between the average fluorescence of the cross and iso protocols normalized by the sum of the two.
+
+        :return cmi (array): Array of CMI values for each ROI.
+        """
         id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
         id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
         
@@ -385,6 +392,20 @@ class Trial(object):
         return cmi
     
     def sort_trials_by_states(self, time_onset_aligned_on_ca_img:list, real_time_states_sorted:list):
+        """
+        Sort trials by arousal states.
+
+        For each trial, get the period of states during the trial and assign a state to the trial based on the following rules :
+        - If there is a run state, assign "run"
+        - If there is an undefined state of more than 1/3 of the trial duration, assign "undefined"
+        - If there is an AS state, assign "AS"
+        - If there is a rest state, assign "rest"
+
+        :param list time_onset_aligned_on_ca_img: Times of stimuli onset aligned with calcium imaging time.
+        :param list real_time_states_sorted: List of tuples in the format ([t_start_state, t_end_state], state_name) ordered by time.
+
+        :return arousal_states (dict): Dictionary with protocol ids as keys and a list of states as values.
+        """
         d = {}
         for i in range(len(self.visual_stim.protocol_ids)):    
             if self.visual_stim.stim_cat[i] :
@@ -807,6 +828,20 @@ class Trial(object):
         plt.close(fig)
 
     def plot_cmi_hist(self, cmi, save_dir:str):
+        """
+        Plot histogram of contextual modulation index (CMI).
+
+        Parameters
+        ----------
+        cmi : list of float
+            List of CMI values for each neuron.
+        save_dir : str
+            Directory to save the figure.
+
+        Returns
+        -------
+        None
+        """
         edgecolor='black'
         cmi_plot = [el if np.abs(el) < 1.5 else 2 if el > 1.5 else -2 for el in cmi]
         
@@ -829,10 +864,28 @@ class Trial(object):
         plt.close(fig)
 
     def plot_iso_vs_cross(self, save_dir:str) :
+        """
+        Plot cross vs iso responses.
 
+        Parameters
+        ----------
+        save_dir : str
+            Directory to save the figure.
+
+        Returns
+        -------
+        None
+        """
+        
         id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
         id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
         
+        rois_cross = np.where(np.array([data[0] for data in self.responsive[id_srm_cross]]) != 0)[0]
+        rois_iso = np.where(np.array([data[0] for data in self.responsive[id_srm_iso]]) != 0)[0]
+
+        valid_neurons = np.unique(np.concatenate((rois_cross, rois_iso)))
+        invalid_neurons = np.array([i for i in range(len(self.responsive[12])) if i not in valid_neurons])
+
         cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.5*self.ca_img.fs):], axis=1)
         iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.5*self.ca_img.fs):], axis=1)
 
@@ -843,7 +896,8 @@ class Trial(object):
         ax.axhline(0, color='black', linestyle='--', linewidth=1)
         ax.axvline(0, color='black', linestyle='--', linewidth=1)
         ax.plot([min, max], [min, max], linestyle='--', color='black', linewidth=1)
-        sns.scatterplot(x=cross, y=iso, color='grey', alpha=0.5, s=70, ax=ax)
+        sns.scatterplot(x=cross[invalid_neurons], y=iso[invalid_neurons], color='grey', alpha=0.5, s=70, ax=ax)
+        sns.scatterplot(x=cross[valid_neurons], y=iso[valid_neurons], color='green', alpha=0.5, s=70, ax=ax)
         plt.gca().spines[['right', 'top', 'left', 'bottom']].set_visible(False)
         ax.set_xlabel(r'Cross [$\Delta$F/F]', fontsize=12)
         ax.set_ylabel(r'Iso [$\Delta$F/F]', fontsize=12)
