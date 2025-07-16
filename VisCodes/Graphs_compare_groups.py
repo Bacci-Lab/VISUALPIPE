@@ -9,7 +9,7 @@ import glob
 #-----------------------INPUTS-----------------------#
 ## Organization of the data: folder for the protocol (e.g surround mod) > group (e.g KO and WT) > # mouse (e.g 110, 108) > session (e.g 2023-10-01) > .npz file with the validity of the neurons and .npy file with the trials
 #The folder containing all subfolders
-data_path = r""
+data_path = r"Y:\raw-imaging\Nathan\PYR\2orientations-8contrasts"
 save_path = data_path
 # group names have to be the name of the subfolders
 groups = ['WT', 'KO']
@@ -17,15 +17,15 @@ groups = ['WT', 'KO']
 WT_mice = ['110', '108']
 KO_mice = ['109', '112']
 #Will be included in all names of saved figures
-fig_name = 'drifting-grating-1.0'
+fig_name = 'center-grating-0.05-0.0_positive_neurons'
 # Write the protocols you want to plot 
-protocols = ['drifting-grating-1.0']
+protocols = ['center-grating-0.05-0.0']  
 # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-protocol_validity = ['drifting-grating-0.2', 'drifting-grating-0.6', 'drifting-grating-1.0'] 
+protocol_validity = ['center-grating-0.46-0.0', 'center-grating-0.59-0.0', 'center-grating-0.73-0.0','center-grating-0.05-0.0', 'center-grating-0.19-0.0', 'center-grating-0.32-0.0', 'center-grating-0.86-0.0', 'center-grating-1.0-0.0'] 
 #Frame rate
 frame_rate = 30
 #----------------------------------------------------#
-
+#'center-grating-0.46-90.0', 'center-grating-0.59-90.0', 'center-grating-0.73-90.0','center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-0.86-90.0', 'center-grating-1.0-90.0'
 
 
 
@@ -208,7 +208,7 @@ for i, protocol in enumerate(protocols):
 
 # Labeling
 ax.set_xticks(x_ticks)
-ax.set_xticklabels(x_labels, rotation=0)
+ax.set_xticklabels(x_labels, rotation=45, ha='right')
 ax.set_ylabel('Mean stimulus response (z-score)')
 ax.set_title('Session-averaged responses during stimulus')
 ax.legend()
@@ -258,8 +258,32 @@ plt.legend()
 plt.savefig(os.path.join(save_path, f"average_{fig_name}_wt_vs_ko.jpeg"), dpi=300)
 plt.show()
 
-
-
+# if you want a separate plot for each group
+color_map = plt.get_cmap('tab10')  # You can use 'tab10', 'Set2', etc.
+protocol_colors = {protocol: color_map(i) for i, protocol in enumerate(protocols)}
+for group in groups:
+    if group == 'WT':
+        avg_data = avg_wt
+        sem_data = sem_wt
+        neurons = wt_neurons
+    elif group == 'KO':
+        avg_data = avg_ko
+        sem_data = sem_ko
+        neurons = ko_neurons
+    plt.figure(figsize=(10, 6))
+    for protocol in protocols:
+        plt.plot(time, avg_data[protocol][:min_len], color=protocol_colors[protocol], label=f"{group} {protocol}, {neurons} neurons")
+        plt.fill_between(time,
+                        avg_data[protocol][:min_len] - sem_data[protocol][:min_len],
+                        avg_data[protocol][:min_len] + sem_data[protocol][:min_len], color=protocol_colors[protocol],
+                        alpha=0.3)
+    plt.xticks(np.arange(-1, time[-1] + 1, 1))
+    plt.xlabel("Time (s)")
+    plt.ylabel(f"Average Z-score for neurons responsive to all contrasts at 90°")
+    plt.title(f"Mean z-score ± SEM by Protocol for {group}")
+    plt.legend()
+    plt.savefig(os.path.join(save_path, f"average_{fig_name}_{group}.jpeg"), dpi=300)
+    plt.show()
 
 ###----------------Boxplot for CMI-----------###
 
