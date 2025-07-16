@@ -7,11 +7,12 @@ import os
 import random
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.stats.weightstats import ztest as ztest
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn import metrics
 from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoLocator
+import seaborn as sns
 
 class Trial(object):
 
@@ -328,7 +329,7 @@ class Trial(object):
             averaged_group1 = np.mean(np.array(roi_trials_traces)[group1], axis=0)
             averaged_group2 = np.mean(np.array(roi_trials_traces)[group2], axis=0)
 
-            corr = pearsonr(averaged_group1 , averaged_group2)[0]
+            corr = spearmanr(averaged_group1 , averaged_group2)[0]
             corr_list.append(corr)
 
         r = np.mean(corr_list)
@@ -341,7 +342,7 @@ class Trial(object):
 
         for k in range(len(roi_trials_traces)) :
             for j in range(k+1, len(roi_trials_traces)):
-                corr = pearsonr(roi_trials_traces[k] , roi_trials_traces[j])[0]
+                corr = spearmanr(roi_trials_traces[k] , roi_trials_traces[j])[0]
                 corr_list.append(corr)
         
         r = np.mean(corr_list)
@@ -373,19 +374,38 @@ class Trial(object):
         return r_null_distribution
 
     def compute_cmi(self):
+        """
+        Compute the CMI (Contextual Modulation Index).
+
+        CMI is a metric that evaluates the contextual modulation of a neuron. It is computed as the difference between the average fluorescence of the cross and iso protocols normalized by the sum of the two.
+
+        :return cmi (array): Array of CMI values for each ROI.
+        """
         id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
         id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
-        cmi = []
+        
+        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.5*self.ca_img.fs):], axis=1)
+        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.5*self.ca_img.fs):], axis=1)
 
-        for i in range(len(self.ca_img._list_ROIs_idx)) :
-            cross = np.mean(self.trial_fluorescence[id_srm_cross][i])
-            iso = np.mean(self.trial_fluorescence[id_srm_iso][i])
-            cmi_roi = (cross - iso) / (cross + iso)
-            cmi.append(cmi_roi)
+        cmi = (cross - iso) / (cross + iso)
     
         return cmi
     
     def sort_trials_by_states(self, time_onset_aligned_on_ca_img:list, real_time_states_sorted:list):
+        """
+        Sort trials by arousal states.
+
+        For each trial, get the period of states during the trial and assign a state to the trial based on the following rules :
+        - If there is a run state, assign "run"
+        - If there is an undefined state of more than 1/3 of the trial duration, assign "undefined"
+        - If there is an AS state, assign "AS"
+        - If there is a rest state, assign "rest"
+
+        :param list time_onset_aligned_on_ca_img: Times of stimuli onset aligned with calcium imaging time.
+        :param list real_time_states_sorted: List of tuples in the format ([t_start_state, t_end_state], state_name) ordered by time.
+
+        :return arousal_states (dict): Dictionary with protocol ids as keys and a list of states as values.
+        """
         d = {}
         for i in range(len(self.visual_stim.protocol_ids)):    
             if self.visual_stim.stim_cat[i] :
@@ -464,7 +484,7 @@ class Trial(object):
         k = 0
         while k < len(real_time_states_sorted) and \
             not (real_time_states_sorted[k][0][0] <=  t0 <= real_time_states_sorted[k][0][1]) and \
-                (k==0 or not (real_time_states_sorted[k-1][0][1] <=  tf <= real_time_states_sorted[k][0][0])) :
+                (k==0 or not (real_time_states_sorted[k-1][0][1] <=  t0 <= real_time_states_sorted[k][0][0])) :
             k +=1
         idx_interval_1 = int(k)
 
@@ -483,21 +503,56 @@ class Trial(object):
         return list(zip(l_el, l_key))
 
     #--------------PLOTS FUNCTIONS---------------
-    def trial_average_rasterplot(self, stimuli_id:int, savepath:str='', sort:bool=True) :
+    def trial_average_rasterplot(self, stimuli_id:int, trace:str='z-score', savepath:str='', sort:bool=True, normalize:bool=False) :
         """
         Plot a rasterplot of all neurons trial-averaged response for a fixed stimulus.
         
         :param int stimuli_id: Index of the stimulus to consider.
+        :param str trace: Choose between displaying averaged-trial z-score ('z-score') or the trial averaged calcium imaging traces substracted by the stimuli baseline ('baseline substracted')
         :param str savepath: Saving directory.
         :param bool sort: If True, shows traces sorted by mean fluorescence, if not show traces in ROIs index order.
+        :param bool normalize: If True, normalize traces.
         """
+
+        pre_colorbar_title = ''
+        post_fig_title = ''
+
+        if trace == 'z-score' : 
+            pre_trial_averaged = self.pre_trial_averaged_zscores[stimuli_id]
+            trial_averaged = self.trial_averaged_zscores[stimuli_id]
+            post_trial_averaged = self.post_trial_averaged_zscores[stimuli_id]
+        elif trace == 'baseline substracted' :
+            pre_trial_averaged = self.pre_trial_average_fluorescence_norm[stimuli_id]
+            trial_averaged = self.trial_average_fluorescence_norm[stimuli_id]
+            post_trial_averaged = self.post_trial_average_fluorescence_norm[stimuli_id]
+        else :
+            raise Exception("Trace not recognized: choose 'z-score' or 'baseline_substracted'.")
+
+        trial_averaged_sort = trial_averaged
+
+        if normalize :
+
+            pre_colorbar_title = 'normalized '
+            post_fig_title = '_normalized'
+
+            # Concatenate full trace per neuron before normalization
+            full_trace = np.concatenate((pre_trial_averaged,
+                                         trial_averaged,
+                                         post_trial_averaged), axis=1)
+
+            # Normalize the full trace per neuron
+            max_abs = np.max(np.abs(full_trace), axis=1, keepdims=True)
+
+            pre_trial_averaged = pre_trial_averaged / max_abs
+            trial_averaged = trial_averaged / max_abs
+            post_trial_averaged = post_trial_averaged / max_abs
 
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
-        stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
-        data = np.concatenate((self.pre_trial_averaged_zscores[stimuli_id], self.trial_averaged_zscores[stimuli_id], self.post_trial_averaged_zscores[stimuli_id]), axis=1)
+        stimuli_onset = pre_trial_averaged.shape[1]
+        data = np.concatenate((pre_trial_averaged, trial_averaged, post_trial_averaged), axis=1)
         if sort :
-            idx_sorted = np.argsort(np.mean(self.trial_averaged_zscores[stimuli_id], axis=1))
+            idx_sorted = np.argsort(np.mean(trial_averaged_sort, axis=1))
             data = data[idx_sorted]
         time = (np.arange(data.shape[1]) - stimuli_onset) / self.ca_img.fs
 
@@ -509,7 +564,7 @@ class Trial(object):
 
         fig = plt.figure(figsize=(10, 6))
         im = plt.pcolormesh(time, np.arange(data.shape[0]), data, cmap='RdBu_r', vmin=-lim, vmax=lim)
-        plt.colorbar(im, label=self.ca_attr + " z-score")
+        plt.colorbar(im, label=pre_colorbar_title + self.ca_attr + " " + trace)
         plt.axvline(0, color='black', linestyle='--')
         if self.dt_post_stim + self.dt_post_stim_plot > 0 :
             plt.axvline(stim_dt, color='black', linestyle='--')
@@ -518,9 +573,9 @@ class Trial(object):
         plt.title(stimuli_name)
 
         if sort :
-            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot_sorted.png"))
+            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot_sorted"+ post_fig_title +".png"))
         else :
-            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot.png"))
+            fig.savefig(os.path.join(savepath, stimuli_name + "_trial_average_rasterplot"+ post_fig_title +".png"))
         plt.close(fig)
 
     def trial_rasterplot(self, trial_zscores, pre_trial_zscores, post_trial_zscores, stimuli_id:int, attr:str='fluorescence', savepath:str='') :
@@ -593,6 +648,8 @@ class Trial(object):
             colors, positions = ['midnightblue', 'paleturquoise'], [0, 1]
             cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=trial_rois_zscores.shape[0])
         
+        rc = {'axes.facecolor':'white','axes.grid' : False}
+        plt.rcParams.update(rc)
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
         if self.dt_post_stim + self.dt_post_stim_plot > 0 :
@@ -610,6 +667,10 @@ class Trial(object):
             ax.axvspan(0, stim_dt + self.dt_post_stim, color='thistle', alpha=0.2, label='trial period')
         fig_name = stimuli_name + "_neuron_" + str(neuron_idx)
         ax.margins(x=0)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
         ax.set_xlabel("Time (s)")
         ax.set_ylabel(self.ca_attr + " z-score")
         ax.set_title(stimuli_name + '\n' + fig_name)
@@ -637,6 +698,8 @@ class Trial(object):
         :param str folder_prefix: Prefix of the folder name.
         """
 
+        rc = {'axes.facecolor':'white','axes.grid' : False}
+        plt.rcParams.update(rc)
         stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
         stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
         colors, positions = ['darkred', 'lightgray'], [0, 1]
@@ -666,6 +729,10 @@ class Trial(object):
                         ax.axvspan(stim_states[k][0][0], stim_states[k][0][1], color=color_dict[stim_states[k][1]], alpha=0.4)
                 ax.set_xticks([])
                 ax.margins(x=0)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['left'].set_visible(False)
                 ax.set_ylabel(f'ROI {roi_id}')
             
             run_legend = Line2D([0], [0], color=color_dict['run'], linewidth=5)
@@ -675,6 +742,7 @@ class Trial(object):
                       loc='lower left', bbox_to_anchor=(1.0, 0.0), prop={'size': 9})
             ax.set_xlabel("Time (s)")
             ax.xaxis.set_major_locator(AutoLocator())
+            plt.subplots_adjust(wspace=0, hspace=0)
             fig.suptitle(stimuli_name + '\n' + f'Occurence {i} of stimulus')
 
             fig_name = stimuli_name + "_occ_" + str(i)
@@ -757,6 +825,89 @@ class Trial(object):
             os.mkdir(save_folder)
         save_path = os.path.join(save_folder, fig_name)
         fig.savefig(save_path + ".png")
+        plt.close(fig)
+
+    def plot_cmi_hist(self, cmi, save_dir:str):
+        """
+        Plot histogram of contextual modulation index (CMI).
+
+        Parameters
+        ----------
+        cmi : list of float
+            List of CMI values for each neuron.
+        save_dir : str
+            Directory to save the figure.
+
+        Returns
+        -------
+        None
+        """
+        edgecolor='black'
+        cmi_plot = [el if np.abs(el) < 1.5 else 2 if el > 1.5 else -2 for el in cmi]
+        
+        fig, ax = plt.subplots(figsize=(6, 5))
+        sns.histplot(cmi_plot, bins=12, binrange=(-1.5, 1.5), color='white', edgecolor=edgecolor, element='step', ax=ax)
+        sns.histplot(cmi_plot, bins=1, binrange=(1.875, 2.125), color='white', edgecolor=edgecolor, ax=ax)
+        sns.histplot(cmi_plot, bins=1, binrange=(-2.125, -1.875), color='white', edgecolor=edgecolor, ax=ax)
+        ax.set_xticks([-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2], labels=['<-1.5', '-1.5', '-1', '-0.5', '0', '0.5', '1', '1.5', '>1.5'])
+        ax.set_ylabel('Count of neurons')
+        ax.set_title('Contextual Modulation Index')
+        ax.axvline(np.median(cmi), color='black', linestyle='--', linewidth=1.5, label='median') # Add vertical dashed line at median position
+        plt.gca().spines[['right', 'top']].set_visible(False)
+        plt.gca().spines[['left', 'bottom']].set_visible(True)
+        ax.legend()
+        textstr = f'{len(cmi)} neurons'
+        plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                        fontsize=12, verticalalignment='top', horizontalalignment='left')
+        
+        fig.savefig(os.path.join(save_dir, 'cmi_histogram.png'), dpi=300)
+        plt.close(fig)
+
+    def plot_iso_vs_cross(self, save_dir:str) :
+        """
+        Plot cross vs iso responses.
+
+        Parameters
+        ----------
+        save_dir : str
+            Directory to save the figure.
+
+        Returns
+        -------
+        None
+        """
+        
+        id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
+        id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
+        
+        rois_cross = np.where(np.array([data[0] for data in self.responsive[id_srm_cross]]) != 0)[0]
+        rois_iso = np.where(np.array([data[0] for data in self.responsive[id_srm_iso]]) != 0)[0]
+
+        valid_neurons = np.unique(np.concatenate((rois_cross, rois_iso)))
+        invalid_neurons = np.array([i for i in range(len(self.responsive[12])) if i not in valid_neurons])
+
+        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.5*self.ca_img.fs):], axis=1)
+        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.5*self.ca_img.fs):], axis=1)
+
+        min = np.min((cross, iso))
+        max = np.max((cross, iso))
+
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.axhline(0, color='black', linestyle='--', linewidth=1)
+        ax.axvline(0, color='black', linestyle='--', linewidth=1)
+        ax.plot([min, max], [min, max], linestyle='--', color='black', linewidth=1)
+        sns.scatterplot(x=cross[invalid_neurons], y=iso[invalid_neurons], color='grey', alpha=0.5, s=70, ax=ax)
+        sns.scatterplot(x=cross[valid_neurons], y=iso[valid_neurons], color='green', alpha=0.5, s=70, ax=ax)
+        plt.gca().spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+        ax.set_xlabel(r'Cross [$\Delta$F/F]', fontsize=12)
+        ax.set_ylabel(r'Iso [$\Delta$F/F]', fontsize=12)
+        ax.set_title('Iso vs cross')
+
+        textstr = f'{len(cross)} neurons'
+        plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                       fontsize=10, verticalalignment='top', horizontalalignment='left')
+        
+        fig.savefig(os.path.join(save_dir, 'iso_vs_cross.png'), dpi=300, bbox_inches='tight')
         plt.close(fig)
 
     #-------------SAVE FUNCTIONS---------------

@@ -4,7 +4,7 @@ import seaborn as sns
 import numpy as np
 from tqdm import tqdm
 import copy
-from scipy.stats import pearsonr, zscore
+from scipy.stats import spearmanr, zscore
 from scipy.ndimage import gaussian_filter1d
 from visual_stim import VisualStim
 
@@ -32,7 +32,7 @@ def get_spont_stim(visual_stim:VisualStim):
 def compute_spont_corr(behavior_spont, F_spontaneous, time_stamps_spont, label='', save_spont_dir='', permutation=True):
 
     # Correlation with dFoF0
-    spont_behavior_corr = [pearsonr(behavior_spont, ROI)[0] for ROI in F_spontaneous]
+    spont_behavior_corr = [spearmanr(behavior_spont, ROI)[0] for ROI in F_spontaneous]
     spont_behavior_corr = [float(value) for value in spont_behavior_corr]
 
     if permutation :
@@ -57,7 +57,7 @@ def permutation_test(fluorescence, beh_trace, corr, time, samples=1000, sigma=0,
     valid_neurons = []
 
     for s in tqdm(range(len(fluorescence_norm)), desc=label + " permutation processing"):
-        null_corr = np.array([pearsonr(beh_trace_shuffled[i], fluorescence_norm[s])[0] for i in range(samples)])
+        null_corr = np.array([spearmanr(beh_trace_shuffled[i], fluorescence_norm[s])[0] for i in range(samples)])
         p_value = np.sum(np.abs(null_corr) >= np.abs(corr[s])) / samples
 
         plot_permutation(null_corr, corr[s], p_value, s, beh_trace_norm, fluorescence_norm, time, label, samples, savefolder)

@@ -86,9 +86,9 @@ def process_group(group_name, mice_list):
             session_stim_mean = np.mean(mean_stim_response)  # average over neurons in that session
             stim_mean[protocol].append(session_stim_mean)
             #Get the magnitude of the response (minimum or maximum in pre, stim or post periods), for normalization later
-            printed = False
             for zneuron in zscores_concat:
-                magnitude[protocol].append(np.max(np.abs(zneuron)))
+                magnitude[protocol].append(zneuron[np.argmax(np.abs(zneuron))])
+    
     #This one will be used to plot average responses per cluster (not normalized)
     single_traces = np.concatenate(single_traces[f'{protocol}'], axis=0)
     magnitudes_array = np.array(magnitude[protocol])
