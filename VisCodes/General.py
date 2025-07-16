@@ -255,6 +255,7 @@ trials.save_protocol_validity(save_dir, filename)
 if "center-surround-cross" in visual_stim.protocol_names :
     cmi = trials.compute_cmi()
     trials.plot_cmi_hist(cmi, save_fig_dir)
+    trials.plot_iso_vs_cross(save_fig_dir)
 else :
     cmi = None
 
