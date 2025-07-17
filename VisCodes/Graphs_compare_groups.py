@@ -9,7 +9,7 @@ import glob
 #-----------------------INPUTS-----------------------#
 ## Organization of the data: folder for the protocol (e.g surround mod) > group (e.g KO and WT) > # mouse (e.g 110, 108) > session (e.g 2023-10-01) > .npz file with the validity of the neurons and .npy file with the trials
 #The folder containing all subfolders
-data_path = r"Y:\raw-imaging\Nathan\PYR\2orientations-8contrasts"
+data_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod"
 save_path = data_path
 # group names have to be the name of the subfolders
 groups = ['WT', 'KO']
@@ -17,25 +17,31 @@ groups = ['WT', 'KO']
 WT_mice = ['110', '108']
 KO_mice = ['109', '112']
 #Will be included in all names of saved figures
-fig_name = 'center-grating-0.05-0.0_positive_neurons'
+fig_name = 'IsoVsCross'
 # Write the protocols you want to plot 
-protocols = ['center-grating-0.05-0.0']  
+protocols = ['center-surround-iso', 'center-surround-cross']  
 # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-protocol_validity = ['center-grating-0.46-0.0', 'center-grating-0.59-0.0', 'center-grating-0.73-0.0','center-grating-0.05-0.0', 'center-grating-0.19-0.0', 'center-grating-0.32-0.0', 'center-grating-0.86-0.0', 'center-grating-1.0-0.0'] 
+protocol_validity = ['center'] 
 #Frame rate
 frame_rate = 30
+# Decide if you want to plot the dFoF0 baseline substraced or the z-scores
+attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 #----------------------------------------------------#
-#'center-grating-0.46-90.0', 'center-grating-0.59-90.0', 'center-grating-0.73-90.0','center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-0.86-90.0', 'center-grating-1.0-90.0'
 
+if attr == 'dFoF0-baseline':
+    z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
+elif attr == 'z_scores':
+    z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
 
-
-
-z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
 x_labels = ['Pre-stim', 'Stim', 'Post-stim']
 
 
 
-def process_group(group_name, mice_list):
+def process_group(group_name, mice_list, attr):
+    if attr == 'dFoF0-baseline':
+        z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
+    elif attr == 'z_scores':
+        z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
     magnitude = {protocol: [] for protocol in protocols} #Will contain the magnitude of the response to each protocol for each neuron
     avg_data = {protocol: [] for protocol in protocols} 
     all_neurons = 0
@@ -72,8 +78,13 @@ def process_group(group_name, mice_list):
             valid_neurons = np.unique(np.concatenate(valid_neuron_lists))  # Get unique indices of valid neurons
             neurons = len(valid_neurons)
             print(neurons)
-            proportion = 100 * len(valid_neurons) / trials['trial_averaged_zscores'][0].shape[0]
-            proportion_list.append(proportion)
+            if attr == 'dFoF0-baseline':
+                proportion = 100 * len(valid_neurons) / trials['norm_trial_averaged_ca_trace'][0].shape[0]
+                proportion_list.append(proportion)
+            elif attr == 'z_scores':
+                proportion = 100 * len(valid_neurons) / trials['trial_averaged_zscores'][0].shape[0]
+                proportion_list.append(proportion)
+            
             print(f"Proportion responding neurons: {proportion}")
             all_neurons += neurons
             all_protocols = validity.files # List of all stimuli ("protocols") types in that session
@@ -87,7 +98,10 @@ def process_group(group_name, mice_list):
                 avg_session = np.mean(zscores_concat, axis=0) # average over neurons in that session
                 avg_data[protocol].append(avg_session)
                 # Extract trial-averaged zscores during the stim period and give the average response of all neurons in that session
-                trial_zscores = trials['trial_averaged_zscores'][list(trials['trial_averaged_zscores'].keys())[idx]][valid_neurons, :]
+                if attr == 'dFoF0-baseline':
+                    trial_zscores = trials['norm_trial_averaged_ca_trace'][list(trials['norm_trial_averaged_ca_trace'].keys())[idx]][valid_neurons, :]
+                elif attr == 'z_scores':
+                    trial_zscores = trials['trial_averaged_zscores'][list(trials['trial_averaged_zscores'].keys())[idx]][valid_neurons, :]
                 mean_stim_response = np.mean(trial_zscores[:,int(frame_rate*0.5):], axis=1)  # average per neuron over time, exclude the first 0.5 seconds because of GCaMP's slow kinetics
                 session_stim_mean = np.mean(mean_stim_response)  # average over neurons in that session
                 stim_mean[protocol].append(session_stim_mean)
@@ -126,14 +140,14 @@ def process_group(group_name, mice_list):
     sem = {protocol: stats.sem(avg_data[protocol], axis=0) for protocol in protocols}
     print(f"List of % of responsive neurons per session for {group_name}: {proportion_list}")
 
-    return suppression, magnitude, stim_mean, all_neurons, avg, sem, cmi
+    return suppression, magnitude, stim_mean, all_neurons, avg, sem, cmi, proportion_list
 
 
 
 # Process WT
-suppression_wt, magnitude_wt, stim_wt, wt_neurons, avg_wt, sem_wt, cmi_wt = process_group('WT', WT_mice)
+suppression_wt, magnitude_wt, stim_wt, wt_neurons, avg_wt, sem_wt, cmi_wt, proportions_wt = process_group('WT', WT_mice, attr)
 # Process KO
-suppression_ko, magnitude_ko, stim_ko, ko_neurons, avg_ko, sem_ko, cmi_ko = process_group('KO', KO_mice)
+suppression_ko, magnitude_ko, stim_ko, ko_neurons, avg_ko, sem_ko, cmi_ko, proportions_ko = process_group('KO', KO_mice, attr)
 
 
 #--------------For each neuron, plot in x the magnitude of the response to protocol 1, in y for protocol 2----------------#
@@ -161,10 +175,56 @@ if len(protocols) == 2:
         # Add labels
         plt.xlabel(f"Magnitude of response to {protocols[0]}")
         plt.ylabel(f"Magnitude of response to {protocols[1]}")
-        plt.title("Response magnitudes (z-score) for each neuron")
+        plt.title(f"Response magnitudes ({attr}) for {protocol_validity}-responsive neurons")
     plt.legend()
-    plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response.jpeg"), dpi=300)
+    plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=300)
     plt.show()
+
+#--------------To plot the % of responsive neurons per session----------------#
+
+colors = {'WT': 'skyblue', 'KO': 'salmon'}
+
+fig, ax = plt.subplots(figsize=(8, 6))
+
+x_ticks = []
+x_labels = []
+width = 0.6
+offset = 0.3  # spacing between WT and KO
+
+# Bar height: mean
+wt_mean = np.mean(proportions_wt)
+ko_mean = np.mean(proportions_ko)
+# Mann–Whitney U test
+stat, p = mannwhitneyu(proportions_wt, proportions_ko, alternative='two-sided')
+
+# Plot WT
+ax.bar(1, wt_mean, width=width, color=colors['WT'], edgecolor='black', label='WT')
+ax.scatter([1] * len(proportions_wt), proportions_wt, color='black', zorder=10)
+
+# Plot KO
+ax.bar(2, ko_mean, width=width, color=colors['KO'], edgecolor='black', label='KO')
+ax.scatter([2] * len(proportions_ko), proportions_ko, color='black', zorder=10)
+
+# Annotate p-value
+y_max = max(np.max(proportions_wt), np.max(proportions_ko)) + 0.3
+ax.plot([1,2], [y_max, y_max], color='black', linewidth=1.5)
+ax.text((3) / 2, y_max + 0.05, f"M-W p = {p:.3g}", ha='center', va='bottom', fontsize=11)
+
+# Update ticks
+x_ticks.extend([1,2])
+x_labels.extend(['WT', 'KO'])
+
+# Labeling
+ax.set_xticks(x_ticks)
+ax.set_xticklabels(x_labels, rotation=45, ha='right')
+ax.set_ylabel(f'% of {protocol_validity}-responsive neurons')
+ax.set_title('% of responsive neurons per session')
+ax.legend()
+plt.tight_layout()
+
+# save figure
+plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_%responsive.jpeg"), dpi=300)
+plt.show()
 
 #--------------To plot the average response during the stim period per session----------------#
 
@@ -209,13 +269,13 @@ for i, protocol in enumerate(protocols):
 # Labeling
 ax.set_xticks(x_ticks)
 ax.set_xticklabels(x_labels, rotation=45, ha='right')
-ax.set_ylabel('Mean stimulus response (z-score)')
+ax.set_ylabel(f'Mean stimulus response ({attr})')
 ax.set_title('Session-averaged responses during stimulus')
 ax.legend()
 plt.tight_layout()
 
 # Optional: save figure
-plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_stim_response.jpeg"), dpi=300)
+plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_stim_response_{attr}.jpeg"), dpi=300)
 plt.show()
 
 
@@ -252,10 +312,10 @@ for protocol in protocols:
 
 plt.xticks(np.arange(-1, time[-1] + 1, 1))
 plt.xlabel("Time (s)")
-plt.ylabel(f"Average Z-score for neurons responsive to {protocol_validity}")
-plt.title("Mean z-score ± SEM by Group and Protocol")
+plt.ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
+plt.title(f"Mean {attr} ± SEM by Group and Protocol")
 plt.legend()
-plt.savefig(os.path.join(save_path, f"average_{fig_name}_wt_vs_ko.jpeg"), dpi=300)
+plt.savefig(os.path.join(save_path, f"average_{fig_name}_wt_vs_ko_{attr}.jpeg"), dpi=300)
 plt.show()
 
 # if you want a separate plot for each group
@@ -279,10 +339,10 @@ for group in groups:
                         alpha=0.3)
     plt.xticks(np.arange(-1, time[-1] + 1, 1))
     plt.xlabel("Time (s)")
-    plt.ylabel(f"Average Z-score for neurons responsive to all contrasts at 90°")
-    plt.title(f"Mean z-score ± SEM by Protocol for {group}")
+    plt.ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
+    plt.title(f"Mean {attr} ± SEM by Protocol for {group}")
     plt.legend()
-    plt.savefig(os.path.join(save_path, f"average_{fig_name}_{group}.jpeg"), dpi=300)
+    plt.savefig(os.path.join(save_path, f"average_{fig_name}_{group}_{attr}.jpeg"), dpi=300)
     plt.show()
 
 ###----------------Boxplot for CMI-----------###
@@ -366,7 +426,7 @@ if len(protocols) == 2:
 
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_cmi.jpeg"), dpi=300)
+    plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_cmi_{attr}.jpeg"), dpi=300)
     plt.show()
 
 
@@ -448,7 +508,7 @@ if len(protocols)==2:
 
 
 plt.tight_layout()
-plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_surround-sup.jpeg"), dpi=300)
+plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_surround-sup_{attr}.jpeg"), dpi=300)
 plt.show()
 
 
