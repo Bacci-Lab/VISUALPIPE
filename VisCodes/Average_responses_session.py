@@ -229,7 +229,6 @@ def plot_boxplot_magnitudes(magnitude, protocols, attr, file_name, save_path, ge
     - file_name: string, base name for the saved figure
     - save_path: string, folder where to save the figure
     - get_valid: bool, if True, only responsive neurons were used (affects title and filename)
-    - show: bool, whether to display the figure (optional, default: True)
     """
 
     # Create appropriate filename
@@ -262,7 +261,7 @@ def plot_boxplot_magnitudes(magnitude, protocols, attr, file_name, save_path, ge
     plt.show()
 
 
-"""
+
 #---------------------------------Plots-------------------------------------------#
 # Plot averages +/- SEM and get a dictionary of the magnitude of responses for all protocols
 
@@ -278,4 +277,3 @@ cmi_responsive, median_cmi_responsive = cmi(magnitude_responsive, neurons_count_
 responsive_cmi = plot_cmi(cmi_responsive, median_cmi_responsive, file_name, attr, save_path, get_valid=True)
 boxplot_responsive = plot_boxplot_magnitudes(magnitude_all, protocols, attr, file_name, save_path, get_valid = True)
 
-"""
