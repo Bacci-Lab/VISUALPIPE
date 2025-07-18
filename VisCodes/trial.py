@@ -45,7 +45,8 @@ class Trial(object):
         self.trial_zscores, self.pre_trial_zscores, self.post_trial_zscores = self.compute_trial_zscores_avb()
 
         self.trial_response_bounds, self.responsive, self.reliability = None, None, None
-        
+        self.trial_avg_trace_state, self.pre_trial_avg_trace_state, self.post_trial_avg_trace_state = None, None, None
+
     def get_trials_trace(self, roi_id:int, stimulus_id:int, attr:str='fluorescence'):
         """
         For a fixed stimulus and neuron, get the calcium imaging baseline, trial trace and post-stimulus trace of each stimuli occurence.
@@ -438,6 +439,44 @@ class Trial(object):
         self.arousal_states = d
         return d
     
+    def compute_avg_by_states(self):
+        """
+        Compute averaged traces for each arousal state.
+
+        :return: Dictionaries with protocol ids as keys and a dictionary of states as values. The inner dictionary has arousal states as keys and a 2D array with averaged traces as value.
+        """
+        
+        if self.arousal_states is None :
+            raise Exception("Trials must be sorted by arousal states first. Use sort_trials_by_states() method.")
+        
+        trial_avg_trace_state, pre_trial_avg_trace_state, post_trial_avg_trace_state = {}, {}, {}
+
+        for i in self.trial_fluorescence.keys() :
+
+            states = np.unique(self.arousal_states[i])
+            state_dict_pre, state_dict_trial, state_dict_post = {}, {}, {}
+
+            for state in states :
+
+                idx_states = np.where(np.array(self.arousal_states[i]) == state)[0]
+                average_baseline = np.mean(self.pre_trial_fluorescence[i][:, idx_states, :], axis=1)
+                average_trial = np.mean(self.trial_fluorescence[i][:, idx_states, :], axis=1)
+                average_post_trial = np.mean(self.post_trial_fluorescence[i][:, idx_states, :], axis=1)
+
+                state_dict_pre.update({state : average_baseline})
+                state_dict_trial.update({state : average_trial})
+                state_dict_post.update({state : average_post_trial})
+
+            pre_trial_avg_trace_state.update({i : state_dict_pre})
+            trial_avg_trace_state.update({i : state_dict_trial})
+            post_trial_avg_trace_state.update({i : state_dict_post})
+        
+        self.trial_avg_trace_state = trial_avg_trace_state
+        self.pre_trial_avg_trace_state = pre_trial_avg_trace_state
+        self.post_trial_avg_trace_state = post_trial_avg_trace_state
+
+        return trial_avg_trace_state, pre_trial_avg_trace_state, post_trial_avg_trace_state
+
     #--------------TOOL FUNCTIONS---------------
     def zscores(self, baselines, traces):
         return np.array([(traces[i, :] - np.mean(baselines, axis=1)[i]) / np.std(baselines, axis=1)[i] for i in range(traces.shape[0])])
@@ -667,10 +706,7 @@ class Trial(object):
             ax.axvspan(0, stim_dt + self.dt_post_stim, color='thistle', alpha=0.2, label='trial period')
         fig_name = stimuli_name + "_neuron_" + str(neuron_idx)
         ax.margins(x=0)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
-        ax.spines['left'].set_visible(False)
+        ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
         ax.set_xlabel("Time (s)")
         ax.set_ylabel(self.ca_attr + " z-score")
         ax.set_title(stimuli_name + '\n' + fig_name)
@@ -729,10 +765,7 @@ class Trial(object):
                         ax.axvspan(stim_states[k][0][0], stim_states[k][0][1], color=color_dict[stim_states[k][1]], alpha=0.4)
                 ax.set_xticks([])
                 ax.margins(x=0)
-                ax.spines['top'].set_visible(False)
-                ax.spines['right'].set_visible(False)
-                ax.spines['bottom'].set_visible(False)
-                ax.spines['left'].set_visible(False)
+                ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
                 ax.set_ylabel(f'ROI {roi_id}')
             
             run_legend = Line2D([0], [0], color=color_dict['run'], linewidth=5)
@@ -909,6 +942,75 @@ class Trial(object):
         
         fig.savefig(os.path.join(save_dir, 'iso_vs_cross.png'), dpi=300, bbox_inches='tight')
         plt.close(fig)
+
+    def plot_trials_per_states(self, stimuli_id:int, neuron_idx:int, save_dir:str, folder_prefix:str=''):
+        """
+        Plot a neuron trial-averaged response for a fixed stimulus, with a subplot per states.
+
+        :param int stimuli_id: Index of the stimulus to consider.
+        :param int neuron_idx: Index of the ROI to consider.
+        :param str save_dir: Saving directory.
+        :param str folder_prefix: Prefix of the created folder name.
+        """
+        
+        nb_subplots = len(self.trial_avg_trace_state[stimuli_id].keys())
+
+        if nb_subplots > 1:
+
+            stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
+            stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
+            stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
+
+            fig, axs = plt.subplots(nb_subplots, 1, figsize=(10, 6))
+
+            for i, state in enumerate(self.trial_avg_trace_state[stimuli_id].keys()):
+
+                ax = axs[i]
+                idx_states = np.where(np.array(self.arousal_states[stimuli_id]) == state)[0]
+
+                trial_average = np.array(self.trial_avg_trace_state[stimuli_id][state][neuron_idx])
+                pre_trial_average = np.array(self.pre_trial_avg_trace_state[stimuli_id][state][neuron_idx])
+                post_trial_average = np.array(self.post_trial_avg_trace_state[stimuli_id][state][neuron_idx])
+                
+                trial_std = np.std(self.trial_fluorescence[stimuli_id][neuron_idx, idx_states, :], axis=0)
+                pre_trial_std = np.std(self.pre_trial_fluorescence[stimuli_id][neuron_idx, idx_states, :], axis=0)
+                post_trial_std = np.std(self.post_trial_fluorescence[stimuli_id][neuron_idx, idx_states, :], axis=0)
+                
+                data_av = np.concatenate((pre_trial_average, trial_average, post_trial_average))
+                std_av = np.concatenate((pre_trial_std, trial_std, post_trial_std))
+                time = (np.arange(data_av.shape[0]) - stimuli_onset) / self.ca_img.fs
+            
+                if np.abs(self.responsive[stimuli_id][neuron_idx][0]) :
+                    ax.axvspan(0, stim_dt + self.dt_post_stim, color='skyblue', alpha=0.2, label='trial period')
+                else :
+                    ax.axvspan(0, stim_dt + self.dt_post_stim, color='thistle', alpha=0.2, label='trial period')
+                ax.fill_between(time, data_av - std_av, data_av + std_av, color='gray', alpha=0.3)
+                ax.plot(time, data_av, color='black', linewidth=2)
+                ax.axvline(x=0, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
+                if self.dt_post_stim + self.dt_post_stim_plot > 0 :
+                    ax.axvline(x=stim_dt, color='orchid', linestyle='--', alpha=0.7, linewidth=2)
+                ax.set_title(state)
+                ax.margins(x=0)
+                ax.set_ylabel(self.ca_attr)
+                ax.set_xticks([])
+                ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+                textstr = f'{len(idx_states)} trials'
+                ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
+                        fontsize=10, verticalalignment='top', horizontalalignment='left')
+            
+            ax.set_xlabel("Time (s)")
+            ax.xaxis.set_major_locator(AutoLocator())
+            #plt.subplots_adjust(wspace=0, hspace=0)
+            fig.suptitle(f'{stimuli_name} - Neuron {neuron_idx}', fontsize=16)
+            
+            fig_name = stimuli_name + "_neuron_" + str(neuron_idx) + "_per_states"
+            foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
+            save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence')
+            if not os.path.exists(save_folder):
+                os.mkdir(save_folder)
+            save_path = os.path.join(save_folder, fig_name)
+            fig.savefig(save_path + ".png")
+            plt.close(fig)
 
     #-------------SAVE FUNCTIONS---------------
     def save_protocol_validity(self, save_dir, filename):

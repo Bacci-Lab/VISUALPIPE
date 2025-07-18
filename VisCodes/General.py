@@ -270,6 +270,9 @@ else :
 # Sort trials by arousal states (output in trials.npy)
 trials.sort_trials_by_states(F_Time_start_realigned, real_time_states_sorted)
 
+# Compute averaged traces by arousal states
+trials.compute_avg_by_states()
+
 # Plot trials related figures
 for i in range(len(protocol_df)):    
     if visual_stim.stim_cat[i] :
@@ -295,6 +298,9 @@ for i in range(len(protocol_df)):
 
             #plot trial-averaged normalized with baseline traces
             trials.plot_norm_trials(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
+
+            #plot trial-averaged traces per arousal states
+            trials.plot_trials_per_states(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
         
         #plot trials with behavioral states
         trials.plot_stim_occurence(i, trial_zscores, pre_trial_zscores, real_time_states_sorted, F_Time_start_realigned, save_dir, folder_prefix="_".join([unique_id, id_version]))
