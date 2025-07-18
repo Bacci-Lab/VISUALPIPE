@@ -1,5 +1,4 @@
 import numpy as np
-import h5py
 from scipy import stats
 import matplotlib.pyplot as plt
 import os
@@ -17,9 +16,9 @@ groups = ['WT', 'KO']
 WT_mice = ['110', '108']
 KO_mice = ['109', '112']
 #Will be included in all names of saved figures
-fig_name = 'IsoVsCross'
+fig_name = 'test'
 # Write the protocols you want to plot 
-protocols = ['center-surround-iso', 'center-surround-cross']  
+protocols = ['center', 'center-surround-iso']  
 # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
 protocol_validity = ['center'] 
 #Frame rate
@@ -36,7 +35,7 @@ elif attr == 'z_scores':
 x_labels = ['Pre-stim', 'Stim', 'Post-stim']
 
 
-
+#--------------------------FUNCTIONS-----------------------#
 def process_group(group_name, mice_list, attr):
     if attr == 'dFoF0-baseline':
         z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
@@ -143,267 +142,266 @@ def process_group(group_name, mice_list, attr):
     return suppression, magnitude, stim_mean, all_neurons, avg, sem, cmi, proportion_list
 
 
-
-# Process WT
-suppression_wt, magnitude_wt, stim_wt, wt_neurons, avg_wt, sem_wt, cmi_wt, proportions_wt = process_group('WT', WT_mice, attr)
-# Process KO
-suppression_ko, magnitude_ko, stim_ko, ko_neurons, avg_ko, sem_ko, cmi_ko, proportions_ko = process_group('KO', KO_mice, attr)
-
-
-#--------------For each neuron, plot in x the magnitude of the response to protocol 1, in y for protocol 2----------------#
-if len(protocols) == 2:
-    for group in groups:
-        x_values = []
-        y_values = []
-        if group == 'WT':
-            magnitude = magnitude_wt
-        else:
-            magnitude = magnitude_ko
-
+def XY_magnitudes(groups, magnitude_wt, magnitude_ko, protocols, protocol_validity, save_path, attr):
+    """
+    Function to extract and plot the x and y values for the magnitude of the response to each protocol for both groups.
+    """
+    if len(protocols) != 2:
+        raise ValueError("This function is designed to work with exactly two protocols.")
+    x_values = []
+    y_values = []
+    for group, magnitude in zip(groups, [magnitude_wt, magnitude_ko]):
         x_values = magnitude[protocols[0]]
         y_values = magnitude[protocols[1]]
-
         # Create the plot
-        plt.plot(x_values, y_values, 'o', color='cyan' if group == 'WT' else 'orange', alpha=0.5, label=f'{group} neurons')
+        plt.plot(x_values, y_values, 'o', color='cyan' if group == groups[0] else 'orange', alpha=0.5, label=f'{group} neurons')
         slope, intercept, r_value, p_value, std_err = linregress(x_values, y_values)
         # Plot regression line
         x_fit = np.linspace(min(x_values), max(x_values), 100)
         y_fit = [slope * xi + intercept for xi in x_fit]
         plt.plot(x_fit, y_fit,
-                color='blue' if group == 'WT' else 'red',
+                color='blue' if group == groups[0] else 'red',
                 label=f'{group} fit: y = {slope:.2f}x + {intercept:.2f}, p = {p_value:.2g}, r**2 = {(r_value)**2:.3f}')
-        # Add labels
-        plt.xlabel(f"Magnitude of response to {protocols[0]}")
-        plt.ylabel(f"Magnitude of response to {protocols[1]}")
-        plt.title(f"Response magnitudes ({attr}) for {protocol_validity}-responsive neurons")
+    # Add labels
+    plt.xlabel(f"Magnitude of response to {protocols[0]}")
+    plt.ylabel(f"Magnitude of response to {protocols[1]}")
+    plt.title(f"Response magnitudes ({attr}) for {protocol_validity}-responsive neurons")
     plt.legend()
     plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=300)
     plt.show()
 
-#--------------To plot the % of responsive neurons per session----------------#
+def plot_perc_responsive(groups, proportions_wt, proportions_ko, save_path, fig_name):
+    """
+    Function to plot the % of responsive neurons per session for WT and KO groups.
+    """
+    colors = {groups[0]: 'skyblue', groups[1]: 'salmon'}
+    fig, ax = plt.subplots(figsize=(8, 6))
 
-colors = {'WT': 'skyblue', 'KO': 'salmon'}
-
-fig, ax = plt.subplots(figsize=(8, 6))
-
-x_ticks = []
-x_labels = []
-width = 0.6
-offset = 0.3  # spacing between WT and KO
-
-# Bar height: mean
-wt_mean = np.mean(proportions_wt)
-ko_mean = np.mean(proportions_ko)
-# Mann–Whitney U test
-stat, p = mannwhitneyu(proportions_wt, proportions_ko, alternative='two-sided')
-
-# Plot WT
-ax.bar(1, wt_mean, width=width, color=colors['WT'], edgecolor='black', label='WT')
-ax.scatter([1] * len(proportions_wt), proportions_wt, color='black', zorder=10)
-
-# Plot KO
-ax.bar(2, ko_mean, width=width, color=colors['KO'], edgecolor='black', label='KO')
-ax.scatter([2] * len(proportions_ko), proportions_ko, color='black', zorder=10)
-
-# Annotate p-value
-y_max = max(np.max(proportions_wt), np.max(proportions_ko)) + 0.3
-ax.plot([1,2], [y_max, y_max], color='black', linewidth=1.5)
-ax.text((3) / 2, y_max + 0.05, f"M-W p = {p:.3g}", ha='center', va='bottom', fontsize=11)
-
-# Update ticks
-x_ticks.extend([1,2])
-x_labels.extend(['WT', 'KO'])
-
-# Labeling
-ax.set_xticks(x_ticks)
-ax.set_xticklabels(x_labels, rotation=45, ha='right')
-ax.set_ylabel(f'% of {protocol_validity}-responsive neurons')
-ax.set_title('% of responsive neurons per session')
-ax.legend()
-plt.tight_layout()
-
-# save figure
-plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_%responsive.jpeg"), dpi=300)
-plt.show()
-
-#--------------To plot the average response during the stim period per session----------------#
-
-colors = {'WT': 'skyblue', 'KO': 'salmon'}
-
-fig, ax = plt.subplots(figsize=(8, 6))
-
-x_ticks = []
-x_labels = []
-width = 0.6
-offset = 0.3  # spacing between WT and KO
-
-for i, protocol in enumerate(protocols):
-    wt_data = stim_wt[protocol]
-    ko_data = stim_ko[protocol]
+    x_ticks = []
+    x_labels = []
+    width = 0.6
+    offset = 0.3  # spacing between WT and KO
 
     # Bar height: mean
-    wt_median = np.mean(wt_data)
-    ko_median = np.mean(ko_data)
+    wt_mean = np.mean(proportions_wt)
+    ko_mean = np.mean(proportions_ko)
     # Mann–Whitney U test
-    stat, p = mannwhitneyu(wt_data, ko_data, alternative='two-sided')
+    stat, p = mannwhitneyu(proportions_wt, proportions_ko, alternative='two-sided')
 
     # Plot WT
-    x_wt = i * 2 - offset
-    ax.bar(x_wt, wt_median, width=width, color=colors['WT'], edgecolor='black', label='WT' if i == 0 else "")
-    ax.scatter([x_wt] * len(wt_data), wt_data, color='black', zorder=10)
+    ax.bar(1, wt_mean, width=width, color=colors[groups[0]], edgecolor='black', label=groups[0])
+    ax.scatter([1] * len(proportions_wt), proportions_wt, color='black', zorder=10)
 
     # Plot KO
-    x_ko = i * 2 + offset
-    ax.bar(x_ko, ko_median, width=width, color=colors['KO'], edgecolor='black', label='KO' if i == 0 else "")
-    ax.scatter([x_ko] * len(ko_data), ko_data, color='black', zorder=10)
+    ax.bar(2, ko_mean, width=width, color=colors[groups[1]], edgecolor='black', label=groups[1])
+    ax.scatter([2] * len(proportions_ko), proportions_ko, color='black', zorder=10)
 
     # Annotate p-value
-    y_max = max(np.max(wt_data), np.max(ko_data)) + 0.3
-    ax.plot([x_wt, x_ko], [y_max, y_max], color='black', linewidth=1.5)
-    ax.text((x_wt + x_ko) / 2, y_max + 0.05, f"M-W p = {p:.3g}", ha='center', va='bottom', fontsize=11)
+    y_max = max(np.max(proportions_wt), np.max(proportions_ko)) + 0.3
+    ax.plot([1,2], [y_max, y_max], color='black', linewidth=1.5)
+    ax.text((3) / 2, y_max + 0.05, f"M-W p = {p:.3g}", ha='center', va='bottom', fontsize=11)
 
     # Update ticks
-    x_ticks.extend([x_wt, x_ko])
-    x_labels.extend([f'{protocol}\nWT', f'{protocol}\nKO'])
+    x_ticks.extend([1,2])
+    x_labels.extend(groups)
 
-# Labeling
-ax.set_xticks(x_ticks)
-ax.set_xticklabels(x_labels, rotation=45, ha='right')
-ax.set_ylabel(f'Mean stimulus response ({attr})')
-ax.set_title('Session-averaged responses during stimulus')
-ax.legend()
-plt.tight_layout()
-
-# Optional: save figure
-plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_stim_response_{attr}.jpeg"), dpi=300)
-plt.show()
-
-
-
-
-#------------------Plot the average z-scores for each protocol across all sessions for WT and KO groups-------------------------#
-
-# Get minimum length among all protocols
-min_len = min(len(avg_wt[protocol]) for protocol in protocols)
-
-# Generate time vector accordingly
-time = np.linspace(0, min_len, min_len) / frame_rate - 1  # time in seconds
-
-if len(protocols) == 1:
-        colors = {'WT': {protocols[0]: 'blue'},
-            'KO': {protocols[0]: 'red'}}
-elif len(protocols) == 2:
-    colors = {'WT': {protocols[0]: 'blue', protocols[1]: 'cyan'},
-            'KO': {protocols[0]: 'red', protocols[1]: 'orange'}}
-plt.figure(figsize=(10, 6))
-
-for protocol in protocols:
-    plt.plot(time, avg_wt[protocol][:min_len], color=colors['WT'][protocol], label=f"WT {protocol}, {wt_neurons} neurons")
-    plt.fill_between(time,
-                     avg_wt[protocol][:min_len] - sem_wt[protocol][:min_len],
-                     avg_wt[protocol][:min_len] + sem_wt[protocol][:min_len],
-                     color=colors['WT'][protocol], alpha=0.3)
-
-    plt.plot(time, avg_ko[protocol][:min_len], color=colors['KO'][protocol], label=f"KO {protocol}, {ko_neurons} neurons")
-    plt.fill_between(time,
-                     avg_ko[protocol][:min_len] - sem_ko[protocol][:min_len],
-                     avg_ko[protocol][:min_len] + sem_ko[protocol][:min_len],
-                     color=colors['KO'][protocol], alpha=0.3)
-
-plt.xticks(np.arange(-1, time[-1] + 1, 1))
-plt.xlabel("Time (s)")
-plt.ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
-plt.title(f"Mean {attr} ± SEM by Group and Protocol")
-plt.legend()
-plt.savefig(os.path.join(save_path, f"average_{fig_name}_wt_vs_ko_{attr}.jpeg"), dpi=300)
-plt.show()
-
-# if you want a separate plot for each group
-color_map = plt.get_cmap('tab10')  # You can use 'tab10', 'Set2', etc.
-protocol_colors = {protocol: color_map(i) for i, protocol in enumerate(protocols)}
-for group in groups:
-    if group == 'WT':
-        avg_data = avg_wt
-        sem_data = sem_wt
-        neurons = wt_neurons
-    elif group == 'KO':
-        avg_data = avg_ko
-        sem_data = sem_ko
-        neurons = ko_neurons
-    plt.figure(figsize=(10, 6))
-    for protocol in protocols:
-        plt.plot(time, avg_data[protocol][:min_len], color=protocol_colors[protocol], label=f"{group} {protocol}, {neurons} neurons")
-        plt.fill_between(time,
-                        avg_data[protocol][:min_len] - sem_data[protocol][:min_len],
-                        avg_data[protocol][:min_len] + sem_data[protocol][:min_len], color=protocol_colors[protocol],
-                        alpha=0.3)
-    plt.xticks(np.arange(-1, time[-1] + 1, 1))
-    plt.xlabel("Time (s)")
-    plt.ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
-    plt.title(f"Mean {attr} ± SEM by Protocol for {group}")
-    plt.legend()
-    plt.savefig(os.path.join(save_path, f"average_{fig_name}_{group}_{attr}.jpeg"), dpi=300)
+    # Labeling
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(x_labels, rotation=45, ha='right')
+    ax.set_ylabel(f'% of {protocol_validity}-responsive neurons')
+    ax.set_title(f'% of responsive neurons per session')
+    ax.legend()
+    
+    plt.tight_layout()
+    
+    # save figure
+    plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_%responsive.jpeg"), dpi=300)
     plt.show()
 
-###----------------Boxplot for CMI-----------###
+def plot_avg_session(groups, attr, save_path, fig_name, stim_wt, stim_ko, protocols):
+    
+    colors = {groups[0]: 'skyblue', groups[1]: 'salmon'}
 
-# Assume cmi_wt and cmi_ko are lists or arrays of CMIs for WT and KO respectively
-if len(protocols) == 2:
-    cmi_wt_array = np.array(cmi_wt)
-    cmi_ko_array = np.array(cmi_ko)
+    fig, ax = plt.subplots(figsize=(8, 6))
 
-    # Median and Wilcoxon vs 0 for each group
-    median_wt = np.median(cmi_wt_array)
-    median_ko = np.median(cmi_ko_array)
-    p_value_wt = wilcoxon(cmi_wt_array, alternative='two-sided')[1]
-    p_value_ko = wilcoxon(cmi_ko_array, alternative='two-sided')[1]
+    x_ticks = []
+    x_labels = []
+    width = 0.6
+    offset = 0.3  # spacing between WT and KO
 
-    # Define bin edges between -1.5 and +1.5, e.g. 15 bins inside
-    inside_bins = np.linspace(-1.5, 1.5, 16)  # 15 bins of width 0.2
+    for i, protocol in enumerate(protocols):
+        wt_data = stim_wt[protocol]
+        ko_data = stim_ko[protocol]
+
+        # Bar height: mean
+        wt_mean = np.mean(wt_data)
+        ko_mean = np.mean(ko_data)
+        # Mann–Whitney U test
+        stat, p = mannwhitneyu(wt_data, ko_data, alternative='two-sided')
+
+        # Plot WT
+        x_wt = i * 2 - offset
+        ax.bar(x_wt, wt_mean, width=width, color=colors[groups[0]], edgecolor='black', label=groups[0] if i == 0 else "")
+        ax.scatter([x_wt] * len(wt_data), wt_data, color='black', zorder=10)
+
+        # Plot KO
+        x_ko = i * 2 + offset
+        ax.bar(x_ko, ko_mean, width=width, color=colors[groups[1]], edgecolor='black', label=groups[1] if i == 0 else "")
+        ax.scatter([x_ko] * len(ko_data), ko_data, color='black', zorder=10)
+
+        # Annotate p-value
+        y_max = max(np.max(wt_data), np.max(ko_data)) + 0.3
+        ax.plot([x_wt, x_ko], [y_max, y_max], color='black', linewidth=1.5)
+        ax.text((x_wt + x_ko) / 2, y_max + 0.05, f"M-W p = {p:.3g}", ha='center', va='bottom', fontsize=11)
+
+        # Update ticks
+        x_ticks.extend([x_wt, x_ko])
+        x_labels.extend([f'{protocol}\nWT', f'{protocol}\nKO'])
+
+    # Labeling
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(x_labels, rotation=45, ha='right')
+    ax.set_ylabel(f'Mean stimulus response ({attr})')
+    ax.set_title('Session-averaged responses during stimulus')
+    ax.legend()
+    plt.tight_layout()
+
+    plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_stim_response_{attr}.jpeg"), dpi=300)
+    plt.show()
+
+
+def graph_averages(frame_rate, groups, fig_name, attr, save_path, protocols, protocol_validity, avg_wt, sem_wt, avg_ko, sem_ko, wt_neurons, ko_neurons):
+    """
+    Function to plot the average z-scores or dFoF0 for responsive neurons.
+    """
+    # Create a figure with subplots
+    fig, axs = plt.subplots(2, 2, figsize=(18, 18))
+    # Select colors for each group and protocol
+    if len(protocols) == 1:
+        colors = {groups[0]: {protocols[0]: 'blue'},
+            groups[1]: {protocols[0]: 'red'}}
+    elif len(protocols) == 2:
+        colors = {groups[0]: {protocols[0]: 'blue', protocols[1]: 'cyan'},
+                groups[1]: {protocols[0]: 'red', protocols[1]: 'orange'}}
+    # color map for graphs separating groups
+    color_map = plt.get_cmap('tab10')  # You can use 'tab10', 'Set2', etc.
+    protocol_colors = {protocol: color_map(i) for i, protocol in enumerate(protocols)}
+
+    for i,group in enumerate(groups):
+        if group == groups[0]:
+            avg = avg_wt
+            sem = sem_wt
+            neurons = wt_neurons
+        elif group == groups[1]:
+            avg = avg_ko
+            sem = sem_ko
+            neurons = ko_neurons
+        # Get minimum length among all protocols
+        min_len = min(len(avg[protocol]) for protocol in protocols)
+
+        # Generate time vector accordingly
+        time = np.linspace(0, min_len, min_len) / frame_rate - 1  # time in seconds
+
+        for protocol in protocols:
+            axs[1,0].plot(time, avg[protocol][:min_len], color=colors[group][protocol], label=f"{group}, {protocol}, {neurons} neurons")
+            axs[1,0].fill_between(time,
+                            avg[protocol][:min_len] - sem[protocol][:min_len],
+                            avg[protocol][:min_len] + sem[protocol][:min_len],
+                            color=colors[group][protocol], alpha=0.3)
+            
+        # plot each group separately
+        for protocol in protocols:
+            axs[0,i].plot(time, avg[protocol][:min_len], color=protocol_colors[protocol], label=f"{group} {protocol}, {neurons} neurons")
+            axs[0,i].fill_between(time,
+                            avg[protocol][:min_len] - sem[protocol][:min_len],
+                            avg[protocol][:min_len] + sem[protocol][:min_len], color=protocol_colors[protocol],
+                            alpha=0.3)
+        axs[0,i].set_xticks(np.arange(-1, time[-1] + 1, 1))
+        axs[0,i].set_xlabel("Time (s)")
+        axs[0,i].set_ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
+        axs[0,i].set_title(f"Mean {attr} ± SEM by Protocol for {group}")
+        axs[0, i].legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+
+
+    axs[1,0].set_xticks(np.arange(-1, time[-1] + 1, 1))
+    axs[1,0].set_xlabel("Time (s)")
+    axs[1,0].set_ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
+    axs[1,0].set_title(f"Mean {attr} ± SEM by Group and Protocol")
+    axs[1,0].legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+
+    # Hide the unused subplot (bottom-right)
+    axs[1, 1].axis('off')
+    fig.tight_layout()
+    fig.subplots_adjust(hspace=0.2)
+    plt.savefig(os.path.join(save_path, f"{fig_name}_averages_{attr}.jpeg"), dpi=300, bbox_inches='tight')
+    plt.show()
+
+def boxplot(list1, list2, neurons1, neurons2, groups, protocols, save_path, fig_name, attr, variable = "CMI"):
+    """
+    Function to plot a boxplot comparing the distribution of two groups.
+    variable: 'CMI' or 'suppression_index'
+    """
+    if len (protocols)!= 2:
+        raise ValueError("This function is designed to work with exactly two protocols.")
+    
+    array1 = np.array(list1)
+    array2 = np.array(list2)
+    median1 = np.median(array1)
+    median2 = np.median(array2)
+    p_value_1 = wilcoxon(array1, alternative='two-sided')[1]
+    p_value_2 = wilcoxon(array2, alternative='two-sided')[1]
+
+    # Define bin edges 
+    outside_labels = []
+    if variable == "CMI":
+        inside_bins = np.linspace(-1.5, 1.5, 16)  
+        outside_labels = ['< -1.5', '> 1.5']
+    elif variable == "suppression_index":
+        inside_bins = np.linspace(-2, 2, 24)
+        outside_labels = ['< -2', '> 2']
     bins = np.concatenate(([-np.inf], inside_bins, [np.inf]))
 
-    # Digitize data: assign each CMI value to a bin index
-    bin_indices_wt = np.digitize(cmi_wt_array, bins)
-    bin_indices_ko = np.digitize(cmi_ko_array, bins)
+    bin_indices_1 = np.digitize(array1, bins)
+    bin_indices_2 = np.digitize(array2, bins)
 
-    # Prepare counts and labels
-    counts_wt = []
-    counts_ko = []
+    counts_1 = []
+    counts_2 = []
     labels = []
+    # Prepare counts and labels
+    # negative outside bin 
+    labels.append(outside_labels[0])
+    counts_1.append(100 * np.sum(bin_indices_1 == 1) / neurons1)
+    counts_2.append(100 * np.sum(bin_indices_2 == 1) / neurons2)
 
-    labels.append('< -1.5')
-    counts_wt.append(100 * np.sum(bin_indices_wt == 1) / wt_neurons)
-    counts_ko.append(100 * np.sum(bin_indices_ko == 1) / ko_neurons)
-
+    # inside bins
     for i in range(2, len(bins)-1):
         bin_start = bins[i-1]
         bin_end = bins[i]
         labels.append(f'{bin_start:.2f} to {bin_end:.2f}')
-        counts_wt.append(100 * np.sum(bin_indices_wt == i) / wt_neurons)
-        counts_ko.append(100 * np.sum(bin_indices_ko == i) / ko_neurons)
+        counts_1.append(100 * np.sum(bin_indices_1 == i) / neurons1)
+        counts_2.append(100 * np.sum(bin_indices_2 == i) / neurons2)
 
-    labels.append('> 1.5')
-    counts_wt.append(100 * np.sum(bin_indices_wt == len(bin_indices_wt)) / wt_neurons)
-    counts_ko.append(100 * np.sum(bin_indices_ko == len(bin_indices_wt)) / ko_neurons)
+    # positive outside bin 
+    labels.append(outside_labels[1])
+    counts_1.append(100 * np.sum(bin_indices_1 == len(bin_indices_1)) / neurons1)
+    counts_2.append(100 * np.sum(bin_indices_2 == len(bin_indices_2)) / neurons2)
 
     # Bar plot parameters
     x = np.arange(len(labels))  # label locations
     width = 0.4  # width of the bars
 
     plt.figure(figsize=(12,6))
-    plt.bar(x - width/2, counts_wt, width, label='WT', color='blue', edgecolor='black')
-    plt.bar(x + width/2, counts_ko, width, label='KO', color='red', edgecolor='black')
-
-    from scipy.stats import mannwhitneyu
+    plt.bar(x - width/2, counts_1, width, label=groups[0], color='blue', edgecolor='black')
+    plt.bar(x + width/2, counts_2, width, label=groups[1], color='red', edgecolor='black')
 
     # Perform Mann–Whitney U test between WT and KO
-    stat_mwu, p_value_mwu = mannwhitneyu(cmi_wt_array, cmi_ko_array, alternative='two-sided')
+    stat_mwu, p_value_mwu = mannwhitneyu(array1, array2, alternative='two-sided')
 
     # Add p-value annotation to the plot
     textstr = (
-        f'WT median = {median_wt:.2f}, p (vs 0) = {p_value_wt:.3g}\n'
-        f'KO median = {median_ko:.2f}, p (vs 0) = {p_value_ko:.3g}\n'
-        f'WT vs KO (Mann–Whitney) p = {p_value_mwu:.3g}'
+        f'{groups[0]} median = {median1:.2f}, p (vs 0) = {p_value_1:.3g}\n'
+        f'{groups[1]} median = {median2:.2f}, p (vs 0) = {p_value_2:.3g}\n'
+        f'{groups[0]} vs {groups[1]} (Mann–Whitney) p = {p_value_mwu:.3g}'
     )
 
     # Position textbox on plot
@@ -414,101 +412,33 @@ if len(protocols) == 2:
     plt.legend(loc='upper right')
 
 
-    # Perform Mann–Whitney U test between WT and KO
-    stat_mwu, p_value_mwu = mannwhitneyu(cmi_wt_array, cmi_ko_array, alternative='two-sided')
-
-
     plt.xticks(x, labels, rotation=45, ha='right')
     plt.ylabel(f'% of neurons')
-    plt.title('Distribution of CMI values by group')
+    plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
     plt.legend()
-
-
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_cmi_{attr}.jpeg"), dpi=300)
+    plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_{variable}_{attr}.jpeg"), dpi=300)
     plt.show()
+#---------------------------END OF FUNCTIONS-----------------------#
 
 
-###----------------Boxplot for surround suppression-----------###
-
-# Assume cmi_wt and cmi_ko are lists or arrays of CMIs for WT and KO respectively
-if len(protocols)==2:
-    suppr_wt_array = np.array(suppression_wt)
-    suppr_ko_array = np.array(suppression_ko)
-
-    # Median and Wilcoxon vs 0 for each group
-    median_wt = np.median(suppr_wt_array)
-    median_ko = np.median(suppr_ko_array)
-    p_value_wt = wilcoxon(suppr_wt_array, alternative='two-sided')[1]
-    p_value_ko = wilcoxon(suppr_ko_array, alternative='two-sided')[1]
-
-    # Define bin edges between -2 and 2, e.g. 20 bins inside
-    inside_bins = np.linspace(-2, 2, 24)  # 20 bins of width 0.2
-    bins = np.concatenate(([-np.inf], inside_bins, [np.inf]))
-
-    # Digitize data: assign each surround suppression value to a bin index
-    bin_indices_wt = np.digitize(suppr_wt_array, bins)
-    bin_indices_ko = np.digitize(suppr_ko_array, bins)
-
-    # Prepare counts and labels
-    counts_wt = []
-    counts_ko = []
-    labels = []
-
-    labels.append('< -2')
-    counts_wt.append(100 * np.sum(bin_indices_wt == 1) / wt_neurons)
-    counts_ko.append(100 * np.sum(bin_indices_ko == 1) / ko_neurons)
-
-    for i in range(2, len(bins)-1):
-        bin_start = bins[i-1]
-        bin_end = bins[i]
-        labels.append(f'{bin_start:.2f} to {bin_end:.2f}')
-        counts_wt.append(100 * np.sum(bin_indices_wt == i) / wt_neurons)
-        counts_ko.append(100 * np.sum(bin_indices_ko == i) / ko_neurons)
-
-    labels.append('> 2')
-    counts_wt.append(100 * np.sum(bin_indices_wt == len(bin_indices_wt)) / wt_neurons)
-    counts_ko.append(100 * np.sum(bin_indices_ko == len(bin_indices_wt)) / ko_neurons)
-
-    # Bar plot parameters
-    x = np.arange(len(labels))  # label locations
-    width = 0.4  # width of the bars
-
-    plt.figure(figsize=(12,6))
-    plt.bar(x - width/2, counts_wt, width, label='WT', color='blue', edgecolor='black')
-    plt.bar(x + width/2, counts_ko, width, label='KO', color='red', edgecolor='black')
-
-    from scipy.stats import mannwhitneyu
-
-    # Perform Mann–Whitney U test between WT and KO
-    stat_mwu, p_value_mwu = mannwhitneyu(suppr_wt_array, suppr_ko_array, alternative='two-sided')
-
-    # Add p-value annotation to the plot
-    textstr = (
-        f'WT median = {median_wt:.2f}, p (vs 0) = {p_value_wt:.3g}\n'
-        f'KO median = {median_ko:.2f}, p (vs 0) = {p_value_ko:.3g}\n'
-        f'WT vs KO (Mann–Whitney) p = {p_value_mwu:.3g}'
-    )
-
-    # Position textbox on plot
-    plt.gca().text(0.95, 0.95, textstr,
-                transform=plt.gca().transAxes,
-                fontsize=11, verticalalignment='top', horizontalalignment='right',
-                bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.85))
-    plt.legend(loc='upper right')
-
-
-
-    plt.xticks(x, labels, rotation=45, ha='right')
-    plt.ylabel(f'% of neurons')
-    plt.title('Distribution of surround suppression values by group')
-    plt.legend()
-
-
-
-plt.tight_layout()
-plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_surround-sup_{attr}.jpeg"), dpi=300)
-plt.show()
-
+#-------------------Call the functions to process and plot the data-------------------#
+# Process WT
+suppression_wt, magnitude_wt, stim_wt, wt_neurons, avg_wt, sem_wt, cmi_wt, proportions_wt = process_group('WT', WT_mice, attr)
+# Process KO
+suppression_ko, magnitude_ko, stim_ko, ko_neurons, avg_ko, sem_ko, cmi_ko, proportions_ko = process_group('KO', KO_mice, attr)
+#XY plot of the magnitudes of the responses to the two protocols
+XY_magnitudes(groups, magnitude_wt, magnitude_ko, protocols, protocol_validity, save_path, attr)
+# Plot the % of responsive neurons per session
+plot_perc_responsive(groups, proportions_wt, proportions_ko, save_path, fig_name)
+# Plot the average response during the stim period per session
+plot_avg_session(groups, attr, save_path, fig_name, stim_wt, stim_ko, protocols)
+# Plot the average z-scores or dFoF0-baseline trace for responsive neurons
+graph_averages(frame_rate, groups, fig_name, attr, save_path, protocols, protocol_validity, avg_wt, sem_wt, avg_ko, sem_ko, wt_neurons, ko_neurons)
+#plot the distribution of CMI 
+boxplot(cmi_wt, cmi_ko, wt_neurons, ko_neurons, groups, protocols, save_path, fig_name, attr, variable = "CMI")
+#plot the distribution of suppression index
+boxplot(suppression_wt, suppression_ko, wt_neurons, ko_neurons, groups, protocols, save_path, fig_name, attr, variable = "suppression_index")
+#----------------------------------------------------------------------------#
 
