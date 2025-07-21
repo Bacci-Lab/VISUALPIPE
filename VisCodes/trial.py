@@ -385,8 +385,8 @@ class Trial(object):
         id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
         id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
         
-        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.5*self.ca_img.fs):], axis=1)
-        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.5*self.ca_img.fs):], axis=1)
+        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.3*self.ca_img.fs):], axis=1)
+        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.3*self.ca_img.fs):], axis=1)
 
         cmi = (cross - iso) / (cross + iso)
     
@@ -919,8 +919,8 @@ class Trial(object):
         valid_neurons = np.unique(np.concatenate((rois_cross, rois_iso)))
         invalid_neurons = np.array([i for i in range(len(self.responsive[12])) if i not in valid_neurons])
 
-        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.5*self.ca_img.fs):], axis=1)
-        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.5*self.ca_img.fs):], axis=1)
+        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.3*self.ca_img.fs):], axis=1)
+        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.3*self.ca_img.fs):], axis=1)
 
         min = np.min((cross, iso))
         max = np.max((cross, iso))
