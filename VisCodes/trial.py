@@ -1067,6 +1067,64 @@ class Trial(object):
             fig.savefig(save_path + ".png")
             plt.close(fig)
 
+    def plot_trials_per_states2(self, stimuli_id:int, neuron_idx:int, save_dir:str, folder_prefix:str=''):
+
+        nb_states = len(self.trial_avg_trace_state[stimuli_id].keys())
+        colors, positions = ['darkred', 'gray'], [0, 1]
+        cmap = LinearSegmentedColormap.from_list('my_colormap', list(zip(positions, colors)), N=3)
+        colors = {'run': cmap(0), 'AS': cmap(1), 'rest': cmap(2), 'undefined': 'lightsteelblue'}
+
+        if nb_states > 1:
+
+            stim_dt = self.visual_stim.protocol_df['duration'][stimuli_id]
+            stimuli_name = self.visual_stim.protocol_df['name'][stimuli_id]
+            stimuli_onset = self.pre_trial_averaged_zscores[stimuli_id].shape[1]
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.axvline(x=0, color='black', linestyle='--', linewidth=2)
+            if self.dt_post_stim + self.dt_post_stim_plot > 0 :
+                ax.axvline(x=stim_dt, color='black', linestyle='--', linewidth=2)
+            
+            for state in self.trial_avg_trace_state[stimuli_id].keys():
+
+                if state != 'undefined':
+                    idx_states = np.where(np.array(self.arousal_states[stimuli_id]) == state)[0]
+
+                    trial_average = np.array(self.trial_avg_trace_state[stimuli_id][state][neuron_idx])
+                    pre_trial_average = np.array(self.pre_trial_avg_trace_state[stimuli_id][state][neuron_idx])
+                    post_trial_average = np.array(self.post_trial_avg_trace_state[stimuli_id][state][neuron_idx])
+                    
+                    trial_std = np.std(self.trial_fluorescence[stimuli_id][neuron_idx, idx_states, :], axis=0)
+                    pre_trial_std = np.std(self.pre_trial_fluorescence[stimuli_id][neuron_idx, idx_states, :], axis=0)
+                    post_trial_std = np.std(self.post_trial_fluorescence[stimuli_id][neuron_idx, idx_states, :], axis=0)
+                    
+                    data_av = np.concatenate((pre_trial_average, trial_average, post_trial_average))
+                    std_av = np.concatenate((pre_trial_std, trial_std, post_trial_std))
+                    time = (np.arange(data_av.shape[0]) - stimuli_onset) / self.ca_img.fs
+                
+                    ax.fill_between(time, data_av - std_av, data_av + std_av, color=colors[state], alpha=0.2)
+                    ax.plot(time, data_av, linewidth=2, label=f'{state} ({len(idx_states)} trials)', color=colors[state], alpha=1)
+
+            ax.margins(x=0)
+            ax.set_ylabel(self.ca_attr)
+            ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+            textstr = 'responsive' if np.abs(self.responsive[stimuli_id][neuron_idx][0]) > 0 else 'not responsive'
+            ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
+                    fontsize=10, verticalalignment='top', horizontalalignment='left')
+            
+            ax.set_xlabel("Time (s)")
+            fig.suptitle(f'{stimuli_name} - Neuron {neuron_idx}', fontsize=16)
+            plt.legend(bbox_to_anchor=(0.95, 1), loc='upper right')
+
+            fig_name = stimuli_name + "_neuron_" + str(neuron_idx) + "_per_states_2"
+            foldername = "_".join(list(filter(None, [folder_prefix, stimuli_name])))
+            save_folder = os.path.join(save_dir, foldername, 'stimuli_occurence')
+            if not os.path.exists(save_folder):
+                os.mkdir(save_folder)
+            save_path = os.path.join(save_folder, fig_name)
+            fig.savefig(save_path + ".png")
+            plt.close(fig)
+
     #-------------SAVE FUNCTIONS---------------
     def save_protocol_validity(self, save_dir, filename):
         protocol_validity = []
