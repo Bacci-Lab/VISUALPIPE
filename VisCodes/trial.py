@@ -392,6 +392,33 @@ class Trial(object):
     
         return cmi
     
+    def compute_surround_sup(self):
+        """
+        Compute the surround suppression for the cross and iso protocols.
+
+        The surround suppression is computed as 1 - (cross/center) and 1 - (iso/center), where cross and iso are the average responses to the cross and iso protocols, respectively, and center is the average response to the center protocol.
+
+        :return surround_sup_cross (array): Array of surround suppression values for the cross protocol.
+        :return surround_sup_iso (array): Array of surround suppression values for the iso protocol.
+        """
+        
+        id_srm_cross = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-cross"].index[0]
+        id_srm_iso = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center-surround-iso"].index[0]
+        id_srm_center = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center"].index[0]
+        
+        cross = np.mean(self.trial_average_fluorescence_norm[id_srm_cross][:, round(0.3*self.ca_img.fs):], axis=1)
+        iso = np.mean(self.trial_average_fluorescence_norm[id_srm_iso][:, round(0.3*self.ca_img.fs):], axis=1)
+        center = np.mean(self.trial_average_fluorescence_norm[id_srm_center][:, round(0.3*self.ca_img.fs):], axis=1)
+
+        surround_sup_cross = 1 - cross / center
+        surround_sup_iso = 1 - iso / center
+
+        # Exclude ROI with negative center response
+        surround_sup_cross = np.where(center>0, surround_sup_cross, np.nan)
+        surround_sup_iso = np.where(center>0, surround_sup_iso, np.nan)
+    
+        return surround_sup_cross, surround_sup_iso
+    
     def sort_trials_by_states(self, time_onset_aligned_on_ca_img:list, real_time_states_sorted:list):
         """
         Sort trials by arousal states.

@@ -256,8 +256,10 @@ if "center-surround-cross" in visual_stim.protocol_names :
     cmi = trials.compute_cmi()
     trials.plot_cmi_hist(cmi, save_fig_dir)
     trials.plot_iso_vs_cross(save_fig_dir)
+    surround_sup_cross, surround_sup_iso = trials.compute_surround_sup()
 else :
     cmi = None
+    surround_sup_cross, surround_sup_iso = None, None
 
 # Compute the trial zscores not based on the averaged baseline but the baseline of the trace
 trial_zscores, pre_trial_zscores, post_trial_zscores = trials.compute_trial_zscores('dFoF0')
@@ -452,7 +454,7 @@ file.create_H5_dataset(caImg_full_trace, [ca_img_dm.raw_F, ca_img_dm.raw_Fneu, c
 file.create_H5_dataset(stimuli_group, [visual_stim.real_time_onset, F_Time_start_realigned, F_stim_init_indexes], 
                                     ['time_onset', 'time_onset_caimg_timescale', 'idx_onset_caimg_timescale'])
 if cmi is not None :
-    file.create_H5_dataset(stimuli_group, [cmi], ['cmi'])
+    file.create_H5_dataset(stimuli_group, [cmi, surround_sup_cross, surround_sup_iso], ['cmi', 'surround_sup_cross', 'surround_sup_iso'])
 file.create_H5_dataset(rois_group, [detected_roi, kept2p_ROI, kept_ROI_alpha, kept_ROI_F0], 
                                     ['0_original', '1_neuropil', '2_alpha', '3_F0'])
 if not face_cam_dm.no_face_data :
