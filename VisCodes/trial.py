@@ -131,6 +131,20 @@ class Trial(object):
         return trial_average_fluorescence, average_baselines, post_trial_average_fluorescence
 
     def normalize_with_baseline(self) :
+        """
+        Normalize the trial fluorescence, pre-trial fluorescence and post-trial fluorescence by substracting the mean of the baseline.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        trial_average_fluorescence_norm (dict): A dictionary with protocol ids as keys and the normalized trial fluorescence as values.
+        pre_trial_average_fluorescence_norm (dict): A dictionary with protocol ids as keys and the normalized pre-trial fluorescence as values.
+        post_trial_average_fluorescence_norm (dict): A dictionary with protocol ids as keys and the normalized post-trial fluorescence as values.
+
+        """
         pre_trial_average_fluorescence_norm = {}
         trial_average_fluorescence_norm = {}
         post_trial_average_fluorescence_norm = {}
@@ -175,6 +189,14 @@ class Trial(object):
         return trial_zscores, pre_trial_zscores, post_trial_zscores
 
     def compute_trial_zscores_avb(self):
+        """
+        Compute the z-scores of the fluorescence traces based on the average of baselines per trial.
+
+        :return trial_zscores (dict): A dictionary of z-scores of the fluorescence traces of each trial.
+        :return pre_trial_zscores (dict): A dictionary of z-scores of the baselines of each trial.
+        :return post_trial_zscores (dict): A dictionary of z-scores of the post-trial fluorescence traces of each trial.
+        """
+        
         trial_zscores, pre_trial_zscores, post_trial_zscores = {}, {}, {}
 
         for i in self.trial_fluorescence.keys() :
@@ -486,9 +508,15 @@ class Trial(object):
             for state in states :
 
                 idx_states = np.where(np.array(self.arousal_states[i]) == state)[0]
-                average_baseline = np.mean(self.pre_trial_fluorescence[i][:, idx_states, :], axis=1)
-                average_trial = np.mean(self.trial_fluorescence[i][:, idx_states, :], axis=1)
-                average_post_trial = np.mean(self.post_trial_fluorescence[i][:, idx_states, :], axis=1)
+
+                mean_baseline = np.dot(np.mean(self.average_baselines[i], axis=1).reshape(-1,1), np.ones((1, self.pre_trial_fluorescence[i].shape[2])))
+                average_baseline = np.mean(self.pre_trial_fluorescence[i][:, idx_states, :], axis=1) - mean_baseline
+
+                mean_baseline = np.dot(np.mean(self.average_baselines[i], axis=1).reshape(-1,1), np.ones((1, self.trial_fluorescence[i].shape[2])))
+                average_trial = np.mean(self.trial_fluorescence[i][:, idx_states, :], axis=1) - mean_baseline
+                
+                mean_baseline = np.dot(np.mean(self.average_baselines[i], axis=1).reshape(-1,1), np.ones((1, self.post_trial_fluorescence[i].shape[2])))
+                average_post_trial = np.mean(self.post_trial_fluorescence[i][:, idx_states, :], axis=1) - mean_baseline
 
                 state_dict_pre.update({state : average_baseline})
                 state_dict_trial.update({state : average_trial})
