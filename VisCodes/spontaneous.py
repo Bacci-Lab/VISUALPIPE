@@ -29,24 +29,24 @@ def get_spont_stim(visual_stim:VisualStim):
     
     return spont_stimuli_id, analyze_pupil
 
-def compute_spont_corr(behavior_spont, F_spontaneous, time_stamps_spont, label='', save_spont_dir='', permutation=True):
+def compute_spont_corr(behavior_spont, F_spontaneous, time_stamps_spont, sigma=0, label='', save_spont_dir='', permutation=True):
+
+    if sigma > 0 :
+        F_spontaneous = gaussian_filter1d(F_spontaneous, sigma, axis=1)
+        behavior_spont = gaussian_filter1d(behavior_spont, sigma)
 
     # Correlation with dFoF0
     spont_behavior_corr = [spearmanr(behavior_spont, ROI)[0] for ROI in F_spontaneous]
     spont_behavior_corr = [float(value) for value in spont_behavior_corr]
 
     if permutation :
-        valid_neurons = permutation_test(F_spontaneous, behavior_spont, spont_behavior_corr, time_stamps_spont, sigma=10, label=label, savefolder=os.path.join(save_spont_dir, f"permutation_{label}"))
+        valid_neurons = permutation_test(F_spontaneous, behavior_spont, spont_behavior_corr, time_stamps_spont, label=label, savefolder=os.path.join(save_spont_dir, f"permutation_{label}"))
         return spont_behavior_corr, valid_neurons
     
     else :
         return spont_behavior_corr, None
 
-def permutation_test(fluorescence, beh_trace, corr, time, samples=1000, sigma=0, label='', savefolder=''):
-
-    if sigma > 0 :
-        fluorescence = gaussian_filter1d(fluorescence, sigma, axis=1)
-        beh_trace = gaussian_filter1d(beh_trace, sigma)
+def permutation_test(fluorescence, beh_trace, corr, time, samples=1000, label='', savefolder=''):
     
     beh_trace_norm = beh_trace/np.max(beh_trace)
     fluorescence_norm = [i/np.max(i) for i in fluorescence]
@@ -138,8 +138,9 @@ def pie_plot(nb_valid_ROIs, nb_invalid_ROIs, save_folder='', label='', color_val
 
 def colormap_perm_test(time, dF, x, valid_neurons, corr, sigma=0, label:str=None, save_path=None):
     
-    idx_sorted = np.flip(np.argsort(corr))
-    dF_valid_corr_sorted = dF[idx_sorted][valid_neurons]
+    idx_sorted = np.flip(np.argsort(np.array(corr)[valid_neurons]))
+    id_roi_sorted = np.arange(len(corr))[valid_neurons][idx_sorted]
+    dF_valid_corr_sorted = dF[valid_neurons][idx_sorted]
     mean_dF = np.mean(dF[valid_neurons], axis=0)
 
     if sigma > 0:
@@ -200,7 +201,7 @@ def colormap_perm_test(time, dF, x, valid_neurons, corr, sigma=0, label:str=None
         ax3.plot(time, dF_valid_corr_sorted[i])
         ax3.margins(x=0)
         ax3.set_facecolor("white")
-        ax3.set_title(label_order[i] + label + r" correlated neuron's normalized $\Delta$F/F : ROI " + f"{idx_sorted[i]}", horizontalalignment='center')
+        ax3.set_title(label_order[i] + label + r" correlated neuron's normalized $\Delta$F/F : ROI " + f"{id_roi_sorted[i]}", horizontalalignment='center')
         
         if i == nb_plot_ROIs - 1 : 
             ax3.set_xlabel('Time (s)')

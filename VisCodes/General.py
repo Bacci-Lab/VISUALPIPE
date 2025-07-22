@@ -322,6 +322,7 @@ print(protocol_validity)
 
 #---------------------------------- Spontaneous behaviour ----------------------------------
 spont_stimuli_id, _ = spont.get_spont_stim(visual_stim)
+sigma = 5
 
 if len(spont_stimuli_id) > 0 :
     spont_speed_corr_list = []
@@ -347,26 +348,26 @@ if len(spont_stimuli_id) > 0 :
 
         # Speed correlation
         speed_spont = speed[start_spont_index:end_spont_index]
-        spont_speed_corr, valid_neurons_temp = spont.compute_spont_corr(speed_spont, F_spontaneous[i], time_stamps_spont, 'speed', save_spont_dir_i)
+        spont_speed_corr, valid_neurons_temp = spont.compute_spont_corr(speed_spont, F_spontaneous[i], time_stamps_spont, sigma, 'speed', save_spont_dir_i)
         spont_speed_corr_list.append(spont_speed_corr)
         valid_neurons_speed_list.append(valid_neurons_temp)
-        spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], speed_spont, valid_neurons_temp, spont_speed_corr, sigma=10, label='speed', save_path=save_spont_dir_i)
+        spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], speed_spont, valid_neurons_temp, spont_speed_corr, sigma=sigma, label='speed', save_path=save_spont_dir_i)
 
         if not face_cam_dm.no_face_data :
             # Facemotion correlation
             facemotion_spont = facemotion[start_spont_index:end_spont_index]
-            spont_facemotion_corr, valid_neurons_temp = spont.compute_spont_corr(facemotion_spont, F_spontaneous[i], time_stamps_spont, 'facemotion', save_spont_dir_i)
+            spont_facemotion_corr, valid_neurons_temp = spont.compute_spont_corr(facemotion_spont, F_spontaneous[i], time_stamps_spont, sigma, 'facemotion', save_spont_dir_i)
             spont_facemotion_corr_list.append(spont_facemotion_corr)
             valid_neurons_facemotion_list.append(valid_neurons_temp)
-            spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], facemotion_spont, valid_neurons_temp, spont_facemotion_corr, sigma=10, label='facemotion', save_path=save_spont_dir_i)
+            spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], facemotion_spont, valid_neurons_temp, spont_facemotion_corr, sigma=sigma, label='facemotion', save_path=save_spont_dir_i)
 
             # Pupil correlation
             pupil_spont = pupil[start_spont_index:end_spont_index]
             if spont_df.loc[id].analyze_pupil :
-                spont_pupil_corr, valid_neurons_temp = spont.compute_spont_corr(pupil_spont, F_spontaneous[i], time_stamps_spont, 'pupil', save_spont_dir_i)
+                spont_pupil_corr, valid_neurons_temp = spont.compute_spont_corr(pupil_spont, F_spontaneous[i], time_stamps_spont, sigma, 'pupil', save_spont_dir_i)
                 spont_pupil_corr_list.append(spont_pupil_corr)
                 valid_neurons_pupil_list.append(valid_neurons_temp)
-                spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], pupil_spont, valid_neurons_temp, spont_pupil_corr, sigma=10, label='pupil', save_path=save_spont_dir_i)
+                spont.colormap_perm_test(time_stamps_spont, F_spontaneous[i], pupil_spont, valid_neurons_temp, spont_pupil_corr, sigma=sigma, label='pupil', save_path=save_spont_dir_i)
 
     speed_corr = np.dot(np.array(spont_speed_corr_list).T, spont_df.duration/np.sum(spont_df.duration))
     valid_neurons_speed = spont.get_valid_neurons(valid_neurons_speed_list)
