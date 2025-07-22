@@ -220,3 +220,74 @@ def colormap_perm_test(time, dF, x, valid_neurons, corr, sigma=0, label:str=None
         plt.show()
     
     plt.close(fig)
+
+def process_correlation(x, fluorescence, time, idx_lim_protocol, sigma=0, label:str='', save_path:str='', plot:bool=True):
+    """
+    Compute the correlation between x (e.g. behavior) and fluorescence in a given time window
+    and performs a permutation test to identify which neurons are significantly correlated to x.
+    Also plot correlation and the pie chart of correlated neurons if plotis set to True.
+
+    Parameters
+    ----------
+    x : array
+        Behavioral signal.
+    fluorescence : array
+        Fluorescence activity.
+    time : array
+        Time of the fluorescence activity.
+    start_spont_index : int
+        Start index of the spontaneous activity.
+    end_spont_index : int
+        End index of the spontaneous activity.
+    sigma : int
+        Sigma of the Gaussian filter applied to the behavioral signal.
+    label : str
+        Label of the behavioral signal.
+    save_path : str
+        Path to save the figure.
+    plot : bool
+        If True, plot the correlation and the pie chart of correlated neurons.
+
+    Returns
+    -------
+    corr : array
+        Correlation between fluorescence activity and behavioral signal.
+    valid_neurons : array
+        Indices of the neurons that passed the permutation test.
+    """
+    
+    [start_spont_index, end_spont_index] = idx_lim_protocol
+    x_spont = x[start_spont_index:end_spont_index]
+    if fluorescence.shape[1] > x_spont.shape[0] :
+        fluorescence = fluorescence[:, start_spont_index:end_spont_index]
+    if time.shape[0] > x_spont.shape[0] :
+        time = time[start_spont_index:end_spont_index]
+    
+    corr, valid_neurons = compute_spont_corr(x_spont, fluorescence, time, sigma, label, save_path)
+    if plot :
+        colormap_perm_test(time, fluorescence, x_spont, valid_neurons, corr, sigma=sigma, label=label, save_path=save_path)
+        pie_plot(len(valid_neurons), len(corr) - len(valid_neurons), save_path, label)
+
+    return corr, valid_neurons 
+
+def process_multiple_protocols(spont_corr_list, spont_df, valid_neurons_list, label:str='', save_path:str='', plot:bool=True):
+
+    # Compute the mean correlation weighted by the duration of each protocol
+    if label == 'pupil' :
+        spont_dt_pupil = spont_df[spont_df.analyze_pupil == 1].duration
+        corr = np.dot(np.array(spont_corr_list).T, spont_dt_pupil/np.sum(spont_dt_pupil))
+    else :
+        corr = np.dot(np.array(spont_corr_list).T, spont_df.duration/np.sum(spont_df.duration))
+    
+    # Valid neurons should be valid for all protocols
+    valid_neurons_speed = get_valid_neurons(valid_neurons_list)
+    
+    # Build array of valid neurons for each protocol for the HDF5 file
+    valid_neurons_list_save = np.zeros((len(corr), len(valid_neurons_list)))
+    for i in range(len(valid_neurons_list)) : 
+        valid_neurons_list_save[valid_neurons_list[i], i] = 1
+
+    if plot :
+        pie_plot(len(valid_neurons_speed), len(corr) - len(valid_neurons_speed), save_path, label)
+
+    return corr, valid_neurons_list_save
