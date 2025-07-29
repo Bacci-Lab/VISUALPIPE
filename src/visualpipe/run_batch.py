@@ -1,7 +1,7 @@
 """
 This module provides a function to run a batch process for running visual pipelines on a list of file paths.
 """
-from General import visual_pipe
+from pipeline import visual_pipe
 
 def run_batch(filepath) :
     """

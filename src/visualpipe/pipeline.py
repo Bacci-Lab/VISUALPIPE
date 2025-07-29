@@ -9,12 +9,12 @@ import datetime
 import sys
 sys.path.append("./src")
 
-from analysis.Running_computation import compute_speed
-from analysis.Ca_imaging import CaImagingDataManager
+from visualpipe.analysis.speed_computation import compute_speed
+from analysis.ca_imaging import CaImagingDataManager
 from analysis.face_camera import FaceCamDataManager
 from analysis.visual_stim import VisualStim
-import utils.General_functions as General_functions
-import analysis.Photodiode as Photodiode
+import utils.general_functions as general_functions
+import analysis.photodiode as ptd
 from gui.inputUI import InputWindow
 import utils.file as file
 from analysis.trial import Trial
@@ -108,7 +108,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
 
     #---------------------------------- Load Camera data ----------------------------------
     print("Loading face camera data")
-    timestamp_start = Photodiode.get_timestamp_start(base_path)
+    timestamp_start = ptd.get_timestamp_start(base_path)
     face_cam_dm = FaceCamDataManager(base_path, timestamp_start)
     print("    ------------> Done")
 
@@ -127,25 +127,25 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     print(f"Total duration of the recording: {total_duration} s")
 
     #sub sampling and filtering speed
-    speed = General_functions.resample_signal(speed, 
+    speed = general_functions.resample_signal(speed, 
                                             t_sample=speed_time_stamps, 
                                             new_freq=ca_img_dm.fs,
                                             interp_time=new_time_stamps,
                                             post_smoothing=2./50.)
 
     if not face_cam_dm.no_face_data :
-        pupil = General_functions.resample_signal(face_cam_dm.pupil, 
+        pupil = general_functions.resample_signal(face_cam_dm.pupil, 
                                                 t_sample=face_cam_dm.time_stamps, 
                                                 new_freq=ca_img_dm.fs, 
                                                 interp_time=new_time_stamps)
-        facemotion = General_functions.resample_signal(face_cam_dm.facemotion, 
+        facemotion = general_functions.resample_signal(face_cam_dm.facemotion, 
                                                     t_sample=face_cam_dm.time_stamps,
                                                     new_freq=ca_img_dm.fs, 
                                                     interp_time=new_time_stamps)
 
         # Normalize
-        pupil = General_functions.scale_trace(pupil)
-        facemotion = General_functions.scale_trace(facemotion)
+        pupil = general_functions.scale_trace(pupil)
+        facemotion = general_functions.scale_trace(facemotion)
     else :
         facemotion, pupil = [np.nan] * len(new_time_stamps), [np.nan] * len(new_time_stamps)
 
@@ -187,8 +187,8 @@ def visual_pipe(base_path:str=None, input_gui=False) :
 
     #---------------------------------- Load Photodiode data -----------------------------
     print("Loading photodiode data")
-    NIdaq, acq_freq = Photodiode.load_and_data_extraction(base_path)
-    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0],
+    NIdaq, acq_freq = ptd.load_and_data_extraction(base_path)
+    Psignal_time, Psignal = general_functions.resample_signal(NIdaq['analog'][0],
                                                             original_freq=acq_freq,
                                                             new_freq=1000)
     print("    ------------> Done")
@@ -202,7 +202,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     #---------------------------------- Set real stimuli onset with photodiode -----------------------------
     print("Realigning visual stimuli onset from photodiode")
     visual_stim.realign_from_photodiode(Psignal_time, Psignal)
-    Psignal = General_functions.scale_trace(Psignal)
+    Psignal = general_functions.scale_trace(Psignal)
     print("    ------------> Done")
 
     #---------------------------------- Stimuli start times and durations -----------------
@@ -210,7 +210,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     stim_time_end = list(visual_stim.real_time_onset + visual_stim.duration)
     stim_time_period = [visual_stim.real_time_onset, stim_time_end]
 
-    F_Time_start_realigned, F_stim_init_indexes  = Photodiode.Find_F_stim_index(visual_stim.real_time_onset, ca_img_dm.time_stamps)
+    F_Time_start_realigned, F_stim_init_indexes  = ptd.Find_F_stim_index(visual_stim.real_time_onset, ca_img_dm.time_stamps)
     print("    ------------> Done")
 
     #---------------------------------- Compute behavioral states -----------------

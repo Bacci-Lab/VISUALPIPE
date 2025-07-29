@@ -12,7 +12,7 @@ from matplotlib.figure import Figure
 from matplotlib import cm, colors, colormaps
 
 from visualpipe.red_channel.red_Image_GUI import RedImageAdjust, CategorizeCells
-from visualpipe.gui.Time_series_GUI import TimeSeriesUI  # Import your previous class
+from visualpipe.gui.time_series_GUI import TimeSeriesUI  # Import your previous class
 
 class CorrelationView(QGraphicsView):
     objectClicked = pyqtSignal(int)

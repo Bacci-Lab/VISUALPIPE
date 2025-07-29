@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import datetime
 
 import visualpipe.utils.figures as figures
-import visualpipe.utils.General_functions as General_functions
+import visualpipe.utils.general_functions as general_functions
 
 def get_timestamp_start(base_path) :
     NIdaq_path = os.path.join(base_path, "NIdaq.start.npy")
@@ -75,7 +75,7 @@ def average_image(
     for Neuron_index in range(len(F)):
         test_F = F[Neuron_index]
         base_line_F_I = get_base_line(test_F, F_stim_init_indexes)
-        bootstrapped_base, fith_bootstraping_base = General_functions.bootstrap(base_line_F_I, num_samples)
+        bootstrapped_base, fith_bootstraping_base = general_functions.bootstrap(base_line_F_I, num_samples)
         F_specific_protocol = []
         F_stim = []
 
@@ -120,7 +120,7 @@ def average_image(
 if __name__ == "__main__":
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
     NIdaq, acq_freq = load_and_data_extraction(base_path)
-    Psignal_time, Psignal = General_functions.resample_signal(NIdaq['analog'][0], original_freq=acq_freq, new_freq=1000)
+    Psignal_time, Psignal = general_functions.resample_signal(NIdaq['analog'][0], original_freq=acq_freq, new_freq=1000)
 
     plt.plot(Psignal_time, Psignal)
     plt.show()
