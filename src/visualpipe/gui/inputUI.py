@@ -5,7 +5,8 @@ from PyQt5.QtGui import QIntValidator, QDoubleValidator
 import json
 from PyQt5.QtCore import QStringListModel
 from pathlib import Path
-from red_cell_function import get_red_channel
+
+from visualpipe.red_channel.red_cell_function import get_red_channel
 
 class InputWindow(QtWidgets.QMainWindow):
     def __init__(self):

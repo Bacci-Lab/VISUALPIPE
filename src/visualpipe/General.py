@@ -6,19 +6,21 @@ import os
 import pandas as pd
 import h5py
 import datetime
+import sys
+sys.path.append("./src")
 
-from Running_computation import compute_speed
-from Ca_imaging import CaImagingDataManager
-from face_camera import FaceCamDataManager
-from visual_stim import VisualStim
-import General_functions
-import Photodiode
-from inputUI import InputWindow
+from analysis.Running_computation import compute_speed
+from analysis.Ca_imaging import CaImagingDataManager
+from analysis.face_camera import FaceCamDataManager
+from analysis.visual_stim import VisualStim
+import utils.General_functions as General_functions
+import analysis.Photodiode as Photodiode
+from gui.inputUI import InputWindow
 import utils.file as file
-from trial import Trial
-import behavioral_states
-import spontaneous as spont
-import parameters_batch as params
+from analysis.trial import Trial
+import analysis.behavioral_states as behavioral_states
+import analysis.spontaneous as spont
+import params.parameters_batch as params
 
 def visual_pipe(base_path:str=None, input_gui=False) :
     

@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-import figures
+
+import visualpipe.utils.figures as figures
 
 class VisualStim(object):
     
@@ -318,9 +319,9 @@ class VisualStim(object):
         self.protocol_df.to_excel(save_path)
 
 if __name__ == "__main__":
-    import Photodiode
-    import General_functions
-    import Ca_imaging
+    import visualpipe.analysis.Photodiode as Photodiode
+    import visualpipe.utils.General_functions as General_functions
+    import visualpipe.analysis.Ca_imaging as Ca_imaging
 
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
 

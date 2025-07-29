@@ -5,7 +5,8 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui import QIntValidator
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import General_functions
+
+import visualpipe.utils.General_functions as General_functions
 
 class TimeSeriesUI(object):
     

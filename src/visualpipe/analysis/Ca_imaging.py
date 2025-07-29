@@ -1,6 +1,5 @@
 import numpy as np
 import os.path
-import xml_parser
 import glob
 import cv2
 from scipy.signal.windows import hamming
@@ -8,6 +7,8 @@ from scipy.signal import convolve
 from sklearn.linear_model import LinearRegression
 from scipy.ndimage import minimum_filter1d, maximum_filter1d, gaussian_filter1d
 import matplotlib.pyplot as plt
+
+import visualpipe.utils.xml_parser as xml_parser
 
 class CaImagingDataManager(object):
     __slots__ = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay',

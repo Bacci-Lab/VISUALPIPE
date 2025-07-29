@@ -8,9 +8,9 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap, QColor, QPen, QBrush
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPixmapItem, QFileDialog
 
-import GUI_functions
-import red_cell_function
-import utils.file as file
+import visualpipe.gui.GUI_functions as GUI_functions
+import visualpipe.red_channel.red_cell_function as red_cell_function
+import visualpipe.utils.file as file
 
 class RedGUI(QtWidgets.QMainWindow):
     def __init__(self):
