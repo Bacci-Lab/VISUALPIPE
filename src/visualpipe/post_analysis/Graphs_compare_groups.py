@@ -5,37 +5,6 @@ import os
 from scipy.stats import mannwhitneyu, wilcoxon, linregress
 import glob
 
-#-----------------------INPUTS-----------------------#
-## Organization of the data: folder for the protocol (e.g surround mod) > group (e.g KO and WT) > # mouse (e.g 110, 108) > session (e.g 2023-10-01) > .npz file with the validity of the neurons and .npy file with the trials
-#The folder containing all subfolders
-data_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod"
-save_path = data_path
-# group names have to be the name of the subfolders
-groups = ['WT', 'KO']
-# mice ids per group (sub-subfolders)
-WT_mice = ['110', '108']
-KO_mice = ['109', '112']
-#Will be included in all names of saved figures
-fig_name = 'test'
-# Write the protocols you want to plot 
-protocols = ['center', 'center-surround-iso']  
-# List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-protocol_validity = ['center'] 
-#Frame rate
-frame_rate = 30
-# Decide if you want to plot the dFoF0 baseline substraced or the z-scores
-attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
-#----------------------------------------------------#
-
-if attr == 'dFoF0-baseline':
-    z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
-elif attr == 'z_scores':
-    z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
-
-x_labels = ['Pre-stim', 'Stim', 'Post-stim']
-
-
-#--------------------------FUNCTIONS-----------------------#
 def process_group(group_name, mice_list, attr):
     if attr == 'dFoF0-baseline':
         z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
@@ -140,7 +109,6 @@ def process_group(group_name, mice_list, attr):
     print(f"List of % of responsive neurons per session for {group_name}: {proportion_list}")
 
     return suppression, magnitude, stim_mean, all_neurons, avg, sem, cmi, proportion_list
-
 
 def XY_magnitudes(groups, magnitude_wt, magnitude_ko, protocols, protocol_validity, save_path, attr):
     """
@@ -268,7 +236,6 @@ def plot_avg_session(groups, attr, save_path, fig_name, stim_wt, stim_ko, protoc
 
     plt.savefig(os.path.join(save_path, f"{fig_name}_barplot_stim_response_{attr}.jpeg"), dpi=300)
     plt.show()
-
 
 def graph_averages(frame_rate, groups, fig_name, attr, save_path, protocols, protocol_validity, avg_wt, sem_wt, avg_ko, sem_ko, wt_neurons, ko_neurons):
     """
@@ -420,25 +387,52 @@ def boxplot(list1, list2, neurons1, neurons2, groups, protocols, save_path, fig_
     plt.tight_layout()
     plt.savefig(os.path.join(save_path, f"barplot_{fig_name}_{variable}_{attr}.jpeg"), dpi=300)
     plt.show()
-#---------------------------END OF FUNCTIONS-----------------------#
 
+if __name__ == "__main__":
+    
+    #-----------------------INPUTS-----------------------#
+    ## Organization of the data: folder for the protocol (e.g surround mod) > group (e.g KO and WT) > # mouse (e.g 110, 108) > session (e.g 2023-10-01) > .npz file with the validity of the neurons and .npy file with the trials
+    #The folder containing all subfolders
+    data_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod"
+    save_path = data_path
+    # group names have to be the name of the subfolders
+    groups = ['WT', 'KO']
+    # mice ids per group (sub-subfolders)
+    WT_mice = ['110', '108']
+    KO_mice = ['109', '112']
+    #Will be included in all names of saved figures
+    fig_name = 'test'
+    # Write the protocols you want to plot 
+    protocols = ['center', 'center-surround-iso']  
+    # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
+    protocol_validity = ['center'] 
+    #Frame rate
+    frame_rate = 30
+    # Decide if you want to plot the dFoF0 baseline substraced or the z-scores
+    attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
+    #----------------------------------------------------#
 
-#-------------------Call the functions to process and plot the data-------------------#
-# Process WT
-suppression_wt, magnitude_wt, stim_wt, wt_neurons, avg_wt, sem_wt, cmi_wt, proportions_wt = process_group('WT', WT_mice, attr)
-# Process KO
-suppression_ko, magnitude_ko, stim_ko, ko_neurons, avg_ko, sem_ko, cmi_ko, proportions_ko = process_group('KO', KO_mice, attr)
-#XY plot of the magnitudes of the responses to the two protocols
-XY_magnitudes(groups, magnitude_wt, magnitude_ko, protocols, protocol_validity, save_path, attr)
-# Plot the % of responsive neurons per session
-plot_perc_responsive(groups, proportions_wt, proportions_ko, save_path, fig_name)
-# Plot the average response during the stim period per session
-plot_avg_session(groups, attr, save_path, fig_name, stim_wt, stim_ko, protocols)
-# Plot the average z-scores or dFoF0-baseline trace for responsive neurons
-graph_averages(frame_rate, groups, fig_name, attr, save_path, protocols, protocol_validity, avg_wt, sem_wt, avg_ko, sem_ko, wt_neurons, ko_neurons)
-#plot the distribution of CMI 
-boxplot(cmi_wt, cmi_ko, wt_neurons, ko_neurons, groups, protocols, save_path, fig_name, attr, variable = "CMI")
-#plot the distribution of suppression index
-boxplot(suppression_wt, suppression_ko, wt_neurons, ko_neurons, groups, protocols, save_path, fig_name, attr, variable = "suppression_index")
-#----------------------------------------------------------------------------#
+    if attr == 'dFoF0-baseline':
+        z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
+    elif attr == 'z_scores':
+        z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
 
+    x_labels = ['Pre-stim', 'Stim', 'Post-stim']
+
+    #-------------------Call the functions to process and plot the data-------------------#
+    # Process WT
+    suppression_wt, magnitude_wt, stim_wt, wt_neurons, avg_wt, sem_wt, cmi_wt, proportions_wt = process_group('WT', WT_mice, attr)
+    # Process KO
+    suppression_ko, magnitude_ko, stim_ko, ko_neurons, avg_ko, sem_ko, cmi_ko, proportions_ko = process_group('KO', KO_mice, attr)
+    #XY plot of the magnitudes of the responses to the two protocols
+    XY_magnitudes(groups, magnitude_wt, magnitude_ko, protocols, protocol_validity, save_path, attr)
+    # Plot the % of responsive neurons per session
+    plot_perc_responsive(groups, proportions_wt, proportions_ko, save_path, fig_name)
+    # Plot the average response during the stim period per session
+    plot_avg_session(groups, attr, save_path, fig_name, stim_wt, stim_ko, protocols)
+    # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
+    graph_averages(frame_rate, groups, fig_name, attr, save_path, protocols, protocol_validity, avg_wt, sem_wt, avg_ko, sem_ko, wt_neurons, ko_neurons)
+    #plot the distribution of CMI 
+    boxplot(cmi_wt, cmi_ko, wt_neurons, ko_neurons, groups, protocols, save_path, fig_name, attr, variable = "CMI")
+    #plot the distribution of suppression index
+    boxplot(suppression_wt, suppression_ko, wt_neurons, ko_neurons, groups, protocols, save_path, fig_name, attr, variable = "suppression_index")
