@@ -110,64 +110,53 @@ def cmi(magnitude, neurons_count, protocols):
 
     return(cmi, median_cmi)
 
-def plot_cmi(cmi, median_cmi, file_name, attr, save_path, get_valid):
+def plot_cmi(cmi, median_cmi=None, file_name='', attr='dFoF0-baseline', save_path='', get_valid=False):
     """
     Function to plot a boxplot of the distribution of CMIs
     """
+
+    if median_cmi is None:
+        median_cmi = np.median(cmi)
+
     if get_valid:
         file3 = f"barplot_{file_name}_{attr}_responsive"
     elif not get_valid:
         file3 = f"barplot_{file_name}_{attr}_allneurons"
-
-    plt.figure(figsize=(10,5))
     
-    cmi_array = np.array(cmi)
-    # Define bin edges between -1.5 and +1.5, e.g. 15 bins inside
-    inside_bins = np.linspace(-1.5, 1.5, 16)  # 15 bins of width 0.2
-    # 2 extra bins for values +/-1.5
-    bins = np.concatenate(([-np.inf], inside_bins, [np.inf]))
-    # Digitize data: assign each CMI value to a bin index
-    bin_indices = np.digitize(cmi_array, bins)
-    # Count number of values per bin
-    counts = []
-    labels = []
-    # For bins, index 1 is <-1.5, last index is >1.5
-    labels.append('< -1.5')
-    counts.append(np.sum(bin_indices == 1))
-    for i in range(2, len(bins)-1):
-        bin_start = bins[i-1]
-        bin_end = bins[i]
-        labels.append(f'{bin_start:.2f} to {bin_end:.2f}')
-        counts.append(np.sum(bin_indices == i))
-    labels.append('> 1.5')
-    counts.append(np.sum(bin_indices == len(bins)))
+    edgecolor='black'
+    cmi_plot = [el if np.abs(el) < 1.5 else 2 if el > 1.5 else -2 for el in cmi]
 
-    # Plot bar plot
-    plt.bar(labels, counts, color='steelblue', edgecolor='black')
-    plt.xticks(rotation=45, ha='right')
-    plt.ylabel('Number of neurons')
+    _, p_value = wilcoxon(cmi, zero_method='wilcox', alternative='two-sided', correction=False)
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    sns.histplot(cmi_plot, bins=12, binrange=(-1.5, 1.5), color='white', edgecolor=edgecolor, element='step', ax=ax)
+    sns.histplot(cmi_plot, bins=1, binrange=(1.875, 2.125), color='white', edgecolor=edgecolor, ax=ax)
+    sns.histplot(cmi_plot, bins=1, binrange=(-2.125, -1.875), color='white', edgecolor=edgecolor, ax=ax)
+    ax.set_xticks([-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2], labels=['<-1.5', '-1.5', '-1', '-0.5', '0', '0.5', '1', '1.5', '>1.5'])
+    ax.set_ylabel('Count of neurons')
+    ax.set_title('Contextual Modulation Index')
+    ax.axvline(median_cmi, color='black', linestyle='--', linewidth=1.5, label='median') # Add vertical dashed line at median position
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+    plt.tight_layout()
+
+    textstr = f'{len(cmi)} neurons'
+    plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                    fontsize=10, verticalalignment='top', horizontalalignment='left')
+    
+    textstr = f'Median = {median_cmi:.2f}\nWilcoxon p = {p_value:.3g}'
+    plt.gca().text(0.95, 0.95, textstr, transform=plt.gca().transAxes,
+                   fontsize=10, verticalalignment='top', horizontalalignment='right',
+                   bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
+    
     if get_valid:
         plt.title('Distribution of CMI values (Responsive neurons)')
     elif not get_valid:
         plt.title('Distribution of CMI values (All neurons)')
-    # Find which bin the median falls into
-    median_bin_idx = np.digitize(median_cmi, bins) - 1  # minus 1 to convert to zero-based index for labels/bars
-    # Median line x-position = center of the median bin's bar on the x-axis
-    median_x = median_bin_idx
-    # Perform two-sided Wilcoxon signed-rank test against zero median
-    stat, p_value = wilcoxon(cmi_array, zero_method='wilcox', alternative='two-sided', correction=False)
-    # Add vertical dashed line at median position
-    plt.axvline(median_x, color='red', linestyle='--', linewidth=2, label=f'Median = {median_cmi:.2f}, p-value ={p_value}')
-    # Add text box with median and p-value
-    textstr = f'Median = {median_cmi:.2f}\nWilcoxon p = {p_value:.3g}'
 
-    # Position text somewhere visible (top right corner)
-    plt.gca().text(0.95, 0.95, textstr, transform=plt.gca().transAxes,
-                fontsize=12, verticalalignment='top', horizontalalignment='right',
-                bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(save_path, file3), dpi=300)
+    fig.savefig(os.path.join(save_path, file3), dpi=300)
     plt.show()
 
 def plot_boxplot_magnitudes(magnitude, protocols, attr, file_name, save_path, get_valid):
@@ -268,7 +257,6 @@ if __name__ == "__main__":
 
     if attr == 'dFoF0-baseline':
         # Calculate the proportion of valid neurons
-        print(np.shape(trials['norm_trial_averaged_ca_trace'][0]))
         proportion_valid = 100 * len(valid_neurons) / (trials['norm_trial_averaged_ca_trace'][0].shape[0])
     elif attr == 'z_scores':
         # Calculate the proportion of valid neurons
