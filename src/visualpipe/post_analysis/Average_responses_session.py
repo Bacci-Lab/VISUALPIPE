@@ -3,11 +3,25 @@ from scipy import stats
 import matplotlib.pyplot as plt
 import os
 from scipy.stats import wilcoxon
+import pandas as pd
+import os
+import sys
+import seaborn as sns
+sys.path.append("./src")
 
-def graph_averages(file_name, attr, save_path, trials, protocols, z_score_periods, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid):
+import visualpipe.utils.file as file
+from visualpipe.analysis.ca_imaging import CaImagingDataManager
+
+def graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid):
     """
     Function to plot the average z-scores for all neurons if get_valid is False or only responsive neurons if get_valid is True.
     """
+    
+    if attr == 'dFoF0-baseline':
+        z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
+    elif attr == 'z_scores':
+        z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
+    
     # Create a figure and initialize axis
     plt.figure(figsize=(10, 6))
     if not get_valid:
@@ -183,7 +197,7 @@ def plot_boxplot_magnitudes(magnitude, protocols, attr, file_name, save_path, ge
 
     # Plot boxplot
     plt.figure(figsize=(6, 6))
-    box = plt.boxplot(data, labels=protocols, patch_artist=True)
+    box = plt.boxplot(data, tick_labels=protocols, patch_artist=True)
 
     # Optional: Add color
     for patch in box['boxes']:
@@ -201,39 +215,47 @@ def plot_boxplot_magnitudes(magnitude, protocols, attr, file_name, save_path, ge
 
 
 if __name__ == "__main__":
+
     #--------------------INPUTS------------------#
-    data_path = r"P:\raw-imaging\Nathan\PYR\112 female\Visual\14_03_2025\TSeries-03142025-007\2025_03_14_16-02-13_output_3"
-    validity_file = '2025_03_14_16-02-13_3_protocol_validity_2.npz'
-    trials_file = '2025_03_14_16-02-13_3_trials.npy'
-    save_path = data_path
+    base_path = r"P:\raw-imaging\Nathan\PYR\112 female\Visual\14_03_2025\TSeries-03142025-007"
+    id_version = '3'
     file_name = 'CenterVsIso'
+
+    # Get metadata to define data path
+    unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
+    data_path = os.path.join(base_path, "_".join([unique_id, 'output', id_version]))
+
+    # Define save path
+    save_path = data_path
+
+    # --------------------------------- Define stimulus of interests --------------------------------- #
     #This is the list of stimuli you want to use to select the responsive neurons. A responsive neurons is responsive in at least one of these stimuli
     protocol_validity = ['center']  
     # Write the protocols you want to plot
     protocols = ['center-surround-iso', 'center-surround-cross']
     # Decide if you want to plot the dFoF0 baseline substraced or the z-scores
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
-    frame_rate = 30  # Frame rate of the imaging session in Hz
-    #-----------------------------------------------------------------------------#
 
-    if attr == 'dFoF0-baseline':
-        z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
-    elif attr == 'z_scores':
-        z_score_periods = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
-
+    # --------------------------------- Load data --------------------------------- #
 
     # Load the npz file
-    validity = np.load(os.path.join(data_path, validity_file), allow_pickle=True)
-    print(validity.files)
+    validity = np.load(os.path.join(data_path, "_".join([unique_id, id_version, 'protocol_validity_2.npz'])), allow_pickle=True)
     all_protocols = validity.files
 
     # Load NPY file containing averaged z_scores before during and after stim presentation
-    trials = np.load(os.path.join(data_path,trials_file), allow_pickle=True).item()
+    trials = np.load(os.path.join(data_path, "_".join([unique_id, id_version, 'trials.npy'])), allow_pickle=True).item()
+
+    # Get frame rate
+    ca_img = CaImagingDataManager(base_path)
+    frame_rate = ca_img.fs
+
+    # Load xlsx file with visual stimuli info
+    stimuli_df = pd.read_excel(os.path.join(data_path, "_".join([unique_id, id_version, 'visual_stim_info.xlsx'])), engine='openpyxl').set_index('id')
 
     # Get the duration of the pre-stimulus period
     dt_prestim = trials['dt_pre_stim']
 
-    # Select the responsive neurons based on the validity file
+    # ------------------------- Select the responsive neurons based on the validity file ------------------------- #
     keys = list(validity.files)  # Get all keys from the validity file
     valid_data = {}  # Dictionary to store responsive neurons for each protocol
     for protocol in protocol_validity:
@@ -260,13 +282,13 @@ if __name__ == "__main__":
     # Plot averages +/- SEM and get a dictionary of the magnitude of responses for all protocols
 
     # To plot all neurons together
-    magnitude_all, neurons_count_all = graph_averages(file_name, attr, save_path, trials, protocols, z_score_periods, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid = False)
+    magnitude_all, neurons_count_all = graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid = False)
     cmi_all, median_cmi_all = cmi(magnitude_all, neurons_count_all, protocols)
     allneurons_cmi = plot_cmi(cmi_all, median_cmi_all, file_name, attr, save_path, get_valid=False)
     boxplot_all = plot_boxplot_magnitudes(magnitude_all, protocols, attr, file_name, save_path, get_valid = False)
 
     # To plot only responsive neurons
-    magnitude_responsive, neurons_count_responsive = graph_averages(file_name, attr, save_path, trials, protocols, z_score_periods, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid = True)
+    magnitude_responsive, neurons_count_responsive = graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid = True)
     cmi_responsive, median_cmi_responsive = cmi(magnitude_responsive, neurons_count_responsive, protocols)
     responsive_cmi = plot_cmi(cmi_responsive, median_cmi_responsive, file_name, attr, save_path, get_valid=True)
-    boxplot_responsive = plot_boxplot_magnitudes(magnitude_all, protocols, attr, file_name, save_path, get_valid = True)
+    boxplot_responsive = plot_boxplot_magnitudes(magnitude_responsive, protocols, attr, file_name, save_path, get_valid = True)
