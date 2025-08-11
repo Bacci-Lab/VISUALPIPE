@@ -16,11 +16,11 @@ groups = ['WT', 'KO']
 WT_mice = ['110', '108']
 KO_mice = ['109', '112']
 #Will be included in all names of saved figures
-fig_name = 'test'
+fig_name = 'Inverse_InverseResponsive'
 # Write the protocols you want to plot 
-protocols = ['center', 'center-surround-iso']  
+protocols = ['surround-iso_ctrl']  
 # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-protocol_validity = ['center'] 
+protocol_validity = ['surround-iso_ctrl'] 
 #Frame rate
 frame_rate = 30
 # Decide if you want to plot the dFoF0 baseline substraced or the z-scores
@@ -59,6 +59,7 @@ def process_group(group_name, mice_list, attr):
             npz_files = glob.glob(os.path.join(session_path, "*.npz"))
             if len(npz_files) == 1:
                 validity = np.load(npz_files[0], allow_pickle=True)
+                print(validity.files)
             else:
                 raise FileNotFoundError(f"Expected exactly one .npz file in {session_path}, found {len(npz_files)}")      # Load .npy file
             npy_files = glob.glob(os.path.join(session_path, "*.npy"))
@@ -121,7 +122,7 @@ def process_group(group_name, mice_list, attr):
     # compute the surround suppression 
     suppression = []
     accepted_protocols = ['center', 'center-surround-iso', 'center-surround-cross']
-    if protocols[0] in accepted_protocols and protocols[1] in accepted_protocols:
+    if len(protocols) == 2 and protocols[0] in accepted_protocols and protocols[1] in accepted_protocols:
         suppression = [
                 1 - float(magnitude[protocols[1]][n]) / float(magnitude[protocols[0]][n])
                 if magnitude[protocols[0]][n] != 0 else np.nan
@@ -147,7 +148,8 @@ def XY_magnitudes(groups, magnitude_wt, magnitude_ko, protocols, protocol_validi
     Function to extract and plot the x and y values for the magnitude of the response to each protocol for both groups.
     """
     if len(protocols) != 2:
-        raise ValueError("This function is designed to work with exactly two protocols.")
+        print("This function is designed to work with exactly two protocols.")
+        return
     x_values = []
     y_values = []
     for group, magnitude in zip(groups, [magnitude_wt, magnitude_ko]):
@@ -342,7 +344,8 @@ def boxplot(list1, list2, neurons1, neurons2, groups, protocols, save_path, fig_
     variable: 'CMI' or 'suppression_index'
     """
     if len (protocols)!= 2:
-        raise ValueError("This function is designed to work with exactly two protocols.")
+        print("This function is designed to work with exactly two protocols.")
+        return
     
     array1 = np.array(list1)
     array2 = np.array(list2)
