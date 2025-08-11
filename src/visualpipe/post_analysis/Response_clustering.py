@@ -13,6 +13,21 @@ import math
 import pandas as pd
 
 def load_excel_sheet(excel_sheet_path, protocol_name):
+    """
+    Load an excel sheet and filter it according to the specified protocol name.
+
+    Parameters
+    ----------
+    excel_sheet_path : str
+        Path to the excel sheet.
+    protocol_name : str
+        Name of the protocol to filter the sessions.
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        DataFrame containing the selected sessions with the specified protocol name.
+    """
     df = pd.read_excel(excel_sheet_path)
     df = df[df["Protocol"] == protocol_name]
     df = df[df["Analyze"] == 1]
@@ -29,16 +44,28 @@ def load_excel_sheet(excel_sheet_path, protocol_name):
     return df
 
 def load_data_session(path) :
-    """    Load the validity and trials data from the specified path.
-    Args:
-        path (str): Path to the directory containing the .npz and .npy files.
-    Returns:
-        validity (dict): Dictionary containing the validity data loaded from the .npz file.
-        trials (dict): Dictionary containing the trials data loaded from the .npy file.
-    Raises:
-        FileNotFoundError: If the expected .npz or .npy files are not found in the specified path.
     """
-    
+    Load the validity and trials data from the specified path.
+
+    Parameters
+    ----------
+    path : str
+        Path to the directory containing the .npz and .npy files.
+
+    Returns
+    -------
+    validity : dict
+        Dictionary containing the validity data loaded from the .npz file.
+    trials : dict
+        Dictionary containing the trials data loaded from the .npy file.
+    stimuli_df : pandas.DataFrame
+        DataFrame containing the visual stimuli information loaded from the .xlsx file.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the expected .npz, .npy or .xlsx files are not found in the specified path.
+    """
     # Load the npz file
     npz_files = glob.glob(os.path.join(path, "*protocol_validity_2.npz"))
     if len(npz_files) == 1:
@@ -63,7 +90,22 @@ def load_data_session(path) :
     return validity, trials, stimuli_df
 
 def get_valid_neurons_session(validity, protocol):
-   # Dictionary to store responsive neurons for each protocol
+    """
+    Return the indices of responsive neurons for a given protocol in a session.
+    
+    Parameters
+    ----------
+    validity : dict
+        Dictionary containing the validity data loaded from the .npz file.
+    protocol : str
+        Name of the protocol (stimulus) to select the responsive neurons for.
+    
+    Returns
+    -------
+    valid_neurons : array-like
+        Indices of responsive neurons for the given protocol.
+    """
+    # Dictionary to store responsive neurons for each protocol
     valid_data = {protocol : validity[protocol] 
                  if protocol in validity.files 
                  else print(f"{protocol} does not exist in validity file.") }
@@ -257,7 +299,24 @@ def plot_dunn_index(k_range, dunn_scores, group, save_path=None, fig_name='', sh
     plt.close()
 
 def elbow_method(var=None, data=None, var_type='wcss', group='', max_nb_clusters=10, save_path=None, fig_name='', show=True):
-    
+    """
+    Use the elbow method to determine the optimal number of clusters for a given dataset.
+
+    The elbow method is a heuristic method for determining the number of clusters in a dataset by plotting the distortion (wcss) or inter-cluster distance as a function of the number of clusters.
+
+    Parameters:
+        var (list or array, optional): the distortion or inter-cluster distances to plot, defaults to None
+        data (array-like, optional): the data to cluster, defaults to None
+        var_type (str, optional): the type of the distortion or inter-cluster distances, either 'wcss' or 'interdistance', defaults to 'wcss'
+        group (str, optional): the name of the group, for plotting, defaults to ''
+        max_nb_clusters (int, optional): the maximum number of clusters to consider, defaults to 10
+        save_path (str, optional): path to save the plot, defaults to None
+        fig_name (str, optional): prefix for the figure name, defaults to ''
+        show (bool, optional): whether to show the plot, defaults to True
+
+    Returns:
+        int: the optimal number of clusters given by the elbow method
+    """
     k_range = range(2, max_nb_clusters+1)
 
     if var is None :
@@ -383,7 +442,23 @@ def get_avg_responses_clusters(traces, cluster_data, time, nclusters, labels, xt
     return cluster_data
 
 def compare_clusters_traces(wt_cluster, ko_cluster, cluster_data, time, xticks=None, attr='z-scores', save_path=None, fig_name='', show=True):
+    """
+    Compare average traces of two clusters, one from WT and one from KO.
 
+    Parameters:
+        wt_cluster (int): Index of the WT cluster.
+        ko_cluster (int): Index of the KO cluster.
+        cluster_data (dict): Dictionary containing the data for each cluster, with keys 'WT' and 'KO'.
+        time (array): Array of time points.
+        xticks (array, optional): Array of x-ticks. Defaults to None.
+        attr (str, optional): Type of data to plot. Can be either 'z-scores' or 'dFoF0-baseline'. Defaults to 'z-scores'.
+        save_path (str, optional): Path to save the figure. Defaults to None.
+        fig_name (str, optional): Prefix for the figure name. Defaults to ''.
+        show (bool, optional): Whether to display the plot. Defaults to True.
+
+    Returns:
+        None
+    """
     if attr == 'z-scores':
         ylabel = 'Z-scored ΔF/F0'
     elif attr == 'dFoF0-baseline':
@@ -420,7 +495,25 @@ def compare_clusters_traces(wt_cluster, ko_cluster, cluster_data, time, xticks=N
     plt.close()
 
 def pie_chart_clusters(percentages, n_clusters_joint, group, save_path=None, fig_name='', show=True):
+    """
+    Plot a pie chart of the percentage of neurons in each cluster for a given group.
 
+    Parameters
+    ----------
+    percentages : array-like
+        An array of percentages, where each element is the percentage of neurons
+        in a given cluster.
+    n_clusters_joint : int
+        The number of clusters.
+    group : str
+        The group name, either 'WT' or 'KO'.
+    save_path : str, optional
+        The path to save the figure. If None, the figure will not be saved.
+    fig_name : str, optional
+        The name of the figure. If None, a default name will be used.
+    show : bool, optional
+        Whether to display the plot. Defaults to True.
+    """
     fig = plt.figure()
     
     plt.pie(percentages, labels=[f'Cluster {i}' for i in range(n_clusters_joint)],
@@ -435,7 +528,30 @@ def pie_chart_clusters(percentages, n_clusters_joint, group, save_path=None, fig
     plt.close()
 
 def plot_avg_cluster_traces_group(cluster_id, joint_cluster_data, time, xticks=None, save_path=None, fig_name='', show=True):
+    """
+    Plot the average traces for a given cluster in both WT and KO groups to compare their responses.
 
+    Parameters
+    ----------
+    cluster_id : int
+        The ID of the cluster to be plotted.
+    joint_cluster_data : dict
+        A dictionary containing the means and SEMs of the traces for each group.
+    time : array-like
+        A time array.
+    xticks : array-like, optional
+        Optional xticks for the plot.
+    save_path : str, optional
+        The path to save the figure. If None, the figure will not be saved.
+    fig_name : str, optional
+        The name of the figure. If None, a default name will be used.
+    show : bool, optional
+        Whether to show the plot. Default is True.
+
+    Returns
+    -------
+    None
+    """
     mean_wt = joint_cluster_data['WT']['mean']
     sem_wt = joint_cluster_data['WT']['sem']
     n_wt = joint_cluster_data['WT']['n']
@@ -464,7 +580,34 @@ def plot_avg_cluster_traces_group(cluster_id, joint_cluster_data, time, xticks=N
     plt.close()
     
 def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, xticks=None, save_path=None, fig_name='', show=True):
+    """
+    Plot raster plots of normalized neural traces for two groups of neurons in the same cluster.
 
+    Parameters
+    ----------
+    cluster_id : int
+        The id of the cluster to plot.
+    norm_traces : array-like
+        2D array of normalized traces for the two groups of neurons. The first dimension corresponds to the neuron, the second to the time.
+    idx_wt : array-like
+        Indices of the neurons in the WT group.
+    idx_ko : array-like
+        Indices of the neurons in the KO group.
+    time : array-like
+        Time points of the traces.
+    xticks : array-like, optional
+        Time points to display on the x-axis.
+    save_path : str, optional
+        Path to save the figure to.
+    fig_name : str, optional
+        Base name of the figure.
+    show : bool, optional
+        Whether to display the figure.
+
+    Returns
+    -------
+    None
+    """
     vmin, vmax = np.nanmin(norm_traces), np.nanmax(norm_traces)
     if np.abs(vmin) > np.abs(vmax) :
         lim = math.floor(np.abs(vmin)*100) * 0.01
