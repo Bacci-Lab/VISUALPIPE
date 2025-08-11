@@ -1,18 +1,18 @@
 import numpy as np
-from Ca_imaging import CaImagingDataManager
-from visual_stim import VisualStim
 import matplotlib.pyplot as plt
 import math
 import os
 import random
-from scipy.ndimage import gaussian_filter1d
 from statsmodels.stats.weightstats import ztest as ztest
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import spearmanr
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn import metrics
 from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoLocator
 import seaborn as sns
+
+from visualpipe.analysis.ca_imaging import CaImagingDataManager
+from visualpipe.analysis.visual_stim import VisualStim
 
 class Trial(object):
 

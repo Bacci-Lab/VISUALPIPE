@@ -106,7 +106,7 @@ class FaceCamDataManager(object) :
         plt.close(fig)
 
 if __name__ == "__main__":
-    import Photodiode
+    import visualpipe.analysis.Photodiode as Photodiode
 
     base_path = "Y:/raw-imaging/Adrianna/experiments/NDNF/2025_02_26/12-28-29"
     timestamp_start = Photodiode.get_timestamp_start(base_path)

@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from tqdm import tqdm
-import copy
 from scipy.stats import spearmanr, zscore
 from scipy.ndimage import gaussian_filter1d
-from visual_stim import VisualStim
+
+from visualpipe.analysis.visual_stim import VisualStim
 
 def get_spont_stim(visual_stim:VisualStim):
     spont_stimuli_name = []

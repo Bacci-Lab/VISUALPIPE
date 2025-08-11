@@ -5,7 +5,8 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui import QIntValidator
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import General_functions
+
+import visualpipe.utils.general_functions as general_functions
 
 class TimeSeriesUI(object):
     
@@ -41,7 +42,7 @@ class TimeSeriesUI(object):
         duration = visual_stim['time_duration']
         stim_time_period = [time_onset, list(time_onset + duration)]
 
-        dFoF0_norm = General_functions.scale_trace(dFoF0, axis=1)
+        dFoF0_norm = general_functions.scale_trace(dFoF0, axis=1)
         
         return cls(centralwidget, dFoF0_norm, time_stamps, speed, facemotion, pupil, photodiode, stim_time_period)
 

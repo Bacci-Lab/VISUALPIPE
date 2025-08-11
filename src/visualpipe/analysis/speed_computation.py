@@ -148,10 +148,10 @@ def compute_speed(base_path, position_smoothing=10e-3, #s
         return speed, speed_time_stamps
 
 if __name__ == "__main__":
-    import Ca_imaging
+    from visualpipe.analysis.ca_imaging import CaImagingDataManager
     
     starting_delay_2p = 0.1
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
-    ca_img = Ca_imaging.CaImagingDataManager(base_path, starting_delay=starting_delay_2p)
+    ca_img = CaImagingDataManager(base_path, starting_delay=starting_delay_2p)
     speed, speed_time_stamps = compute_speed(base_path)
     print(speed)

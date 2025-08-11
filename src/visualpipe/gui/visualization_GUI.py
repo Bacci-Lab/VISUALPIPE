@@ -11,9 +11,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import cm, colors, colormaps
 
-from red_Image_GUI import RedImageAdjust, CategorizeCells
-from Time_series_GUI import TimeSeriesUI  # Import your previous class
-import GUI_functions
+from visualpipe.red_channel.red_Image_GUI import RedImageAdjust, CategorizeCells
+from visualpipe.gui.time_series_GUI import TimeSeriesUI  # Import your previous class
 
 class CorrelationView(QGraphicsView):
     objectClicked = pyqtSignal(int)
@@ -483,7 +482,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         duration = visual_stim['time_duration']
         stim_time_period = [time_onset, list(time_onset + duration)]
 
-        dFoF0_norm = General_functions.scale_trace(dFoF0, axis=1)
+        dFoF0_norm = visualpipe.utils.General_functions.scale_trace(dFoF0, axis=1)
         
         return cls(save_folder, cell_info, ops, background_image_path, 
                    protocol_validity,
@@ -652,7 +651,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         duration = visual_stim['time_duration']
         stimuli_intervals = [time_onset, list(time_onset + duration)]
 
-        dFoF0_norm = General_functions.scale_trace(dFoF0, axis=1)
+        dFoF0_norm = visualpipe.utils.General_functions.scale_trace(dFoF0, axis=1)
         
         self.save_folder = save_folder
         self.cell_info = cell_info
@@ -727,7 +726,7 @@ if __name__ == "__main__":
     from pathlib import Path
 
     import utils.file as file
-    import General_functions
+    import visualpipe.utils.General_functions as General_functions
 
     save_folder = easygui.diropenbox(title='Select folder containing output data')
     path = Path(save_folder)
