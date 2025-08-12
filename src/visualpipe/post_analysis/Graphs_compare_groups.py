@@ -98,7 +98,7 @@ def compute_cmi(magnitude, protocol_cross='center-surround-cross', protocol_iso=
         
     return cmi
 
-def compute_suppression(magnitude, protocol_surround='center-surround-cross'):
+def compute_suppression(magnitude, protocol_surround=''):
     """Compute the suppression index for the specified protocols.
     
     Args:
@@ -114,9 +114,9 @@ def compute_suppression(magnitude, protocol_surround='center-surround-cross'):
     suppression = []
     if protocol_surround not in accepted_protocols :
         print(f"Protocol '{protocol_surround}' is not in the accepted protocols: {accepted_protocols}")
-    if protocol_surround not in magnitude.keys():
+    elif protocol_surround not in magnitude.keys():
         print(f"Protocol '{protocol_surround}' is not in the magnitude keys: {magnitude.keys()}")
-    if 'center' not in magnitude.keys():
+    elif 'center' not in magnitude.keys():
         print(f"Protocol 'center' is not in the magnitude keys: {magnitude.keys()}")
         
     else:
@@ -418,7 +418,7 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
                 labeled = pd.cut(l, bins=bins, labels=labels)
                 labels_list += labeled.astype(str).tolist()
         else :
-            raise Exception("Variable must be 'CMI' or 'suppression_index'")
+            raise Exception("Variable must be 'CMI' or 'suppression_index', and sub_protocols must contain 'center' for suppression index.")
 
         # Perform Mann–Whitney U test between WT and KO
         stat_mwu, p_value_mwu = mannwhitneyu(np.array(list1), np.array(list2), alternative='two-sided')
@@ -460,13 +460,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'IsoVsCross'
+    fig_name = 'CenterVsfbRF_Iso'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-surround-iso', 'center-surround-cross']  
+    sub_protocols = ['center', 'surround-iso_ctrl']  
     # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
     valid_sub_protocols = ['center'] 
 
