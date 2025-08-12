@@ -3,6 +3,7 @@ from scipy import stats
 import matplotlib.pyplot as plt
 import os
 from scipy.stats import wilcoxon
+from scipy.stats import mannwhitneyu
 import pandas as pd
 import os
 import sys
@@ -203,10 +204,77 @@ def plot_boxplot_magnitudes(magnitude, protocols, attr, file_name, save_path, ge
     plt.show()
 
 
+def plot_cdf_magnitudes(magnitude, protocols, attr, file_name, save_path, get_valid):
+    """
+    Plots CDFs of neuron response magnitudes for each protocol
+    and runs pairwise statistical comparisons.
+
+    Parameters:
+    - magnitude: dict, keys are protocol names, values are lists of magnitudes
+    - protocols: list of protocols to include
+    - attr: string, how fluorescence is measured (e.g., 'z_score' or 'dFoF0-baseline')
+    - file_name: string, base name for the saved figure
+    - save_path: string, folder where to save the figure
+    - get_valid: bool, if True, only responsive neurons were used (affects title and filename)
+    """
+
+    # Filename & title
+    if get_valid:
+        fname = f"cdf_{file_name}_{attr}_responsive.png"
+        title = f'Cumulative distribution of neuron response magnitudes ({attr})\n(Responsive neurons)'
+    else:
+        fname = f"cdf_{file_name}_{attr}_allneurons.png"
+        title = f'Cumulative distribution of neuron response magnitudes ({attr})\n(All neurons)'
+
+    plt.figure(figsize=(6, 6))
+
+    colors = plt.cm.tab10(np.linspace(0, 1, len(protocols)))
+    stats_text = []
+
+    # Plot CDF for each protocol
+    for i, protocol in enumerate(protocols):
+        data = np.array(magnitude[protocol])
+        data_sorted = np.sort(data)
+        cdf = np.arange(1, len(data_sorted) + 1) / len(data_sorted)
+        plt.plot(data_sorted, cdf, label=protocol, color=colors[i], lw=2)
+
+    # Perform statistical test (pairwise Mann–Whitney U)
+    for i in range(len(protocols)):
+        for j in range(i + 1, len(protocols)):
+            p = mannwhitneyu(magnitude[protocols[i]], magnitude[protocols[j]], alternative='two-sided').pvalue
+            # Put text in bottom-right corner of the axes
+            plt.text(
+                0.95, 0.05,  # relative position in axes coords
+                f"p = {p:.3e}",
+                transform=plt.gca().transAxes,
+                fontsize=10,
+                ha='right', va='bottom',
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7, edgecolor="none")
+            )
+
+    # Add stats text on the plot
+    y_pos = 0.95
+    for line in stats_text:
+        plt.text(1.05, y_pos, line, transform=plt.gca().transAxes, fontsize=8, va='top')
+        y_pos -= 0.05
+
+    # Styling
+    plt.xlabel(f'Response magnitude (Mean of {attr} excluding first 0.5s)')
+    plt.ylabel('Cumulative probability')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Save
+    plt.savefig(os.path.join(save_path, fname), dpi=300)
+    plt.show()
+
+
 if __name__ == "__main__":
 
     #--------------------INPUTS------------------#
-    base_path = r"P:\raw-imaging\Nathan\PYR\112 female\Visual\14_03_2025\TSeries-03142025-007"
+    base_path = r"Y:\raw-imaging\Nathan\PYR\112 female\Visual\14_03_2025\TSeries-03142025-007"
     id_version = '3'
     file_name = 'CenterVsIso'
 
@@ -280,3 +348,4 @@ if __name__ == "__main__":
     cmi_responsive, median_cmi_responsive = cmi(magnitude_responsive, neurons_count_responsive, protocols)
     responsive_cmi = plot_cmi(cmi_responsive, median_cmi_responsive, file_name, attr, save_path, get_valid=True)
     boxplot_responsive = plot_boxplot_magnitudes(magnitude_responsive, protocols, attr, file_name, save_path, get_valid = True)
+    cdf_= plot_cdf_magnitudes(magnitude_responsive, protocols, attr, file_name, save_path, get_valid=True)

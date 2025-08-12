@@ -98,7 +98,7 @@ def compute_cmi(magnitude, protocol_cross='center-surround-cross', protocol_iso=
         
     return cmi
 
-def compute_suppression(magnitude, protocol_surround=''):
+def compute_suppression(magnitude, protocol_surround='center-surround-iso'):
     """Compute the suppression index for the specified protocols.
     
     Args:
@@ -452,6 +452,82 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         print(f"Current protocols: {sub_protocols}")
         return None
     
+def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_name, save_path):
+    """
+    Plots CDFs of neuron response magnitudes for each protocol
+    and runs pairwise statistical comparisons.
+
+    Parameters:
+    - magnitude: dict, keys are protocol names, values are lists of magnitudes
+    - protocols: list of protocols to include
+    - attr: string, how fluorescence is measured (e.g., 'z_score' or 'dFoF0-baseline')
+    - file_name: string, base name for the saved figure
+    - save_path: string, folder where to save the figure
+    - get_valid: bool, if True, only responsive neurons were used (affects title and filename)
+    """
+
+    # Filename & title
+
+    groups = list(groups_id.keys())
+    fname = f"cdf_{file_name}_{attr}_{groups[0]}_vs_{groups[1]}_responsiveNeurons.png"
+    title = f'Cumulative distribution of neuron response magnitudes ({attr})\n(Responsive neurons)'
+    plt.figure(figsize=(6, 6))
+
+    colors = {groups[0]: 'skyblue',
+                groups[1]: 'orange'}
+    stats_text = []
+    if len(sub_protocols) > 1:
+        print(f"Cannot plot CDFs for more than 1 protocol. Please select 1 protocol to compare WT and KOs.")
+        return None
+    else:
+        protocol = sub_protocols[0] 
+        for group in groups_id.keys():
+            group_idx = groups_id[group]
+
+        # Check data availability
+            if protocol not in list(magnitude_groups[group_idx].keys()):
+                print(f"Protocol '{protocol}' not found in magnitude data for group '{group}'. Skipping.")
+                continue
+            magnitude = magnitude_groups[groups_id[group]][protocol]
+            #normalize the magnitude byt the maximum value for that group
+            magnitude = magnitude / np.max(magnitude)
+
+            # Plot CDF
+            data = np.array(magnitude)
+            data_sorted = np.sort(data)
+            cdf = np.arange(1, len(data_sorted) + 1) / len(data_sorted)
+            plt.plot(data_sorted, cdf, label=f"{group} {protocol}", color=colors[group], lw=2)
+
+        # Perform statistical test (pairwise Mann–Whitney U)
+        p = mannwhitneyu(magnitude_groups[0][protocol], magnitude_groups[1][protocol], alternative='two-sided').pvalue
+        # Put text in bottom-right corner of the axes
+        plt.text(
+            0.95, 0.05,  # relative position in axes coords
+            f"p = {p:.3e}",
+            transform=plt.gca().transAxes,
+            fontsize=10,
+            ha='right', va='bottom',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7, edgecolor="none")
+        )
+
+        # Add stats text on the plot
+        y_pos = 0.95
+        for line in stats_text:
+            plt.text(1.05, y_pos, line, transform=plt.gca().transAxes, fontsize=8, va='top')
+            y_pos -= 0.05
+
+        # Styling
+        plt.xlabel(f'Response magnitude (Mean of {attr} excluding first 0.5s)')
+        plt.ylabel('Cumulative probability')
+        plt.title(title)
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+
+        # Save
+        plt.savefig(os.path.join(save_path, fname), dpi=300)
+        plt.show()
+    
 if __name__ == "__main__":
 
     #-----------------------INPUTS-----------------------#
@@ -460,13 +536,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'CenterVsfbRF_Iso'
+    fig_name = 'center'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center', 'surround-iso_ctrl']  
+    sub_protocols = ['center']  
     # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
     valid_sub_protocols = ['center'] 
 
@@ -497,3 +573,5 @@ if __name__ == "__main__":
     histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
     #plot the distribution of suppression index
     histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
+    # Plot CDFs of neuron response magnitudes comparing groups
+    plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, fig_name, save_path) 
