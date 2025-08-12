@@ -111,15 +111,16 @@ def compute_suppression(magnitude, protocol_surround='center-surround-cross'):
     """
 
     accepted_protocols = ['center-surround-iso', 'center-surround-cross']
-
+    suppression = []
     if protocol_surround not in accepted_protocols :
-        raise ValueError(f"Protocol '{protocol_surround}' is not in the accepted protocols: {accepted_protocols}")
+        print(f"Protocol '{protocol_surround}' is not in the accepted protocols: {accepted_protocols}")
     if protocol_surround not in magnitude.keys():
-        raise ValueError(f"Protocol '{protocol_surround}' is not in the magnitude keys: {magnitude.keys()}")
+        print(f"Protocol '{protocol_surround}' is not in the magnitude keys: {magnitude.keys()}")
     if 'center' not in magnitude.keys():
-        raise ValueError(f"Protocol 'center' is not in the magnitude keys: {magnitude.keys()}")
+        print(f"Protocol 'center' is not in the magnitude keys: {magnitude.keys()}")
         
-    suppression = 1 - magnitude[protocol_surround] / magnitude['center']
+    else:
+        suppression = 1 - magnitude[protocol_surround] / magnitude['center']
 
     return suppression
 
@@ -410,7 +411,7 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
                 labels = ['<-1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '>1.5']
                 labeled = pd.cut(l, bins=bins, labels=labels)
                 labels_list += labeled.astype(str).tolist()
-        elif variable == "suppression_index":
+        elif variable == "suppression_index" and 'center' in sub_protocols:
             for l in [list1, list2]:
                 bins = [-float('inf'), -2, -1.75, -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, float('inf')]
                 labels = ['<-2', '-2 to -1.75', '-1.75 to -1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '1.5 to 1.75', '1.75 to 2', '>2']
@@ -459,15 +460,15 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'test'
+    fig_name = 'IsoVsCross'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-surround-iso']  
+    sub_protocols = ['center-surround-iso', 'center-surround-cross']  
     # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['center-surround-iso'] 
+    valid_sub_protocols = ['center'] 
 
     #Frame rate
     frame_rate = 30
