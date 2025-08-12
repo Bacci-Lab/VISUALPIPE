@@ -120,7 +120,7 @@ def compute_suppression(magnitude, protocol_surround='center-surround-cross'):
         raise ValueError(f"Protocol 'center' is not in the magnitude keys: {magnitude.keys()}")
         
     suppression = 1 - magnitude[protocol_surround] / magnitude['center']
-    
+
     return suppression
 
 def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name):
@@ -184,8 +184,8 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         for protocol in magnitude.keys():
             magnitude[protocol] = np.concatenate(magnitude[protocol])
 
-        if protocol_name == "surround-mod":
-            cmi = compute_cmi(magnitude, sub_protocols[0], sub_protocols[1])
+        if protocol_name == "surround-mod" and len(sub_protocols) == 2:
+            cmi = compute_cmi(magnitude, sub_protocols[1], sub_protocols[0])
             suppression = compute_suppression(magnitude, sub_protocols[1])
         else :
             cmi, suppression = [], []
@@ -212,36 +212,42 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
     return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups
 
-def XY_magnitudes(groups_id, magnitude_groups, protocol_x, protocol_y, protocol_validity, save_path, attr):
+def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity, save_path, attr):
     """
     Function to extract and plot the x and y values for the magnitude of the response to each protocol for both groups.
     """
 
     color = {'WT': 'skyblue', 'KO': 'orange'}
-    
-    for group in groups_id.keys():
+    if len(sub_protocols) == 2:
+        protocol_x = sub_protocols[0]
+        protocol_y = sub_protocols[1]
+        for group in groups_id.keys():
 
-        magnitude = magnitude_groups[groups_id[group]]
-        x_values = magnitude[protocol_x]
-        y_values = magnitude[protocol_y]
+            magnitude = magnitude_groups[groups_id[group]]
+            x_values = magnitude[protocol_x]
+            y_values = magnitude[protocol_y]
 
-        slope, intercept, r_value, p_value, _ = linregress(x_values, y_values)
-        x_fit = np.linspace(min(x_values), max(x_values), 100)
-        y_fit = slope * x_fit + intercept
+            slope, intercept, r_value, p_value, _ = linregress(x_values, y_values)
+            x_fit = np.linspace(min(x_values), max(x_values), 100)
+            y_fit = slope * x_fit + intercept
 
-        # Create the plot
-        plt.scatter(x_values, y_values, marker='o', c=color[group], alpha=0.5, label=f'{group} neurons')
-        # Plot regression line
+            # Create the plot
+            plt.scatter(x_values, y_values, marker='o', c=color[group], alpha=0.5, label=f'{group} neurons')
+            # Plot regression line
+            
+            plt.plot(x_fit, y_fit, color=color[group], label=f'{group} fit: y = {slope:.2f}x + {intercept:.2f}, p = {p_value:.2g}, r**2 = {(r_value)**2:.3f}')
         
-        plt.plot(x_fit, y_fit, color=color[group], label=f'{group} fit: y = {slope:.2f}x + {intercept:.2f}, p = {p_value:.2g}, r**2 = {(r_value)**2:.3f}')
-    
-    # Add labels
-    plt.xlabel(f"Magnitude of response to {protocol_x}")
-    plt.ylabel(f"Magnitude of response to {protocol_y}")
-    plt.title(f"Response magnitudes ({attr}) for {protocol_validity}-responsive neurons")
-    plt.legend()
-    plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=300)
-    plt.show()
+        # Add labels
+        plt.xlabel(f"Magnitude of response to {protocol_x}")
+        plt.ylabel(f"Magnitude of response to {protocol_y}")
+        plt.title(f"Response magnitudes ({attr}) for {protocol_validity}-responsive neurons")
+        plt.legend()
+        plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=300)
+        plt.show()
+    else:
+        print(f"XY plot is not available for {len(sub_protocols)} protocols. Please select 2 protocols to compare.")
+        print(f"Current protocols: {sub_protocols}")
+        return None
 
 def plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name):
     """
@@ -390,63 +396,67 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
     fig.savefig(os.path.join(save_path, f"{fig_name}_averages_{attr}.jpeg"), dpi=300, bbox_inches='tight')
     plt.show()
 
-def histplot(list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
+def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
     """
     Function to plot a histogram comparing the distribution of two groups.
     variable: 'CMI' or 'suppression_index'
     """
     edgecolor = 'black'
     labels_list = []
-    
-    if variable == "CMI":
-        for l in [list1, list2]:
-            bins = [-float('inf'), -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, float('inf')]
-            labels = ['<-1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '>1.5']
-            labeled = pd.cut(l, bins=bins, labels=labels)
-            labels_list += labeled.astype(str).tolist()
-    elif variable == "suppression_index":
-        for l in [list1, list2]:
-            bins = [-float('inf'), -2, -1.75, -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, float('inf')]
-            labels = ['<-2', '-2 to -1.75', '-1.75 to -1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '1.5 to 1.75', '1.75 to 2', '>2']
-            labeled = pd.cut(l, bins=bins, labels=labels)
-            labels_list += labeled.astype(str).tolist()
-    else :
-        raise Exception("Variable must be 'CMI' or 'suppression_index'")
+    if len(sub_protocols) == 2:
+        if variable == "CMI":
+            for l in [list1, list2]:
+                bins = [-float('inf'), -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, float('inf')]
+                labels = ['<-1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '>1.5']
+                labeled = pd.cut(l, bins=bins, labels=labels)
+                labels_list += labeled.astype(str).tolist()
+        elif variable == "suppression_index":
+            for l in [list1, list2]:
+                bins = [-float('inf'), -2, -1.75, -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, float('inf')]
+                labels = ['<-2', '-2 to -1.75', '-1.75 to -1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '1.5 to 1.75', '1.75 to 2', '>2']
+                labeled = pd.cut(l, bins=bins, labels=labels)
+                labels_list += labeled.astype(str).tolist()
+        else :
+            raise Exception("Variable must be 'CMI' or 'suppression_index'")
 
-    # Perform Mann–Whitney U test between WT and KO
-    stat_mwu, p_value_mwu = mannwhitneyu(np.array(list1), np.array(list2), alternative='two-sided')
-    p_value_1 = wilcoxon(np.array(list1), alternative='two-sided')[1]
-    p_value_2 = wilcoxon(np.array(list2), alternative='two-sided')[1]
-    
-    genotype = ["WT"] * len(list1) + ["KO"] * len(list2)
-    df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
+        # Perform Mann–Whitney U test between WT and KO
+        stat_mwu, p_value_mwu = mannwhitneyu(np.array(list1), np.array(list2), alternative='two-sided')
+        p_value_1 = wilcoxon(np.array(list1), alternative='two-sided')[1]
+        p_value_2 = wilcoxon(np.array(list2), alternative='two-sided')[1]
+        
+        genotype = ["WT"] * len(list1) + ["KO"] * len(list2)
+        df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
 
-    fig, ax = plt.subplots(figsize=(12, 7))
-    sns.histplot(df, x=variable, hue="Genotype", multiple="dodge", edgecolor=edgecolor, ax=ax, shrink=.8)
-    plt.ylabel(f'% of neurons')
-    plt.xticks(rotation=45, ha='right')
-    plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
-    plt.tight_layout()
-    textstr = (
-        f'{groups[0]} median = {np.median(list1):.2f}, p (vs 0) = {p_value_1:.3g}\n'
-        f'{groups[1]} median = {np.median(list2):.2f}, p (vs 0) = {p_value_2:.3g}\n'
-        f'{groups[0]} vs {groups[1]} (Mann–Whitney) p = {p_value_mwu:.3g}'
-    )
-    # Position textbox on plot
-    plt.gca().text(0.99, 0.97, textstr,
-                transform=plt.gca().transAxes,
-                fontsize=11, verticalalignment='top', horizontalalignment='right',
-                bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.85))
+        fig, ax = plt.subplots(figsize=(12, 7))
+        sns.histplot(df, x=variable, hue="Genotype", multiple="dodge", edgecolor=edgecolor, ax=ax, shrink=.8)
+        plt.ylabel(f'% of neurons')
+        plt.xticks(rotation=45, ha='right')
+        plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
+        plt.tight_layout()
+        textstr = (
+            f'{groups[0]} median = {np.median(list1):.2f}, p (vs 0) = {p_value_1:.3g}\n'
+            f'{groups[1]} median = {np.median(list2):.2f}, p (vs 0) = {p_value_2:.3g}\n'
+            f'{groups[0]} vs {groups[1]} (Mann–Whitney) p = {p_value_mwu:.3g}'
+        )
+        # Position textbox on plot
+        plt.gca().text(0.99, 0.97, textstr,
+                    transform=plt.gca().transAxes,
+                    fontsize=11, verticalalignment='top', horizontalalignment='right',
+                    bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.85))
 
-    fig.savefig(os.path.join(save_path, f"barplot_{fig_name}_{variable}_{attr}.jpeg"), dpi=300)
-    plt.show()
+        fig.savefig(os.path.join(save_path, f"barplot_{fig_name}_{variable}_{attr}.jpeg"), dpi=300)
+        plt.show()
+    else:
+        print(f"Histogram is not available for {len(sub_protocols)} protocols. Please select 2 protocols to compare.")
+        print(f"Current protocols: {sub_protocols}")
+        return None
     
 if __name__ == "__main__":
 
     #-----------------------INPUTS-----------------------#
 
     excel_sheet_path = "./src/visualpipe/post_analysis/Nathan_sessions.xlsx"
-    save_path = "C:/Users/mai-an.nguyen/Documents/test"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
     
     #Will be included in all names of saved figures
     fig_name = 'test'
@@ -455,9 +465,9 @@ if __name__ == "__main__":
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center', 'center-surround-iso']  
+    sub_protocols = ['center-surround-iso']  
     # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['center'] 
+    valid_sub_protocols = ['center-surround-iso'] 
 
     #Frame rate
     frame_rate = 30
@@ -475,7 +485,7 @@ if __name__ == "__main__":
     #-------------------Call the functions to process and plot the data-------------------#
 
     #XY plot of the magnitudes of the responses to the two protocols
-    XY_magnitudes(groups_id, magnitude_groups, sub_protocols[0], sub_protocols[1], valid_sub_protocols, save_path, attr)
+    XY_magnitudes(groups_id, magnitude_groups, sub_protocols, valid_sub_protocols, save_path, attr)
     # Plot the % of responsive neurons per session
     plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
     # Plot the average response during the stim period per session
@@ -483,6 +493,6 @@ if __name__ == "__main__":
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
     graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
-    histplot(cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
+    histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
     #plot the distribution of suppression index
-    histplot(suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
+    histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
