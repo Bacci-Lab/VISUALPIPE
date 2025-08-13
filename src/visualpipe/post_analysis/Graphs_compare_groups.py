@@ -125,7 +125,6 @@ def compute_suppression(magnitude, protocol_surround='center-surround-iso'):
     return suppression
 
 def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name):
-
     if attr == 'dFoF0-baseline':
         period_names = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
     elif attr == 'z_scores':
@@ -304,7 +303,7 @@ def plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, protocol
     x_labels = []
     width = 0.5
     offset = (len(groups_id.keys()) + 1) * width # spacing between groups
-
+    excel_data = {}
     for i, protocol in enumerate(protocols):
 
         for k, group in enumerate(groups_id.keys()):
@@ -314,13 +313,15 @@ def plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, protocol
 
             stim_mean = stim_groups[groups_id[group]][protocol]
             stim_global_mean = np.mean(stim_mean)
+            col_name = f"{group}_{protocol}_session_avg"
+            excel_data[col_name] = stim_mean
 
             ax.bar(x, stim_global_mean, color=colors[k], width=width, edgecolor='black', label=group if i == 0 else "")
             ax.scatter([x] * len(stim_mean), stim_mean, color='black', zorder=10)
 
         if len(groups_id) == 2 :
             # Mann–Whitney U test
-            stat, p = mannwhitneyu(stim_groups[0][protocol], stim_groups[0][protocol], alternative='two-sided')
+            stat, p = mannwhitneyu(stim_groups[0][protocol], stim_groups[1][protocol], alternative='two-sided')
 
             # Annotate p-value
             y_max = max(np.max(stim_groups[0][protocol]), np.max(stim_groups[1][protocol])) + 0.2
@@ -338,6 +339,15 @@ def plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, protocol
     fig.savefig(os.path.join(save_path, f"{fig_name}_barplot_stim_response_{attr}.jpeg"), dpi=300)
     plt.show()
 
+    #Save values in Excel
+    # Find the longest list length
+    max_len = max(len(v) for v in excel_data.values())
+
+    # Pad shorter lists with None
+    padded = {k: v + [None]*(max_len - len(v)) for k, v in excel_data.items()}
+    excel_path = os.path.join(save_path, f"{fig_name}_avgs_PerSession_{attr}.xlsx")
+    pd.DataFrame(padded).to_excel(excel_path, index=False)
+
 def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, protocol_validity, avg_groups, sem_groups, nb_neurons):
     """
     Function to plot the average z-scores or dFoF0 for responsive neurons.
@@ -353,7 +363,8 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
 
     # Create a figure with subplots
     fig, axs = plt.subplots(1, 3, figsize=(3*8.5, 7))
-    
+    # Build a dict for DataFrame export
+    excel_dict = {}
     for i, group in enumerate(groups):
         avg = avg_groups[groups_id[group]]
         sem = sem_groups[groups_id[group]]
@@ -364,8 +375,18 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
 
         # Generate time vector accordingly
         time = np.linspace(0, min_len, min_len) / frame_rate - 1  # time in seconds
+        # Save time only once
+        if "Time (s)" not in excel_dict:
+            excel_dict["Time (s)"] = time
 
         for protocol in protocols:
+            # Store data for Excel
+            # Add avg & sem columns to dict
+            avg_col_name = f"{group}_{protocol}_avg"
+            sem_col_name = f"{group}_{protocol}_sem"
+            excel_dict[avg_col_name] = avg[protocol][:min_len]
+            excel_dict[sem_col_name] = sem[protocol][:min_len]
+
             axs[2].plot(time, avg[protocol][:min_len], color=colors[group][protocol], label=f"{group}, {protocol}, {neurons} neurons")
             axs[2].fill_between(time,
                             avg[protocol][:min_len] - sem[protocol][:min_len],
@@ -397,6 +418,11 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
     fig.savefig(os.path.join(save_path, f"{fig_name}_averages_{attr}.jpeg"), dpi=300, bbox_inches='tight')
     plt.show()
 
+    # Create DataFrame and save to Excel
+    df = pd.DataFrame(excel_dict)
+    excel_path = os.path.join(save_path, f"{fig_name}_averages_{attr}.xlsx")
+    df.to_excel(excel_path, index=False)
+
 def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
     """
     Function to plot a histogram comparing the distribution of two groups.
@@ -425,11 +451,11 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         p_value_1 = wilcoxon(np.array(list1), alternative='two-sided')[1]
         p_value_2 = wilcoxon(np.array(list2), alternative='two-sided')[1]
         
-        genotype = ["WT"] * len(list1) + ["KO"] * len(list2)
+        genotype = [groups[0]] * len(list1) + [groups[1]] * len(list2)
         df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
 
         fig, ax = plt.subplots(figsize=(12, 7))
-        sns.histplot(df, x=variable, hue="Genotype", multiple="dodge", edgecolor=edgecolor, ax=ax, shrink=.8)
+        sns.histplot(df, x=variable, hue="Genotype", multiple="dodge", edgecolor=edgecolor, ax=ax, shrink=.8, stat="percent")
         plt.ylabel(f'% of neurons')
         plt.xticks(rotation=45, ha='right')
         plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
@@ -447,10 +473,26 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
 
         fig.savefig(os.path.join(save_path, f"barplot_{fig_name}_{variable}_{attr}.jpeg"), dpi=300)
         plt.show()
+
+        # Count neurons per bin per genotype
+        bin_counts = df.groupby(["Genotype", variable]).size().reset_index(name="Count")
+
+        # Pivot so that each column is a genotype
+        pivot_df = bin_counts.pivot(index=variable, columns="Genotype", values="Count").fillna(0)
+
+        # Optionally convert counts to percentages
+        pivot_df_percent = pivot_df.div(pivot_df.sum(axis=0), axis=1) * 100
+
+        # Save percentages to Excel
+        with pd.ExcelWriter(os.path.join(save_path, f"{fig_name}_{variable}_{attr}.xlsx")) as writer:
+            pivot_df_percent.to_excel(writer, sheet_name="Percentages")
+
     else:
         print(f"Histogram is not available for {len(sub_protocols)} protocols. Please select 2 protocols to compare.")
         print(f"Current protocols: {sub_protocols}")
         return None
+    
+
     
 def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_name, save_path):
     """
@@ -472,7 +514,6 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
     fname = f"cdf_{file_name}_{attr}_{groups[0]}_vs_{groups[1]}_responsiveNeurons.png"
     title = f'Cumulative distribution of neuron response magnitudes ({attr})\n(Responsive neurons)'
     plt.figure(figsize=(6, 6))
-
     colors = {groups[0]: 'skyblue',
                 groups[1]: 'orange'}
     stats_text = []
@@ -481,6 +522,7 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
         return None
     else:
         protocol = sub_protocols[0] 
+    
         for group in groups_id.keys():
             group_idx = groups_id[group]
 
@@ -489,8 +531,6 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
                 print(f"Protocol '{protocol}' not found in magnitude data for group '{group}'. Skipping.")
                 continue
             magnitude = magnitude_groups[groups_id[group]][protocol]
-            #normalize the magnitude byt the maximum value for that group
-            magnitude = magnitude / np.max(magnitude)
 
             # Plot CDF
             data = np.array(magnitude)
@@ -536,13 +576,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'center'
+    fig_name = 'CenterVsfbRF_Iso'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center']  
+    sub_protocols = ['center', 'surround-iso_ctrl']  
     # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
     valid_sub_protocols = ['center'] 
 
