@@ -8,3 +8,5 @@ PyQt5_sip==12.16.1
 scikit_learn==1.6.1
 scipy==1.15.1
 seaborn
+statsmodels
+openpyxl
