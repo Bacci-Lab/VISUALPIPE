@@ -716,7 +716,7 @@ if __name__ == "__main__":
     cluster_labels = kmeans.labels_
     
     all_traces = np.concatenate(single_traces_groups, axis=0)
-    group_labels = np.array(['WT'] * norm_traces[groups_id['WT']].shape[0] + ['KO'] * norm_traces[groups_id['KO']].shape[0])
+    group_labels = np.array(['WT'] * all_neurons_groups[groups_id['WT']] + ['KO'] * all_neurons_groups[groups_id['KO']])
 
     # Time axis
     time = (np.arange(all_traces.shape[1]) / frame_rate) - 1
