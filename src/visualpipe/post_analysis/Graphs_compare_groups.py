@@ -143,7 +143,6 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         proportion_list = [] #Will contain the proportion of responding neurons per session
 
         df_filtered = df[df["Genotype"] == key]
-
         for k in range(len(df_filtered)):
             mouse_id = df_filtered["Mouse_id"].iloc[k]
             session_id = df_filtered["Session_id"].iloc[k]
@@ -455,9 +454,10 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
 
         fig, ax = plt.subplots(figsize=(12, 7))
-        sns.histplot(df, x=variable, hue="Genotype", multiple="dodge", edgecolor=edgecolor, ax=ax, shrink=.8, stat="percent")
+       
+        sns.histplot(df, x=variable, hue="Genotype", fill= False, ax=ax, shrink=.8, stat="percent", element = 'step')
         plt.ylabel(f'% of neurons')
-        plt.xticks(rotation=45, ha='right')
+        plt.xticks(rotation=45)
         plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
         plt.tight_layout()
         textstr = (
@@ -572,17 +572,17 @@ if __name__ == "__main__":
 
     #-----------------------INPUTS-----------------------#
 
-    excel_sheet_path = "./src/visualpipe/post_analysis/Nathan_sessions.xlsx"
+    excel_sheet_path = r"Y:\raw-imaging\Nathan\PYR\Nathan_sessions_visualpipe.xlsx"
     save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'CenterVsfbRF_Iso'
+    fig_name = 'test'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center', 'surround-iso_ctrl']  
+    sub_protocols = ['center', 'center-surround-iso']  
     # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
     valid_sub_protocols = ['center'] 
 
@@ -615,3 +615,4 @@ if __name__ == "__main__":
     histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
     # Plot CDFs of neuron response magnitudes comparing groups
     plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, fig_name, save_path) 
+
