@@ -931,14 +931,12 @@ class Trial(object):
         None
         """
         edgecolor='black'
-        cmi_plot = [el if np.abs(el) < 1.5 else 2 if el > 1.5 else -2 for el in cmi]
+        cmi_plot = [el if np.abs(el) <= 1.5 else 2 if el > 1.5 else -2 for el in cmi]
         
         fig, ax = plt.subplots(figsize=(6, 5))
-        sns.histplot(cmi_plot, bins=12, binrange=(-1.5, 1.5), color='white', edgecolor=edgecolor, element='step', ax=ax)
-        sns.histplot(cmi_plot, bins=1, binrange=(1.875, 2.125), color='white', edgecolor=edgecolor, ax=ax)
-        sns.histplot(cmi_plot, bins=1, binrange=(-2.125, -1.875), color='white', edgecolor=edgecolor, ax=ax)
-        ax.set_xticks([-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2], labels=['<-1.5', '-1.5', '-1', '-0.5', '0', '0.5', '1', '1.5', '>1.5'])
-        ax.set_ylabel('Count of neurons')
+        sns.histplot(cmi_plot, binwidth=0.25, color='white', edgecolor=edgecolor, element='step', ax=ax, stat="percent")
+        ax.set_xticks([-1.875, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 1.875], labels=['<-1.5', '-1.5', '-1', '-0.5', '0', '0.5', '1', '1.5', '>1.5'])
+        ax.set_ylabel(f'% of neurons')
         ax.set_title('Contextual Modulation Index')
         ax.axvline(np.median(cmi), color='black', linestyle='--', linewidth=1.5, label='median') # Add vertical dashed line at median position
         plt.gca().spines[['right', 'top']].set_visible(False)
