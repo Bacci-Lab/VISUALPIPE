@@ -11,8 +11,10 @@ import glob
 from kneed import KneeLocator 
 import math
 import pandas as pd
+import sys
+sys.path.append("./src")
 
-import utils
+import visualpipe.post_analysis.utils as utils
 
 def get_valid_neurons_session(validity, protocol):
     """

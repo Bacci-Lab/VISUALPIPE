@@ -9,7 +9,7 @@ import seaborn as sns
 import sys
 sys.path.append("./src")
 
-import utils
+import visualpipe.post_analysis.utils as utils
 
 def get_valid_neurons_session(validity, protocol_list):
    # Dictionary to store responsive neurons for each protocol

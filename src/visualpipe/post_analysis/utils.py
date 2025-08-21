@@ -3,7 +3,7 @@ import numpy as np
 import glob
 import os
 
-def load_excel_sheet(excel_sheet_path:str, protocol_name:str):
+def load_excel_sheet(excel_sheet_path:str, protocol_name:str, neuron_type:str=None, genotype:str=None) :
     """
     Load an excel sheet and filter it according to the specified protocol name.
 
@@ -20,10 +20,14 @@ def load_excel_sheet(excel_sheet_path:str, protocol_name:str):
         DataFrame containing the selected sessions with the specified protocol name.
     """
     
-    column_names = ["Session_id", "Output_id", "Protocol", "Mouse_id", "Genotype", "Analyze", "Session_path"]
+    column_names = ["Session_id", "Output_id", "Protocol", "Mouse_id", "Genotype", "Neuron_type", "Analyze", "Session_path"]
 
     df = pd.read_excel(excel_sheet_path)
     df = df[df["Protocol"] == protocol_name]
+    if neuron_type is not None :
+        df = df[df["Neuron_type"] == neuron_type]
+    if genotype is not None :
+        df = df[df["Genotype"] == genotype]
     df = df[df["Analyze"] == 1]
     duplicates = df.duplicated(subset=['Session_id'], keep='first')
 
@@ -32,7 +36,6 @@ def load_excel_sheet(excel_sheet_path:str, protocol_name:str):
         print(f"    Duplicated session(s) : {df[duplicates]['Session_id'].unique()}")
         df = df[~duplicates] # Remove duplicates
 
-    print(f"Genotype : {df.Genotype.unique()}")
     print(f"Mice included : {df.Mouse_id.unique()}")
     
     return df[column_names]
