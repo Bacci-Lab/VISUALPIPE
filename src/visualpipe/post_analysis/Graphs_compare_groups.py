@@ -9,55 +9,7 @@ import seaborn as sns
 import sys
 sys.path.append("./src")
 
-def load_excel_sheet(excel_sheet_path, protocol_name):
-    df = pd.read_excel(excel_sheet_path)
-    df = df[df["Protocol"] == protocol_name]
-    df = df[df["Analyze"] == 1]
-    duplicates = df.duplicated(subset=['Session_id'], keep='first')
-
-    if np.sum(duplicates) > 0 : 
-        print(f"There is/are {np.sum(duplicates)} duplicated session(s) in the excel file. Please remove them or set 'Analyze' to 0 in the excel file. The first occurence will be kept automatically if nothing is specified.")
-        print(f"    Duplicated session(s) : {df[duplicates]['Session_id'].unique()}")
-        df = df[~duplicates] # Remove duplicates
-
-    print(f"Genotype : {df.Genotype.unique()}")
-    print(f"Mice included : {df.Mouse_id.unique()}")
-    
-    return df
-
-def load_data_session(path) :
-    """    Load the validity and trials data from the specified path.
-    Args:
-        path (str): Path to the directory containing the .npz and .npy files.
-    Returns:
-        validity (dict): Dictionary containing the validity data loaded from the .npz file.
-        trials (dict): Dictionary containing the trials data loaded from the .npy file.
-    Raises:
-        FileNotFoundError: If the expected .npz or .npy files are not found in the specified path.
-    """
-    
-    # Load the npz file
-    npz_files = glob.glob(os.path.join(path, "*protocol_validity_2.npz"))
-    if len(npz_files) == 1:
-        validity = np.load(npz_files[0], allow_pickle=True)
-    else:
-        raise FileNotFoundError(f"Expected exactly one .npz file in {path}, found {len(npz_files)} files")      
-    
-    # Load .npy file
-    npy_files = glob.glob(os.path.join(path, "*trials.npy"))
-    if len(npy_files) == 1:
-        trials = np.load(npy_files[0], allow_pickle=True).item()
-    else:
-        raise FileNotFoundError(f"Expected exactly one .npy file in {path}, found {len(npy_files)}")
-    
-    # Load xlsx file with visual stimuli info
-    xlsx_files = glob.glob(os.path.join(path, "*visual_stim_info.xlsx"))
-    if len(xlsx_files) == 1:
-        stimuli_df = pd.read_excel(os.path.join(path, xlsx_files[0]), engine='openpyxl').set_index('id')
-    else:
-        raise FileNotFoundError(f"Expected exactly one .xlsx file in {path}, found {len(xlsx_files)} files")   
-
-    return validity, trials, stimuli_df
+import utils
 
 def get_valid_neurons_session(validity, protocol_list):
    # Dictionary to store responsive neurons for each protocol
@@ -151,7 +103,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
             print(f"\nSession id: {session_id}\n  Mouse id : {mouse_id}\n     Session path: {session_path}")
 
-            validity, trials, stimuli_df = load_data_session(session_path)
+            validity, trials, stimuli_df = utils.load_data_session(session_path)
 
             valid_neurons = get_valid_neurons_session(validity, valid_sub_protocols)
             neurons = len(valid_neurons)
@@ -590,7 +542,7 @@ if __name__ == "__main__":
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
     #----------------------------------------------------#
-    df = load_excel_sheet(excel_sheet_path, protocol_name)
+    df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
     groups_id = {'WT': 0, 'KO': 1}
 
