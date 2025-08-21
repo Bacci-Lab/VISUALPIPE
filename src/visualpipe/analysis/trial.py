@@ -996,6 +996,57 @@ class Trial(object):
         fig.savefig(os.path.join(save_dir, 'iso_vs_cross.png'), dpi=300, bbox_inches='tight')
         plt.close(fig)
 
+    def plot_surround_vs_center(self, save_dir:str) :
+        """
+        Plot inverse peak response against classical peak response (Keller, 2019, 4c).
+
+        Parameters
+        ----------
+        save_dir : str
+            Directory to save the figure.
+
+        Returns
+        -------
+        None
+        """
+        
+        id_srm_surround = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "surround-iso_ctrl"].index[0]
+        id_srm_center = self.visual_stim.protocol_df[self.visual_stim.protocol_df["name"] == "center"].index[0]
+        
+        rois_surround = np.where(np.array([data[0] for data in self.responsive[id_srm_surround]]) != 0)[0]
+        rois_center = np.where(np.array([data[0] for data in self.responsive[id_srm_center]]) != 0)[0]
+
+        valid_neurons = np.unique(np.concatenate((rois_surround, rois_center)))
+        invalid_neurons = np.array([i for i in range(len(self.responsive[12])) if i not in valid_neurons])
+
+        traces_surround = self.trial_average_fluorescence_norm[id_srm_surround][:, round(0.3*self.ca_img.fs):]
+        traces_center = self.trial_average_fluorescence_norm[id_srm_center][:, round(0.3*self.ca_img.fs):]
+        idx_peak_surround = np.argmax(np.abs(traces_surround), axis=1)
+        idx_peak_center = np.argmax(np.abs(traces_center), axis=1)
+        inverse = np.array([traces_surround[roi, i] for roi, i in enumerate(idx_peak_surround)])
+        classical = np.array([traces_center[roi, i] for roi, i in enumerate(idx_peak_center)])
+
+        min = np.min((inverse, classical))
+        max = np.max((inverse, classical))
+
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.axhline(0, color='black', linestyle='--', linewidth=1)
+        ax.axvline(0, color='black', linestyle='--', linewidth=1)
+        ax.plot([min, max], [min, max], linestyle='--', color='black', linewidth=1)
+        sns.scatterplot(x=inverse[invalid_neurons], y=classical[invalid_neurons], color='grey', alpha=0.5, s=70, ax=ax)
+        sns.scatterplot(x=inverse[valid_neurons], y=classical[valid_neurons], color='green', alpha=0.5, s=70, ax=ax)
+        plt.gca().spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+        ax.set_xlabel(r'Center peak response [$\Delta$F/F]', fontsize=12)
+        ax.set_ylabel(r'Surround peak response [$\Delta$F/F]', fontsize=12)
+        ax.set_title('Surround vs center')
+
+        textstr = f'{len(inverse)} neurons'
+        plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                        fontsize=10, verticalalignment='top', horizontalalignment='left')
+        
+        fig.savefig(os.path.join(save_dir, 'surround_vs_center.png'), dpi=300, bbox_inches='tight')
+        plt.close(fig)
+
     def plot_trials_per_states(self, stimuli_id:int, neuron_idx:int, save_dir:str, folder_prefix:str=''):
         """
         Plot a neuron trial-averaged response for a fixed stimulus, with a subplot per states.

@@ -303,6 +303,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
         cmi = trials.compute_cmi()
         trials.plot_cmi_hist(cmi, save_fig_dir)
         trials.plot_iso_vs_cross(save_fig_dir)
+        trials.plot_surround_vs_center(save_fig_dir)
         surround_sup_cross, surround_sup_iso = trials.compute_surround_sup()
     else :
         cmi = None
