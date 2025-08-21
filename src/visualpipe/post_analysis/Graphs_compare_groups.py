@@ -427,9 +427,8 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
     Function to plot a histogram comparing the distribution of two groups.
     variable: 'CMI' or 'suppression_index'
     """
-    edgecolor = 'black'
-    labels_list = []
     if len(sub_protocols) == 2:
+        labels_list = []
         if variable == "CMI":
             for l in [list1, list2]:
                 bins = [-float('inf'), -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, float('inf')]
@@ -453,9 +452,9 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         genotype = [groups[0]] * len(list1) + [groups[1]] * len(list2)
         df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
 
-        fig, ax = plt.subplots(figsize=(12, 7))
+        fig, ax = plt.subplots(figsize=(8, 7))
        
-        sns.histplot(df, x=variable, hue="Genotype", fill= False, ax=ax, shrink=.8, stat="percent", element = 'step')
+        sns.histplot(df, x=variable, hue="Genotype", common_norm=False, shrink=.8, stat="percent", element='step', ax=ax, alpha=0)
         plt.ylabel(f'% of neurons')
         plt.xticks(rotation=45)
         plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
@@ -475,7 +474,7 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         plt.show()
 
         # Count neurons per bin per genotype
-        bin_counts = df.groupby(["Genotype", variable]).size().reset_index(name="Count")
+        bin_counts = df.groupby(["Genotype", variable], observed=False).size().reset_index(name="Count")
 
         # Pivot so that each column is a genotype
         pivot_df = bin_counts.pivot(index=variable, columns="Genotype", values="Count").fillna(0)
@@ -491,8 +490,6 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         print(f"Histogram is not available for {len(sub_protocols)} protocols. Please select 2 protocols to compare.")
         print(f"Current protocols: {sub_protocols}")
         return None
-    
-
     
 def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_name, save_path):
     """
