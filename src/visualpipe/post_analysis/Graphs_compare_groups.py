@@ -7,6 +7,7 @@ import glob
 import pandas as pd
 import seaborn as sns
 import sys
+from scipy.ndimage import gaussian_filter1d
 sys.path.append("./src")
 
 def load_excel_sheet(excel_sheet_path, protocol_name):
@@ -130,7 +131,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
     elif attr == 'z_scores':
         period_names = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
     
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups = [], [], [], [], [], [], [], []
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = [], [], [], [], [], [], [], [], []
 
     for key in groups_id.keys():
 
@@ -140,6 +141,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         magnitude = {protocol: [] for protocol in sub_protocols} #Will contain the magnitude of the response to each protocol for each neuron
         avg_data = {protocol: [] for protocol in sub_protocols} 
         stim_mean = {protocol: [] for protocol in sub_protocols} #Will contain the mean response to the stimulus for each protocol, per session
+        single_neurons_group = {protocol: [] for protocol in sub_protocols} #Will contain the individual traces of each neuron for each protocol
         proportion_list = [] #Will contain the proportion of responding neurons per session
 
         df_filtered = df[df["Genotype"] == key]
@@ -168,6 +170,12 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 # Get z-scores from responsive-neurons for that protocol from pre, stim and post periods and concatenate along time
                 traces_sep = [trials[period][stim_id][valid_neurons, :] for period in period_names]
                 traces_concat = np.concatenate(traces_sep, axis=1)
+                # Merge individual traces into group-level container
+                if len(single_neurons_group[protocol]) == 0:
+                    single_neurons_group[protocol] = traces_concat
+                else:
+                    single_neurons_group[protocol] = np.vstack([single_neurons_group[protocol], traces_concat])
+
                 avg_session_trace = np.mean(traces_concat, axis=0) # average over neurons in that session
                 avg_data[protocol].append(avg_session_trace)
 
@@ -179,7 +187,6 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 
                 #Store the average response of each neuron to that protocol
                 magnitude[protocol].append(mean_trial_value_per_neurons)
-        
         for protocol in magnitude.keys():
             magnitude[protocol] = np.concatenate(magnitude[protocol])
 
@@ -208,8 +215,9 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         sem_groups.append(sem)
         cmi_groups.append(cmi)
         proportions_groups.append(proportion_list)
+        individual_groups.append(single_neurons_group)
 
-    return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups
+    return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups
 
 def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity, save_path, attr):
     """
@@ -429,6 +437,7 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
     """
     edgecolor = 'black'
     labels_list = []
+    medians = []
     if len(sub_protocols) == 2:
         if variable == "CMI":
             for l in [list1, list2]:
@@ -486,14 +495,89 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         # Save percentages to Excel
         with pd.ExcelWriter(os.path.join(save_path, f"{fig_name}_{variable}_{attr}.xlsx")) as writer:
             pivot_df_percent.to_excel(writer, sheet_name="Percentages")
-
     else:
         print(f"Histogram is not available for {len(sub_protocols)} protocols. Please select 2 protocols to compare.")
         print(f"Current protocols: {sub_protocols}")
         return None
     
 
-    
+def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
+                          individual_groups, sub_protocols, attr, save_path, fig_name,
+                          variable='suppression_index'):
+    if not any(cmi_groups) or not any(suppression_groups):
+        print("No CMI or suppression index data available to plot representative traces.")
+        return
+    excel_dict = {}
+    fig, ax = plt.subplots(2, 2, figsize=(14, 10))
+    if len(groups_id) == 1:  # ensure ax is iterable
+        ax = [ax]
+
+    for i, group in enumerate(groups_id.keys()):
+        id_group = groups_id[group]
+        if variable == 'suppression_index':
+            cmi = suppression_groups[id_group]
+        elif variable == 'CMI':
+            cmi = cmi_groups[id_group]
+        else:
+            raise ValueError(f"Unknown variable: {variable}")
+
+        # Find representative trace (closest to median)
+        median = np.round(np.median(cmi), 2)
+        print(f"Group {group}: median {variable} = {median}")
+        cmi_id = np.where(np.round(cmi, 2) == median)[0][0]
+        rep_cmi = cmi[cmi_id]
+
+        indiv_traces = individual_groups[id_group]
+        rep_trace = {protocol: indiv_traces[protocol][cmi_id] for protocol in sub_protocols}
+        max_group = np.max([np.percentile(rep_trace[protocol], 95) for protocol in sub_protocols])  # Get max value for normalization
+
+        # Get minimum length among all protocols
+        min_len = min(len(trace) for trace in rep_trace.values())
+
+        # Generate time vector
+        time = np.linspace(0, min_len, min_len) / frame_rate - 1
+        if "Time (s)" not in excel_dict:
+            excel_dict["Time (s)"] = time
+
+        for protocol in sub_protocols:
+            col_name = f"_{group}_{protocol}_representative"
+            excel_dict[col_name] = rep_trace[protocol][:min_len]
+            ax[0,i].plot(time, gaussian_filter1d(rep_trace[protocol][:min_len] / max_group, sigma=1), color = 'skyblue' if protocol == sub_protocols[0] else 'orange',
+                       label=f"{group} {protocol}", lw=2)
+
+        ax[0,i].legend()
+        leg = ax[0,i].legend()
+        # get legend bounding box in axes coordinates
+        bb = leg.get_window_extent().transformed(ax[0,i].transAxes.inverted())
+        ax[0,i].set_title(f"{group}")
+        ax[0,i].set_ylabel(f"{attr} normalized to the highest response")
+        ax[0,i].set_xlabel("Time (s)")
+        x = bb.x1   # right edge of legend
+        y = bb.y0 - 0.05  # just below legend (tweak offset)
+        ax[0,i].text(
+            0.7, 0.02,
+            f"Representative {variable} = {rep_cmi:.2f}",
+            transform=ax[0,i].transAxes,
+            fontsize=9,
+            ha='right', va='bottom',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                    alpha=0.7, edgecolor="none")
+        )
+        magnitudes = [magnitude_groups[id_group][protocol][cmi_id] for protocol in sub_protocols]
+        ax[1,i].bar([protocol for protocol in sub_protocols], magnitudes/np.max(magnitudes), color = ['skyblue', 'orange'], width = 0.3)
+        ax[1,i].set_ylabel(f"Response magnitude ({attr}) normalized to the highest response")
+        ax[1,i].set_title(f"{group} - Response magnitudes")
+    plt.tight_layout()
+    fig.savefig(os.path.join(save_path, f"{fig_name}_representative_traces_{variable}_{attr}.jpeg"),
+                dpi=300, bbox_inches='tight')
+    plt.show()
+
+    # Save to Excel
+    df = pd.DataFrame(excel_dict)
+    df.to_excel(os.path.join(save_path, f"{fig_name}_representative_traces_{variable}_{attr}.xlsx"),
+                index=False)
+
+
 def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_name, save_path):
     """
     Plots CDFs of neuron response magnitudes for each protocol
@@ -505,11 +589,7 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
     - attr: string, how fluorescence is measured (e.g., 'z_score' or 'dFoF0-baseline')
     - file_name: string, base name for the saved figure
     - save_path: string, folder where to save the figure
-    - get_valid: bool, if True, only responsive neurons were used (affects title and filename)
-    """
-
-    # Filename & title
-
+    - get_valid: bool, if True, only responsive neurons were used (affects title and filename)"""
     groups = list(groups_id.keys())
     fname = f"cdf_{file_name}_{attr}_{groups[0]}_vs_{groups[1]}_responsiveNeurons.png"
     title = f'Cumulative distribution of neuron response magnitudes ({attr})\n(Responsive neurons)'
@@ -541,15 +621,12 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
         # Perform statistical test (pairwise Mann–Whitney U)
         p = mannwhitneyu(magnitude_groups[0][protocol], magnitude_groups[1][protocol], alternative='two-sided').pvalue
         # Put text in bottom-right corner of the axes
-        plt.text(
-            0.95, 0.05,  # relative position in axes coords
+        plt.text(0.95, 0.05,  # relative position in axes coords
             f"p = {p:.3e}",
             transform=plt.gca().transAxes,
             fontsize=10,
             ha='right', va='bottom',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7, edgecolor="none")
-        )
-
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7, edgecolor="none"))
         # Add stats text on the plot
         y_pos = 0.95
         for line in stats_text:
@@ -567,6 +644,7 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
         # Save
         plt.savefig(os.path.join(save_path, fname), dpi=300)
         plt.show()
+
     
 if __name__ == "__main__":
 
@@ -582,7 +660,7 @@ if __name__ == "__main__":
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center', 'center-surround-iso']  
+    sub_protocols = ['center']  
     # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
     valid_sub_protocols = ['center'] 
 
@@ -597,11 +675,16 @@ if __name__ == "__main__":
 
     groups_id = {'WT': 0, 'KO': 1}
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name)
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name) 
+    print(cmi_groups)
+    representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
+                          individual_groups, sub_protocols, attr, save_path, fig_name, variable='CMI')
+    
 
-    #-------------------Call the functions to process and plot the data-------------------#
+    
+     #-------------------Call the functions to process and plot the data-------------------#
 
-    #XY plot of the magnitudes of the responses to the two protocols
+    """ #XY plot of the magnitudes of the responses to the two protocols
     XY_magnitudes(groups_id, magnitude_groups, sub_protocols, valid_sub_protocols, save_path, attr)
     # Plot the % of responsive neurons per session
     plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
@@ -613,6 +696,7 @@ if __name__ == "__main__":
     histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
     #plot the distribution of suppression index
     histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
-    # Plot CDFs of neuron response magnitudes comparing groups
+    # Plot CDFs of neuron response magnitudes comparing groups"""
     plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, fig_name, save_path) 
 
+    print(np.where(np.round(suppression_groups[0], 8) == 0.78250644)[0])
