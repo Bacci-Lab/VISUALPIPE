@@ -387,12 +387,8 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
     Function to plot a histogram comparing the distribution of two groups.
     variable: 'CMI' or 'suppression_index'
     """
-<<<<<<< HEAD
     edgecolor = 'black'
-    labels_list = []
     medians = []
-=======
->>>>>>> 5c3a7069c6e6919c53ba64cea77ed1b5ce0b2651
     if len(sub_protocols) == 2:
         labels_list = []
         if variable == "CMI":
@@ -456,7 +452,6 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         print(f"Current protocols: {sub_protocols}")
         return None
     
-<<<<<<< HEAD
 
 def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
                           individual_groups, sub_protocols, attr, save_path, fig_name,
@@ -535,8 +530,6 @@ def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_
                 index=False)
 
 
-=======
->>>>>>> 5c3a7069c6e6919c53ba64cea77ed1b5ce0b2651
 def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_name, save_path):
     """
     Plots CDFs of neuron response magnitudes for each protocol
@@ -643,7 +636,7 @@ if __name__ == "__main__":
     
      #-------------------Call the functions to process and plot the data-------------------#
 
-    """ #XY plot of the magnitudes of the responses to the two protocols
+    #XY plot of the magnitudes of the responses to the two protocols
     XY_magnitudes(groups_id, magnitude_groups, sub_protocols, valid_sub_protocols, save_path, attr)
     # Plot the % of responsive neurons per session
     plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
@@ -655,7 +648,7 @@ if __name__ == "__main__":
     histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
     #plot the distribution of suppression index
     histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
-    # Plot CDFs of neuron response magnitudes comparing groups"""
+    # Plot CDFs of neuron response magnitudes comparing groups
     plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, fig_name, save_path) 
 
     print(np.where(np.round(suppression_groups[0], 8) == 0.78250644)[0])
