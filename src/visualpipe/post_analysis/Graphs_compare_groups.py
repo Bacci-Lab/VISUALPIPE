@@ -10,55 +10,7 @@ import sys
 from scipy.ndimage import gaussian_filter1d
 sys.path.append("./src")
 
-def load_excel_sheet(excel_sheet_path, protocol_name):
-    df = pd.read_excel(excel_sheet_path)
-    df = df[df["Protocol"] == protocol_name]
-    df = df[df["Analyze"] == 1]
-    duplicates = df.duplicated(subset=['Session_id'], keep='first')
-
-    if np.sum(duplicates) > 0 : 
-        print(f"There is/are {np.sum(duplicates)} duplicated session(s) in the excel file. Please remove them or set 'Analyze' to 0 in the excel file. The first occurence will be kept automatically if nothing is specified.")
-        print(f"    Duplicated session(s) : {df[duplicates]['Session_id'].unique()}")
-        df = df[~duplicates] # Remove duplicates
-
-    print(f"Genotype : {df.Genotype.unique()}")
-    print(f"Mice included : {df.Mouse_id.unique()}")
-    
-    return df
-
-def load_data_session(path) :
-    """    Load the validity and trials data from the specified path.
-    Args:
-        path (str): Path to the directory containing the .npz and .npy files.
-    Returns:
-        validity (dict): Dictionary containing the validity data loaded from the .npz file.
-        trials (dict): Dictionary containing the trials data loaded from the .npy file.
-    Raises:
-        FileNotFoundError: If the expected .npz or .npy files are not found in the specified path.
-    """
-    
-    # Load the npz file
-    npz_files = glob.glob(os.path.join(path, "*protocol_validity_2.npz"))
-    if len(npz_files) == 1:
-        validity = np.load(npz_files[0], allow_pickle=True)
-    else:
-        raise FileNotFoundError(f"Expected exactly one .npz file in {path}, found {len(npz_files)} files")      
-    
-    # Load .npy file
-    npy_files = glob.glob(os.path.join(path, "*trials.npy"))
-    if len(npy_files) == 1:
-        trials = np.load(npy_files[0], allow_pickle=True).item()
-    else:
-        raise FileNotFoundError(f"Expected exactly one .npy file in {path}, found {len(npy_files)}")
-    
-    # Load xlsx file with visual stimuli info
-    xlsx_files = glob.glob(os.path.join(path, "*visual_stim_info.xlsx"))
-    if len(xlsx_files) == 1:
-        stimuli_df = pd.read_excel(os.path.join(path, xlsx_files[0]), engine='openpyxl').set_index('id')
-    else:
-        raise FileNotFoundError(f"Expected exactly one .xlsx file in {path}, found {len(xlsx_files)} files")   
-
-    return validity, trials, stimuli_df
+import visualpipe.post_analysis.utils as utils
 
 def get_valid_neurons_session(validity, protocol_list):
    # Dictionary to store responsive neurons for each protocol
@@ -153,7 +105,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
             print(f"\nSession id: {session_id}\n  Mouse id : {mouse_id}\n     Session path: {session_path}")
 
-            validity, trials, stimuli_df = load_data_session(session_path)
+            validity, trials, stimuli_df = utils.load_data_session(session_path)
 
             valid_neurons = get_valid_neurons_session(validity, valid_sub_protocols)
             neurons = len(valid_neurons)
@@ -435,10 +387,14 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
     Function to plot a histogram comparing the distribution of two groups.
     variable: 'CMI' or 'suppression_index'
     """
+<<<<<<< HEAD
     edgecolor = 'black'
     labels_list = []
     medians = []
+=======
+>>>>>>> 5c3a7069c6e6919c53ba64cea77ed1b5ce0b2651
     if len(sub_protocols) == 2:
+        labels_list = []
         if variable == "CMI":
             for l in [list1, list2]:
                 bins = [-float('inf'), -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, float('inf')]
@@ -462,9 +418,9 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         genotype = [groups[0]] * len(list1) + [groups[1]] * len(list2)
         df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
 
-        fig, ax = plt.subplots(figsize=(12, 7))
+        fig, ax = plt.subplots(figsize=(8, 7))
        
-        sns.histplot(df, x=variable, hue="Genotype", fill= False, ax=ax, shrink=.8, stat="percent", element = 'step')
+        sns.histplot(df, x=variable, hue="Genotype", common_norm=False, shrink=.8, stat="percent", element='step', ax=ax, alpha=0)
         plt.ylabel(f'% of neurons')
         plt.xticks(rotation=45)
         plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
@@ -484,7 +440,7 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         plt.show()
 
         # Count neurons per bin per genotype
-        bin_counts = df.groupby(["Genotype", variable]).size().reset_index(name="Count")
+        bin_counts = df.groupby(["Genotype", variable], observed=False).size().reset_index(name="Count")
 
         # Pivot so that each column is a genotype
         pivot_df = bin_counts.pivot(index=variable, columns="Genotype", values="Count").fillna(0)
@@ -500,6 +456,7 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
         print(f"Current protocols: {sub_protocols}")
         return None
     
+<<<<<<< HEAD
 
 def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
                           individual_groups, sub_protocols, attr, save_path, fig_name,
@@ -578,6 +535,8 @@ def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_
                 index=False)
 
 
+=======
+>>>>>>> 5c3a7069c6e6919c53ba64cea77ed1b5ce0b2651
 def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_name, save_path):
     """
     Plots CDFs of neuron response magnitudes for each protocol
@@ -671,7 +630,7 @@ if __name__ == "__main__":
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
     #----------------------------------------------------#
-    df = load_excel_sheet(excel_sheet_path, protocol_name)
+    df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
     groups_id = {'WT': 0, 'KO': 1}
 
