@@ -24,6 +24,8 @@ class VisualStim(object):
         self.stim_cat: list = []
         self.analyze_pupil: list = []
 
+        self.divided_by_contrast = ['looming-stim-log', 'dimming-circle-log', 'black-sweeping-log', 'white-sweeping-log', 'looming-stim-lin', 'dimming-circle-lin', 'black-sweeping-lin', 'white-sweeping-lin', 'drifting-grating']
+
         self.get_protocol(base_path)
         self.build_df()
         self.add_subtype_stimuli(visual_stim)
@@ -69,45 +71,70 @@ class VisualStim(object):
         self.protocol_df = protocol_df.join(protocol_duration, on="id", how="inner").set_index("id")
 
     def add_subtype_stimuli(self, visual_stim):
+
+        contrast = False
+        radius = False
+        position = False
+        angle = False
+        angle_surround = False
+
         qsm_loc, qsm_names, id_qsm = self.get_qsm_loc(visual_stim)
         cs_type, surround_type, cs_names, surround_names, id_cs, id_s = self.get_surround_mod_type(visual_stim)
-        dg_contrast, dg_names, id_dg = self.get_drift_grat_contrast(visual_stim)
         sp_angle, sp_names, id_sp = self.get_stat_patch_angle(visual_stim)
         cg_contrast_angle, cg_names, id_cg = self.get_cg_contrast_angle(visual_stim)
+        st_size_contrast, st_names, id_st = self.get_st_size_contrast(visual_stim)
+        
+        for stim in self.divided_by_contrast :
+            stim_contrast, stim_names, id_stim = self.get_stim_by_contrast(visual_stim, stim)
+            
+            if stim_contrast is not None :
+                self.separate_subtype_stimuli(stim_contrast, stim_names, id_stim)
+                contrast = True
 
         if qsm_loc is not None :
             self.separate_subtype_stimuli(qsm_loc, qsm_names, id_qsm)
+            position = True
 
         if cs_type is not None :
             self.separate_subtype_stimuli(cs_type, cs_names, id_cs)
+            angle = True
         
         if surround_type is not None :
             self.separate_subtype_stimuli(surround_type, surround_names, id_s)
-        
-        if dg_contrast is not None :
-            self.separate_subtype_stimuli(dg_contrast, dg_names, id_dg)
+            angle = True
+            angle_surround = True
         
         if sp_angle is not None :
             self.separate_subtype_stimuli(sp_angle, sp_names, id_sp)
+            angle = True
         
         if cg_contrast_angle is not None :
             self.separate_subtype_stimuli(cg_contrast_angle, cg_names, id_cg)
+            contrast = True
+            angle = True
+
+        if st_size_contrast is not None :
+            self.separate_subtype_stimuli(st_size_contrast, st_names, id_st)
+            contrast = True
+            radius = True
         
         self.build_df()
 
-        if qsm_loc is not None :
+        if position :
             self.add_column_df('x-center', visual_stim['x-center'])
             self.add_column_df('y-center', visual_stim['y-center'])
 
-        if cs_type is not None or surround_type is not None or sp_angle is not None or\
-              cg_contrast_angle is not None:
+        if angle :
             self.add_column_df('angle', visual_stim['angle'])
         
-        if surround_type is not None :
+        if angle_surround :
             self.add_column_df('angle-surround', visual_stim['angle-surround'])
 
-        if dg_contrast is not None or cg_contrast_angle is not None :
+        if contrast :
             self.add_column_df('contrast', visual_stim['contrast'])
+
+        if radius :
+            self.add_column_df('radius', visual_stim['radius'])
         
     def get_qsm_loc(self, visual_stim) :
         if 'grating' in self.protocol_names or 'quick-spatial-mapping' in self.protocol_names:
@@ -150,23 +177,23 @@ class VisualStim(object):
             id_s = None
 
         return cs_type, surround_type, cs_names, s_names, id_cs, id_s
+    
+    def get_stim_by_contrast(self, visual_stim, stimuli):
+        if stimuli in self.protocol_names :
+            id_stim = self.protocol_df[self.protocol_df['name'] == stimuli].index[0]
+            stim_contrast = [str(round(contrast*10)/10) if id_stim == id else None for id, contrast in zip(visual_stim['protocol_id'], visual_stim['contrast'])]
+            stim_names = list(set(stim_contrast))
+            if None in stim_names:
+                stim_names.remove(None)
 
-    def get_drift_grat_contrast(self, visual_stim):
-        if 'drifting-grating' in self.protocol_names :
-            id_dg = self.protocol_df[self.protocol_df['name'] == 'drifting-grating'].index[0]
-            dg_contrast = [str(round(contrast*10)/10) if id == id_dg else None for id, contrast in zip(visual_stim['protocol_id'], visual_stim['contrast'])]
-            dg_names = list(set(dg_contrast))
-            if None in dg_names:
-                dg_names.remove(None)
-            
-            if len(dg_names) < 2 :
-                dg_contrast = None
+            if len(stim_names) < 2 :
+                stim_contrast = None
         else :
-            dg_contrast = None
-            dg_names = None
-            id_dg = None
+            stim_contrast = None
+            stim_names = None
+            id_stim = None
 
-        return dg_contrast, dg_names, id_dg
+        return stim_contrast, stim_names, id_stim
 
     def get_stat_patch_angle(self, visual_stim):
         if 'static-patch' in self.protocol_names :
@@ -201,6 +228,23 @@ class VisualStim(object):
             id_cg = None
 
         return cg_contrast_angle, cg_names, id_cg
+
+    def get_st_size_contrast(self, visual_stim):
+        if 'size-tuning-contrast-log' in self.protocol_names or 'size-tuning-contrast-lin' in self.protocol_names :
+            id_st = self.protocol_df[(self.protocol_df['name'] == 'size-tuning-contrast-log') | (self.protocol_df['name'] == 'size-tuning-contrast-lin')].index[0]
+            st_size_contrast = [f"{round(radius)}-{round(contrast*100)/100}" if id == id_st else None for id, radius, contrast in zip(visual_stim['protocol_id'], visual_stim['radius'], visual_stim['contrast'])]
+            st_names = list(set(st_size_contrast))
+            if None in st_names:
+                st_names.remove(None)
+
+            if len(st_names) < 2 :
+                st_size_contrast = None
+        else :
+            st_size_contrast = None
+            st_names = None
+            id_st = None
+
+        return st_size_contrast, st_names, id_st
 
     def separate_subtype_stimuli(self, subtype_stim_order, subtype_stim_names, id_stim) :
         protocol_name = self.protocol_names[id_stim]
