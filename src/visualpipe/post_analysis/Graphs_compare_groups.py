@@ -24,6 +24,95 @@ def get_valid_neurons_session(validity, protocol_list):
     
     return valid_neurons
 
+def get_centered_neurons(stimuli_df, neurons_list, trials, attr, frame_rate = 30, plot = False):
+    """
+    Function to get the indices of neurons that have their maximal response in the center stimulus.
+    """
+    stimuli = [
+        'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up', 
+        'quick-spatial-mapping-up-right', 'quick-spatial-mapping-left',
+        'quick-spatial-mapping-center', 'quick-spatial-mapping-right',
+        'quick-spatial-mapping-down-left', 'quick-spatial-mapping-down',
+        'quick-spatial-mapping-down-right'
+    ]
+    if attr == 'dFoF0-baseline':
+        period_names = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
+    elif attr == 'z_scores':
+        period_names = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
+    else:
+        raise ValueError(f"Unknown attribute: {attr}")
+           
+    if not all(stim in stimuli_df['name'].values for stim in stimuli):
+        missing = [stim for stim in stimuli if stim not in stimuli_df['name'].values]
+        raise ValueError(f"Missing stimuli for selecting centered neurons in this session: {missing}")
+    
+    centered_neurons = []
+    not_centered = []
+    for neuron in neurons_list:  # Iterate over all neurons
+        magnitudes_neuron = {stimulus: [] for stimulus in stimuli}
+        # build magnitude dictionary for the mapping stimuli
+        for stimulus in stimuli:
+            stimulus_id = stimuli_df[stimuli_df.name == stimulus].index[0]
+            trial_neuron = trials[period_names[1]][stimulus_id][neuron, int(frame_rate*0.5):]  # Exclude first 0.5s
+            magnitudes_neuron[stimulus] = np.mean(trial_neuron)
+        # Find the stimulus with max response
+        max_stimulus = max(magnitudes_neuron, key=magnitudes_neuron.get)
+        if max_stimulus == 'quick-spatial-mapping-center':
+            centered_neurons.append(neuron)
+        else:
+            not_centered.append(neuron)
+    proportion_centered = 100*len(centered_neurons)/trials[period_names[1]][0].shape[0]
+
+    if plot:
+        def plot_for_neurons(neurons, title):
+            fig, axes = plt.subplots(3, 3, figsize=(15, 12))
+            axes = axes.flatten()
+            # First, collect all traces to find global min/max
+            all_avg_traces = []
+            for stim in stimuli:
+                stim_id = stimuli_df[stimuli_df.name == stim].index[0]
+                traces = np.concatenate([trials[period][stim_id][neurons, :] for period in period_names], axis = 1)
+                avg_trace = np.mean(traces, axis=0)
+                all_avg_traces.append(avg_trace)
+
+            time = np.linspace(0, len(all_avg_traces[0]), len(all_avg_traces[0])) / frame_rate - 1
+            # Determine global min and max
+            global_min = min([trace.min() for trace in all_avg_traces])
+            global_max = max([trace.max() for trace in all_avg_traces])
+
+            # Plot each stimulus
+            for i, stim in enumerate(stimuli):   
+                axes[i].plot(time, all_avg_traces[i])
+                axes[i].set_title(stim.replace('quick-spatial-mapping-', ''))
+                axes[i].set_xlabel('Time (s)')
+                axes[i].set_xticks(np.arange(-1, time[-1] + 1, 1))
+                axes[i].set_ylabel('Average dF/F0 - baseline')
+                axes[i].set_ylim(global_min, global_max)  # same scale for all subplots
+
+                # Add % text to center plot only
+                if stim == 'quick-spatial-mapping-center':
+                    axes[i].text(
+                        0.95, 0.95,  # x, y in axes fraction coordinates
+                        f'{proportion_centered:.1f}%\nCentered', 
+                        transform=axes[i].transAxes,
+                        fontsize=9,
+                        fontweight='bold',
+                        ha='right', 
+                        va='top',
+                        color='red'
+                    )
+
+            plt.suptitle(title, fontsize=16)
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
+            plt.show()
+
+        # Plot centered neurons
+        plot_for_neurons(centered_neurons, 'Centered Neurons')
+
+        # Plot not centered neurons
+        plot_for_neurons(not_centered, 'Not Centered Neurons') 
+    return centered_neurons, not_centered
+
 def compute_cmi(magnitude, protocol_cross='center-surround-cross', protocol_iso='center-surround-iso'):
     """Compute the CMI (Center Magnitude Index) for the specified protocols.
     
@@ -77,7 +166,7 @@ def compute_suppression(magnitude, protocol_surround='center-surround-iso'):
 
     return suppression
 
-def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name):
+def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered):
     if attr == 'dFoF0-baseline':
         period_names = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
     elif attr == 'z_scores':
@@ -108,12 +197,21 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
             validity, trials, stimuli_df = utils.load_data_session(session_path)
 
             valid_neurons = get_valid_neurons_session(validity, valid_sub_protocols)
-            neurons = len(valid_neurons)
-            all_neurons += neurons
             
-            proportion = 100 * len(valid_neurons) / trials[period_names[1]][0].shape[0]
-            proportion_list.append(proportion)
-            print(f"Proportion responding neurons: {proportion}, Number of responding neurons: {neurons}")
+            if not get_centered:
+                neurons = len(valid_neurons)
+                all_neurons += neurons
+                proportion = 100 * len(valid_neurons) / trials[period_names[1]][0].shape[0]
+                proportion_list.append(proportion)
+                print(f"Proportion responding neurons: {proportion}, Number of responding neurons: {neurons}")
+            else:
+                centered_neurons, not_centered = get_centered_neurons(stimuli_df, valid_neurons, trials, attr, frame_rate = 30, plot = False)
+                all_neurons += len(centered_neurons)
+                proportion = 100 * len(centered_neurons) / trials[period_names[1]][0].shape[0]
+                proportion_list.append(proportion)
+                print(f"Proportion of centered neurons: {proportion}, Number of centered neurons: {len(centered_neurons)}")
+                valid_neurons = centered_neurons
+                
             
             for protocol in sub_protocols:
 
@@ -185,21 +283,33 @@ def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity,
             magnitude = magnitude_groups[groups_id[group]]
             x_values = magnitude[protocol_x]
             y_values = magnitude[protocol_y]
-
-            slope, intercept, r_value, p_value, _ = linregress(x_values, y_values)
+            # Clamp values
+            x_values = np.clip(x_values, -0.1, 0.5)
+            y_values = np.clip(y_values, -0.1, 0.5)
+            # Define tick positions
+            ticks = np.arange(-0.1, 0.6, 0.1)
+            # Define tick labels (same length as ticks)
+            tick_labels = ['<-0.1'] + [f"{t:.1f}" for t in ticks[1:-1]] + ['>0.5']
+            """ slope, intercept, r_value, p_value, _ = linregress(x_values, y_values)
             x_fit = np.linspace(min(x_values), max(x_values), 100)
-            y_fit = slope * x_fit + intercept
+            y_fit = slope * x_fit + intercept """
 
             # Create the plot
             plt.scatter(x_values, y_values, marker='o', c=color[group], alpha=0.5, label=f'{group} neurons')
             # Plot regression line
             
-            plt.plot(x_fit, y_fit, color=color[group], label=f'{group} fit: y = {slope:.2f}x + {intercept:.2f}, p = {p_value:.2g}, r**2 = {(r_value)**2:.3f}')
+            #plt.plot(x_fit, y_fit, color=color[group], label=f'{group} fit: y = {slope:.2f}x + {intercept:.2f}, p = {p_value:.2g}, r**2 = {(r_value)**2:.3f}')
         
         # Add labels
+        # Add dashed x=y line
+        lims = [-0.1, 0.5]
+        plt.plot(lims, lims, 'k--', alpha=0.7, label="x = y")
+
         plt.xlabel(f"Magnitude of response to {protocol_x}")
         plt.ylabel(f"Magnitude of response to {protocol_y}")
-        plt.title(f"Response magnitudes ({attr}) for {protocol_validity}-responsive neurons")
+        plt.xticks(ticks, tick_labels)
+        plt.yticks(ticks, tick_labels)
+        plt.title(f"Response magnitudes ({attr}) for {str(protocol_validity)+'-responsive' if not get_centered else 'centered'} neurons")
         plt.legend()
         plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=300)
         plt.show()
@@ -243,8 +353,8 @@ def plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name):
     # Labeling
     ax.set_xticks(x_ticks)
     ax.set_xticklabels(x_labels, ha='right')
-    ax.set_ylabel(f'% of {valid_sub_protocols}-responsive neurons')
-    ax.set_title(f'% of responsive neurons per session')
+    ax.set_ylabel('Proportion of neurons')
+    ax.set_title(f'% of {str(valid_sub_protocols)+'-responsive' if not get_centered else 'centered'} neurons')
     #ax.legend()
     plt.tight_layout()
     
@@ -361,14 +471,14 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
                             alpha=0.3)
         axs[i].set_xticks(np.arange(-1, time[-1] + 1, 1))
         axs[i].set_xlabel("Time (s)")
-        axs[i].set_ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
-        axs[i].set_title(f"Mean {attr} ± SEM by Protocol for {group}")
+        axs[i].set_ylabel('Average dF/F0 - baseline' if attr == 'dFoF0-baseline' else 'Average z-scored dF/F0')
+        axs[i].set_title(f"Average {attr} for {str(protocol_validity)+'-responsive neurons' if not get_centered else 'centered neurons'} for {group}s")
         axs[i].legend(loc='upper left', bbox_to_anchor=(1.05, 1))
 
     axs[2].set_xticks(np.arange(-1, time[-1] + 1, 1))
     axs[2].set_xlabel("Time (s)")
-    axs[2].set_ylabel(f"Average {attr} for neurons responsive to {protocol_validity}")
-    axs[2].set_title(f"Mean {attr} ± SEM by Group and Protocol")
+    axs[2].set_ylabel('Average dF/F0 - baseline' if attr == 'dFoF0-baseline' else 'Average z-scored dF/F0')
+    axs[2].set_title(f"Average {attr} for {str(protocol_validity)+'-responsive neurons' if not get_centered else 'centered neurons'} comparing groups")
     axs[2].legend(loc='upper left', bbox_to_anchor=(1.05, 1))
 
     # Hide the unused subplot (bottom-right)
@@ -612,9 +722,12 @@ if __name__ == "__main__":
     protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center']  
-    # List of protocol(s) used to select reponsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['center'] 
+    sub_protocols = ['center', 'center-surround-iso']  
+    # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
+    valid_sub_protocols = ['quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
+        'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
+        'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up-right',
+        'quick-spatial-mapping-down-left', 'quick-spatial-mapping-down-right'] 
 
     #Frame rate
     frame_rate = 30
@@ -622,15 +735,17 @@ if __name__ == "__main__":
     # Decide if you want to plot the dFoF0 baseline substraced or the z-scores
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
+    # Decide if you want to only keep neurons that are centered
+    get_centered = True
+
     #----------------------------------------------------#
     df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
     groups_id = {'WT': 0, 'KO': 1}
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name) 
-    print(cmi_groups)
-    representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
-                          individual_groups, sub_protocols, attr, save_path, fig_name, variable='CMI')
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered) 
+    #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
+    #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable='CMI')
     
 
     
@@ -650,5 +765,3 @@ if __name__ == "__main__":
     histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
     # Plot CDFs of neuron response magnitudes comparing groups
     plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, fig_name, save_path) 
-
-    print(np.where(np.round(suppression_groups[0], 8) == 0.78250644)[0])
