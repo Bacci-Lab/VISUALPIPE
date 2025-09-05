@@ -205,13 +205,13 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 proportion_list.append(proportion)
                 print(f"Proportion responding neurons: {proportion}, Number of responding neurons: {neurons}")
             else:
-                centered_neurons, not_centered = get_centered_neurons(stimuli_df, valid_neurons, trials, attr, frame_rate = 30, plot = False)
+                centered_neurons, non_centered = get_centered_neurons(stimuli_df, valid_neurons, trials, attr, frame_rate = 30, plot = False)
                 all_neurons += len(centered_neurons)
                 proportion = 100 * len(centered_neurons) / trials[period_names[1]][0].shape[0]
                 proportion_list.append(proportion)
                 print(f"Proportion of centered neurons: {proportion}, Number of centered neurons: {len(centered_neurons)}")
                 valid_neurons = centered_neurons
-                
+
             
             for protocol in sub_protocols:
 
@@ -713,22 +713,23 @@ if __name__ == "__main__":
     #-----------------------INPUTS-----------------------#
 
     excel_sheet_path = r"Y:\raw-imaging\Nathan\PYR\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\vision_survey\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'test'
+    fig_name = 'looming'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "surround-mod"
+    protocol_name = "vision-survey"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center', 'center-surround-iso']  
+    sub_protocols = ['looming-stim']  
     # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
+    valid_sub_protocols = ['looming-stim'] 
+    ''''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
         'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up-right',
-        'quick-spatial-mapping-down-left', 'quick-spatial-mapping-down-right'] 
-
+        'quick-spatial-mapping-down-left', 'quick-spatial-mapping-down-right'''
+    
     #Frame rate
     frame_rate = 30
 
@@ -743,7 +744,7 @@ if __name__ == "__main__":
 
     groups_id = {'WT': 0, 'KO': 1}
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered) 
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered = False) 
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
     #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable='CMI')
     
