@@ -166,7 +166,7 @@ def compute_suppression(magnitude, protocol_surround='center-surround-iso'):
 
     return suppression
 
-def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered):
+def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered, plot):
     if attr == 'dFoF0-baseline':
         period_names = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
     elif attr == 'z_scores':
@@ -205,7 +205,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 proportion_list.append(proportion)
                 print(f"Proportion responding neurons: {proportion}, Number of responding neurons: {neurons}")
             else:
-                centered_neurons, non_centered = get_centered_neurons(stimuli_df, valid_neurons, trials, attr, frame_rate = 30, plot = False)
+                centered_neurons, non_centered = get_centered_neurons(stimuli_df, valid_neurons, trials, attr, frame_rate = 30, plot)
                 all_neurons += len(centered_neurons)
                 proportion = 100 * len(centered_neurons) / trials[period_names[1]][0].shape[0]
                 proportion_list.append(proportion)
@@ -744,7 +744,7 @@ if __name__ == "__main__":
 
     groups_id = {'WT': 0, 'KO': 1}
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered = False) 
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered = get_centered, plot=False) 
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
     #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable='CMI')
     
