@@ -11,8 +11,12 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import cm, colors, colormaps
 
+if __name__ == "__main__":
+    import sys 
+    sys.path.append("./src")
 from visualpipe.red_channel.red_Image_GUI import RedImageAdjust, CategorizeCells
 from visualpipe.gui.time_series_GUI import TimeSeriesUI  # Import your previous class
+import visualpipe.utils.general_functions as gf
 
 class CorrelationView(QGraphicsView):
     objectClicked = pyqtSignal(int)
@@ -154,7 +158,10 @@ class MainVisUI(object):
 
         self.protocol_validity = protocol_validity
         self.stimuliNames = protocol_validity.files
-        self.selectedProtocol = [self.protocol_validity[self.stimuliNames[0]][i][0] for i in range(len(self.protocol_validity[self.stimuliNames[0]]))]
+        try :
+            self.selectedProtocol = [self.protocol_validity[self.stimuliNames[0]][i][0] for i in range(len(self.protocol_validity[self.stimuliNames[0]]))]
+        except :
+            self.selectedProtocol = [self.protocol_validity[self.stimuliNames[0]][i] for i in range(len(self.protocol_validity[self.stimuliNames[0]]))]
         
         self.speed_corr = speed_corr
         self.facemotion_corr = facemotion_corr
@@ -335,7 +342,10 @@ class MainVisUI(object):
         # Check if protocolValidity exists and process it
         if hasattr(self, "protocol_validity") and self.protocol_validity :
             if protocol in self.stimuliNames:  # Ensure the key exists in the dictionary
-                self.selectedProtocol = [self.protocol_validity[protocol][i][0] for i in range(len(self.protocol_validity[protocol]))]
+                try : 
+                    self.selectedProtocol = [self.protocol_validity[protocol][i][0] for i in range(len(self.protocol_validity[protocol]))]
+                except :
+                    self.selectedProtocol = [self.protocol_validity[protocol][i] for i in range(len(self.protocol_validity[protocol]))]
             self.lineEdit_protocol.setText(str(int(np.sum(np.abs(self.selectedProtocol)))))
             self.stim_view.drawObjects(self.selectedProtocol)
         else:
@@ -412,7 +422,7 @@ class MainVisUI(object):
         return combo_box
     
 class VisualizationGUI(QtWidgets.QMainWindow):
-    def __init__(self, save_folder,
+    def __init__(self, output_folder,
                  cell_info, ops, background_image_path, 
                  protocol_validity, 
                  speed_corr, facemotion_corr, pupil_corr, 
@@ -428,7 +438,8 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         if pupil_corr is None:
             pupil_corr = np.zeros(len(fluorescence))
 
-        self.save_folder = save_folder
+        self.output_folder = output_folder
+        self.save_red_folder = os.path.join(output_folder, 'red_channel')
         self.cell_info = cell_info
         self.ops = ops
         self.background_image_path = background_image_path 
@@ -476,13 +487,12 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         if np.sum(np.isnan(pupil_corr)) == len(dFoF0):
             pupil_corr = np.zeros(len(dFoF0))
 
-        print(facemotion_corr)
         # Load visual stimuli data
         visual_stim = np.load(visual_stim_filepath, allow_pickle=True).item()
         duration = visual_stim['time_duration']
         stim_time_period = [time_onset, list(time_onset + duration)]
 
-        dFoF0_norm = visualpipe.utils.General_functions.scale_trace(dFoF0, axis=1)
+        dFoF0_norm = gf.scale_trace(dFoF0, axis=1)
         
         return cls(save_folder, cell_info, ops, background_image_path, 
                    protocol_validity,
@@ -537,8 +547,8 @@ class VisualizationGUI(QtWidgets.QMainWindow):
 
         self.main_vis_ui = MainVisUI(self.first_tab, self.cell_info, self.background_image_path,
                                      self.protocol_validity, self.speed_corr, self.facemotion_corr, self.pupil_corr)
-        self.red_img_adjust_ui = RedImageAdjust(self.second_tab, self.save_folder, self.red_tif_path)
-        self.categorize_cells_ui = CategorizeCells(self.third_tab, self.save_folder, self.cell_info, self.ops)
+        self.red_img_adjust_ui = RedImageAdjust(self.second_tab, self.save_red_folder, self.red_tif_path)
+        self.categorize_cells_ui = CategorizeCells(self.third_tab, self.output_folder, self.cell_info, self.ops)
         self.data_vis_ui = TimeSeriesUI(self.fourth_tab, self.fluorescence, self.time, self.speed, self.facemotion, self.pupil, self.photodiode, self.stimuli_intervals)
 
         self.retranslateUi()
@@ -552,6 +562,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         self.setMenuBar(self.menubar)
 
         self.button_load_data = QtWidgets.QAction(self)
+        self.button_load_data.setVisible(False)
         self.button_load_data.triggered.connect(self.menu_button_clicked)
         self.menubar.addAction(self.button_load_data)
 
@@ -579,7 +590,8 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         base_path = path.parent.absolute()
 
         unique_id, _, _, _ = file.get_metadata(base_path)
-        id_version = save_folder.split('_')[5]
+        foldername = os.path.basename(output_folder)
+        id_version = foldername.split('_')[5]
         
         # Load stat file
         filename = "_".join([unique_id, id_version, 'stat.npy'])
@@ -651,9 +663,9 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         duration = visual_stim['time_duration']
         stimuli_intervals = [time_onset, list(time_onset + duration)]
 
-        dFoF0_norm = visualpipe.utils.General_functions.scale_trace(dFoF0, axis=1)
+        dFoF0_norm = gf.scale_trace(dFoF0, axis=1)
         
-        self.save_folder = save_folder
+        self.output_folder = save_folder
         self.cell_info = cell_info
         self.ops = ops
         self.background_image_path = background_image_path 
@@ -675,17 +687,20 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         self.main_vis_ui.background_image_path = self.background_image_path
         self.main_vis_ui.protocol_validity = self.protocol_validity
         self.main_vis_ui.stimuliNames = self.protocol_validity.files
-        self.main_vis_ui.selectedProtocol = [self.protocol_validity[self.main_vis_ui.stimuliNames[0]][i][0] for i in range(len(self.protocol_validity[self.main_vis_ui.stimuliNames[0]]))]
+        try : 
+            self.main_vis_ui.selectedProtocol = [self.protocol_validity[self.main_vis_ui.stimuliNames[0]][i][0] for i in range(len(self.protocol_validity[self.main_vis_ui.stimuliNames[0]]))]
+        except : 
+            self.main_vis_ui.selectedProtocol = [self.protocol_validity[self.main_vis_ui.stimuliNames[0]][i] for i in range(len(self.protocol_validity[self.main_vis_ui.stimuliNames[0]]))]
         self.main_vis_ui.speed_corr = self.speed_corr
         self.main_vis_ui.facemotion_corr = self.facemotion_corr
         self.main_vis_ui.pupil_corr = self.pupil_corr
         self.main_vis_ui.reset_data_in_GUI()
 
-        self.red_img_adjust_ui.save_folder = self.save_folder
+        self.red_img_adjust_ui.save_folder = self.output_folder
         self.red_img_adjust_ui.red_frame_path = self.red_tif_path
         self.red_img_adjust_ui.reset_UI()
 
-        self.categorize_cells_ui.save_folder = self.save_folder
+        self.categorize_cells_ui.output_dir = self.output_folder
         self.categorize_cells_ui.cell_info = self.cell_info
         self.categorize_cells_ui.ops = self.ops
         self.categorize_cells_ui.load_data_in_GUI()
@@ -725,19 +740,19 @@ if __name__ == "__main__":
     import easygui
     from pathlib import Path
 
-    import utils.file as file
-    import visualpipe.utils.General_functions as General_functions
+    import visualpipe.utils.file as file
 
-    save_folder = easygui.diropenbox(title='Select folder containing output data')
-    path = Path(save_folder)
+    output_folder = easygui.diropenbox(title='Select folder containing output data')
+    path = Path(output_folder)
     base_path = path.parent.absolute()
 
     unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
-    id_version = save_folder.split('_')[5]
+    foldername = os.path.basename(output_folder)
+    id_version = foldername.split('_')[5]
     
     # Load stat file
     filename = "_".join([unique_id, id_version, 'stat.npy'])
-    stat_filepath = os.path.join(save_folder, filename)
+    stat_filepath = os.path.join(output_folder, filename)
     
     # Load ops file
     tseries = [f for f in os.listdir(base_path) if f.startswith("TSeries")]
@@ -753,11 +768,11 @@ if __name__ == "__main__":
 
     # Protocol validity filepath
     filename_protocol = "_".join([unique_id, id_version, 'protocol_validity_2']) + ".npz"
-    protocol_validity_filepath = os.path.join(save_folder, filename_protocol)
+    protocol_validity_filepath = os.path.join(output_folder, filename_protocol)
     
     # HDF5 filepath
     filename_h5 = "_".join([unique_id, id_version, 'postprocessing']) + ".h5"
-    h5_filepath = os.path.join(save_folder, filename_h5)
+    h5_filepath = os.path.join(output_folder, filename_h5)
 
     # Visual stimuli filepath
     visual_stim_filepath = os.path.join(base_path, "visual-stim.npy")
@@ -776,6 +791,6 @@ if __name__ == "__main__":
 
     # Launch App
     app = QtWidgets.QApplication(sys.argv)
-    main_window = VisualizationGUI.from_file(save_folder, stat_filepath, ops_filepath, background_image_path, protocol_validity_filepath, h5_filepath, visual_stim_filepath, red_tif_path)
+    main_window = VisualizationGUI.from_file(output_folder, stat_filepath, ops_filepath, background_image_path, protocol_validity_filepath, h5_filepath, visual_stim_filepath, red_tif_path)
     main_window.show()
     app.exec_()

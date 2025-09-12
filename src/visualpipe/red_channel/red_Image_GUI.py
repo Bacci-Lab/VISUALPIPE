@@ -8,6 +8,8 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap, QColor, QPen, QBrush
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPixmapItem, QFileDialog
 
+if __name__ == "__main__":
+    sys.path.append("./src")
 import visualpipe.gui.GUI_functions as GUI_functions
 import visualpipe.red_channel.red_cell_function as red_cell_function
 import visualpipe.utils.file as file
@@ -15,7 +17,6 @@ import visualpipe.utils.file as file
 class RedGUI(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__(flags=Qt.WindowStaysOnTopHint)
-        self.save_folder = QFileDialog.getExistingDirectory(self, caption='Select folder containing output data')
         self.setupUi()
 
     def setupUi(self):
@@ -65,32 +66,22 @@ class RedGUI(QtWidgets.QMainWindow):
         self.tabWidget.addTab(self.adjust_red_img_tab, 'Adjust Red Channel Image')
                               
         #------------------------- Tab 1 -------------------------
-        self.categorize_ui = CategorizeCells(self.categorize_cells_tab, self.save_folder)
+        self.categorize_ui = CategorizeCells(self.categorize_cells_tab)
 
         #------------------------- Tab 2 -------------------------
-        self.red_img_adjust_ui = RedImageAdjust(self.adjust_red_img_tab, self.save_folder)
+        self.red_img_adjust_ui = RedImageAdjust(self.adjust_red_img_tab)
 
         #--------------------------------------------------
         self.retranslateUi()
     
     def menu_button_clicked(self):
         
-        save_dir = QFileDialog.getExistingDirectory(self, caption='Select folder containing output data')
-        if save_dir is not None :
-            self.save_folder = save_dir
-            self.categorize_ui.save_folder = save_dir
-            self.red_img_adjust_ui.save_folder = save_dir
+        output_dir = QFileDialog.getExistingDirectory(self, caption='Select folder containing output data')
+        if output_dir != '':
+            self.categorize_ui.output_dir = output_dir
+            self.red_img_adjust_ui.save_folder = os.path.join(output_dir, 'red_channel')
 
-            out = self.categorize_ui.set_cell_info()
-            if out == -1 :
-                raise Exception("No valid stat.npy file.")
-            
-            out = self.categorize_ui.set_ops()
-            if out == -1 :
-                raise Exception("No valid ops.npy file.")
-            
-            # Load data in GUI
-            out = self.categorize_ui.load_data_in_GUI()
+            out = self.categorize_ui.update_UI()
             if out == -1:
                 self.tabWidget.setCurrentIndex(1)
             
@@ -98,6 +89,7 @@ class RedGUI(QtWidgets.QMainWindow):
             return 0
         
         else :
+            print("No output folder selected")
             return -1
         
     def retranslateUi(self):
@@ -109,23 +101,25 @@ class RedGreenView(QGraphicsView):
 
     objectClicked = pyqtSignal(int)
 
-    def __init__(self):
+    def __init__(self, cell_info=None, only_green_cell=None, background_image_path=None):
         super().__init__()
         self.setScene(QGraphicsScene())
-        self.only_green_cell = None
-        self.cell_info = None
-        self.background_image_path = None
+        self.only_green_cell = only_green_cell
+        self.cell_info = cell_info
+        self.background_image_path = background_image_path
+        if background_image_path is not None:
+            self.setBackgroundImage()
+        if cell_info is not None and only_green_cell is not None: 
+            self.drawObjects()
 
     def setBackgroundImage(self):
-        if self.background_image_path:
-            pixmap = QPixmap(self.background_image_path)
-            if not pixmap.isNull():
-                pixmap_item = QGraphicsPixmapItem(pixmap)
-                pixmap_item.setZValue(-100)
-                self.scene().addItem(pixmap_item)
-            else:
-                print("Failed to load background image:", self.background_image_path)
-        self.drawObjects()
+        pixmap = QPixmap(self.background_image_path)
+        if not pixmap.isNull():
+            pixmap_item = QGraphicsPixmapItem(pixmap)
+            pixmap_item.setZValue(-100)
+            self.scene().addItem(pixmap_item)
+        else:
+            print("Failed to load background image:", self.background_image_path)
 
     def drawObjects(self):
         scene = self.scene()
@@ -149,22 +143,25 @@ class RedGreenView(QGraphicsView):
 class GreenView(QGraphicsView):
     objectClicked = pyqtSignal(int)
 
-    def __init__(self):
+    def __init__(self, cell_info=None, only_green_cell=None, background_image_path=None):
         super().__init__()
         self.setScene(QGraphicsScene())
-        self.only_green_cell = None
-        self.cell_info = None
-        self.background_image_path = None
+        self.only_green_cell = only_green_cell
+        self.cell_info = cell_info
+        self.background_image_path = background_image_path
+        if background_image_path is not None:
+            self.setBackgroundImage()
+        if cell_info is not None and only_green_cell is not None: 
+            self.drawObjects()
 
     def setBackgroundImage(self):
-        if self.background_image_path:
-            pixmap = QPixmap(self.background_image_path)
-            if not pixmap.isNull():
-                pixmap_item = QGraphicsPixmapItem(pixmap)
-                pixmap_item.setZValue(-100)
-                self.scene().addItem(pixmap_item)
-            else:
-                print("Failed to load background image:", self.background_image_path)
+        pixmap = QPixmap(self.background_image_path)
+        if not pixmap.isNull():
+            pixmap_item = QGraphicsPixmapItem(pixmap)
+            pixmap_item.setZValue(-100)
+            self.scene().addItem(pixmap_item)
+        else:
+            print("Failed to load background image:", self.background_image_path)
 
     def drawObjects(self):
         scene = self.scene()
@@ -186,12 +183,14 @@ class GreenView(QGraphicsView):
         super().mousePressEvent(event)
 
 class CategorizeCells(object):
-    def __init__(self, centralwidget, save_folder, cell_info=None, ops=None):
+    def __init__(self, centralwidget, output_folder=None, cell_info=None, ops=None):
 
         self.centralwidget = centralwidget
-        self.save_folder = save_folder
+        self.output_dir = output_folder
         self.cell_info = cell_info
         self.ops = ops
+
+        self.save_dir = None
 
         # Initialize tracking lists
         self.currentRedObjects = []
@@ -199,16 +198,24 @@ class CategorizeCells(object):
         self.red_cell_num = 0
         self.green_cell_num = 0
 
-        if self.cell_info is None :
-            out = self.set_cell_info()
-            if out == -1 :
-                raise Exception("No valid stat.npy file.")
-        if self.ops is None :
-            out = self.set_ops()
-            if out == -1 :
-                raise Exception("No valid ops.npy file.")
         self.setupUi()
-        self.load_data_in_GUI()
+
+        if self.output_dir is not None:
+            self.save_dir = os.path.join(self.output_dir, 'red_channel')
+
+            if cell_info is not None and ops is not None:
+                self.load_data_in_GUI()
+            
+            else :
+                if cell_info is None:
+                    out = self.set_cell_info()
+                    if out == -1 :
+                        raise Exception("No valid stat.npy file.")
+
+                if ops is None:
+                    out = self.set_ops()
+                    if out == -1 :
+                        raise Exception("No valid ops.npy file.")
 
     def setupUi(self):
         
@@ -289,9 +296,25 @@ class CategorizeCells(object):
 
         self.retranslateUi()
 
+    def update_UI(self):
+        self.save_dir = os.path.join(self.output_dir, 'red_channel')
+
+        out = self.set_cell_info()
+        if out == -1 :
+            raise Exception("No valid stat.npy file.")
+        
+        out = self.set_ops()
+        if out == -1 :
+            raise Exception("No valid ops.npy file.")
+        
+        # Load data in GUI
+        out = self.load_data_in_GUI()
+
+        return out
+    
     def set_ops(self):
 
-        path = Path(self.save_folder)
+        path = Path(self.output_dir)
         base_path = path.parent.absolute()
 
         # Load ops file
@@ -306,7 +329,7 @@ class CategorizeCells(object):
         if os.path.exists(suite2p_path) :
             self.ops = np.load(os.path.join(suite2p_path, "ops.npy"), allow_pickle=True).item()
         else :
-            print(f"{suite2p_path} doesn't exists. Select op.npy file.")
+            print(f"{suite2p_path} doesn't exists. Select ops.npy file.")
             ops_path = QFileDialog.getOpenFileName(self.centralwidget, caption='Select ops.npy file', filter="npy(*.npy)")[0]
             if 'ops' in ops_path: 
                 self.ops = np.load(ops_path, allow_pickle=True).item()
@@ -318,14 +341,15 @@ class CategorizeCells(object):
     
     def set_cell_info(self):
 
-        path = Path(self.save_folder)
+        path = Path(self.output_dir)
         base_path = path.parent.absolute()
         unique_id, _, _, _ = file.get_metadata(base_path)
-        id_version = self.save_folder.split('_')[5]
-
+        foldername = os.path.basename(self.output_dir)
+        id_version = foldername.split('_')[5]
+        
         # Load stat file
         filename = "_".join([unique_id, id_version, 'stat.npy'])
-        stat_path = os.path.join(self.save_folder, filename)
+        stat_path = os.path.join(self.output_dir, filename)
         if os.path.exists(stat_path) :
             self.cell_info = np.load(stat_path, allow_pickle=True)
         else :
@@ -368,29 +392,34 @@ class CategorizeCells(object):
         return self.currentRedObjects, self.currentGreenObjects
 
     def save_npy_files(self):
-        save_direction1 = os.path.join(self.save_folder, 'red_green_cells.npy')
-        save_direction2 = os.path.join(self.save_folder, 'only_green.npy')
+        if not os.path.exists(self.save_dir) : os.mkdir(self.save_dir) # Create save_dir
+        save_direction1 = os.path.join(self.save_dir, 'red_green_cells.npy')
+        save_direction2 = os.path.join(self.save_dir, 'only_green.npy')
         np.save(save_direction1, self.currentRedObjects, allow_pickle=True)
         np.save(save_direction2, self.currentGreenObjects, allow_pickle=True)
 
     def load_data_in_GUI(self):
+
+        if self.save_dir is None :
+            print("Please first select output folder.")
+            return -2
         
         # Load red_green_cells.npy file
-        red_green_filepath = os.path.join(self.save_folder, 'red_green_cells.npy')
+        red_green_filepath = os.path.join(self.save_dir, 'red_green_cells.npy')
         if os.path.exists(red_green_filepath) :
             data = np.load(red_green_filepath, allow_pickle=True)
             only_green_cells = np.ones(len(self.cell_info))
             only_green_cells[data] = 0
         else :
-            red_masks_dir = os.path.join(self.save_folder, "red_mask.npy")
+            red_masks_dir = os.path.join(self.save_dir, "red_mask.npy")
             if os.path.exists(red_masks_dir) :
-                only_green_cells = red_cell_function.get_GreenMask(self.save_folder, self.ops, self.cell_info)
+                only_green_cells = red_cell_function.get_GreenMask(self.save_dir, self.ops, self.cell_info)
             else : 
                 print("red_mask.npy doesn't exist. Compute masks first.")
                 return -1
         
         # Check existence of adjusted_image.jpg file
-        background_image_path = os.path.join(self.save_folder, 'adjusted_image.jpg')
+        background_image_path = os.path.join(self.save_dir, 'adjusted_image.jpg')
         if not os.path.exists(background_image_path):
             print("adjusted_image.jpg doesn't exist. Compute masks first.")
             return -1
@@ -430,7 +459,7 @@ class CategorizeCells(object):
 
 class RedImageAdjust(object):
 
-    def __init__(self, centralwidget, save_folder, red_frame_path=None):
+    def __init__(self, centralwidget, save_folder=None, red_frame_path=None):
         self.centralwidget = centralwidget
         self.save_folder = save_folder
         GUI_functions.initialize_attributes(self)
@@ -480,7 +509,7 @@ class RedImageAdjust(object):
 
         # ---------------------------------------- Setup Sliders ------------------------------------
         self.verticalSlider_brightness = GUI_functions.setup_sliders(self.frame,(625,70), (22,131), -100, 100, 0,"vertical", self.brightness_value)
-        self.verticalSlider_threshold = GUI_functions.setup_sliders(self.frame, (695, 70), (22, 131), 0, 255, 0,"vertical", self.set_threshold)
+        self.verticalSlider_threshold = GUI_functions.setup_sliders(self.frame, (695, 70), (22, 131), 0, 255, 0, "vertical", self.set_threshold)
         self.verticalSlider_intensity = GUI_functions.setup_sliders(self.frame,(555, 70),(22, 131),0,30,1,"vertical",self.intensity_value)
         self.Slider_min = GUI_functions.setup_sliders(self.frame,(615, 250),(100, 25),0,500,self.min_area, "horizontal", self.set_min)
         self.Slider_max = GUI_functions.setup_sliders(self.frame,(615, 280),(100, 25),0,500,self.max_area, "horizontal", self.set_max)
@@ -574,6 +603,7 @@ class RedImageAdjust(object):
                       'intensity': self.intensity,
                       'blur kernel': self.blur_kernel}
 
+        if not os.path.exists(self.save_folder) : os.mkdir(self.save_folder) # Create save_folder
         SaveMetadata = os.path.join(self.save_folder, 'red_image_parameters.txt')
         with open(SaveMetadata, 'w') as file:
             file.write(json.dumps(parameters, indent = 4))
@@ -584,6 +614,7 @@ class RedImageAdjust(object):
         return self.adjust_image_exist
 
     def save_image(self):
+        if not os.path.exists(self.save_folder) : os.mkdir(self.save_folder) # Create save_folder
         save_background_path = os.path.join(self.save_folder, "adjusted_image.jpg")
         save_mask_path = os.path.join(self.save_folder, "red_mask.npy")
         save_mask_path_image = os.path.join(self.save_folder, "red_mask.jpg")
@@ -592,20 +623,18 @@ class RedImageAdjust(object):
             cv2.imwrite(save_background_path,  self.updated_image)
             np.save(save_mask_path,  self.detect_ROI)
             cv2.imwrite(save_mask_path_image, self.image_contours)
-            print("saving function works")
+            print("red masks saved")
         else:
             self.show_warning_popup("Please first detect masks")
 
     def show_mask(self):
         if self.image is None :
             self.show_warning_popup("Please first load Red TIF")
-        elif self.thresholded_im is not None:
+        else :
             self.thresholded_im, self.updated_image = GUI_functions.thresholding(self.image, self.intensity, self.brightness,
-                                                                  self.threshold,self.blur_kernel, self.scene)
+                                                                  self.threshold, self.blur_kernel, self.scene)
             self.detect_ROI, self.image_contours = red_cell_function.detect_REDROI(self.thresholded_im,self.updated_image, self.min_area, self.max_area )
             GUI_functions.load_mask_image(self.scene_mask, self.image_contours)
-        else:
-            self.show_warning_popup("Please first adjust thresholding")
 
     def load_parameters(self):
         parameter_directory = os.path.join(self.save_folder, "red_image_parameters.txt")
@@ -632,11 +661,16 @@ class RedImageAdjust(object):
             print('No parameters file selected.')
     
     def load_red_tif(self):
+        if self.save_folder is None :
+            print("Please first select output folder.")
+            return -1
         red_frame_path = QFileDialog.getOpenFileName(self.centralwidget, caption='Select red channel tif', filter="Images(*.tif *.tiff)")[0]
         
         if red_frame_path != '' :
             self.red_frame_path = red_frame_path
             self.image = GUI_functions.load_init_image(self.scene, self.red_frame_path)
+        
+        return 0
     
     def reset_UI(self):
         self.image = GUI_functions.load_init_image(self.scene, self.red_frame_path)

@@ -73,7 +73,7 @@ def get_metadata(path):
             subject_id = data['subject_ID']
             return unique_id, global_protocol, experimenter, subject_id
     else:
-        raise Exception("No JSON metadata file exists in this directory")
+        raise Exception(f"No JSON metadata file exists in this directory : {path}")
     
 def create_output_folder(path, unique_id):
     version = []
