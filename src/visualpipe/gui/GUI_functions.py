@@ -1,34 +1,72 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import cv2
-import os.path
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage
+from typing import Tuple
+import numpy as np
 
-def initialize_attributes(obj):
-    obj.intensity = 1
-    obj.brightness = 0
-    obj.min_area = 25
-    obj.max_area = 450
-    obj.threshold = 0
-    obj.blur_kernel = 1
-    obj.detect_ROI = None
-    obj.hresholded_im = None
-    obj.image_contours = None
-    obj.adjust_image_exist = False
-    
-def setup_sliders(parent, location,size,min,max,set_value, orientation, function):
-    Slider = QtWidgets.QSlider(parent)
-    Slider.setGeometry(QtCore.QRect(location[0], location[1], size[0], size[1]))
-    if orientation == "vertical":
-        Slider.setOrientation(QtCore.Qt.Vertical)
-    elif orientation == "horizontal":
-        Slider.setOrientation(QtCore.Qt.Horizontal)
-    Slider.setMinimum(min)
-    Slider.setMaximum(max)
-    Slider.setValue(set_value)
-    Slider.valueChanged.connect(function)
+def show_warning_popup(widget, message):
+    msg = QtWidgets.QMessageBox(widget)
+    msg.setIcon(QtWidgets.QMessageBox.Warning)
+    msg.setText(message)
+    msg.setWindowTitle("Warning")
+    msg.exec_()
 
-    return Slider
-def setup_labels(parent,location,size,color, set_text = False):
+# ----------------------------------- setup UI functions ---------------------------------------
+def add_slider_row(group: QtWidgets.QGroupBox,
+                   vbox: QtWidgets.QVBoxLayout,
+                   text: str,
+                   minimum: float,
+                   maximum: float,
+                   initial: float,
+                   step: float,
+                   on_value_changed,
+                   enabled:bool) -> Tuple[QtWidgets.QSlider, QtWidgets.QLabel]:
+    """
+    Adds a horizontal row into `vbox` (which should belong to `group`) containing:
+      [ QLabel(text) | QSlider | QLabel(current_value) ]
+    Maps the float range [minimum, maximum] with step `step` onto the slider.
+    Hooks slider.valueChanged to update the right‐hand QLabel
+    and call `on_value_changed(new_float_value)`.
+    Returns (slider, value_label).
+    """
+    # compute integer slider range
+    n_steps = int(round((maximum - minimum) / step))
+    # create layout
+    hbox = QtWidgets.QHBoxLayout()
+    hbox.setContentsMargins(0, 0, 0, 0)
+
+    # left‐side text
+    lbl = QtWidgets.QLabel(text, group)
+    lbl.setStyleSheet("color: white;")
+    hbox.addWidget(lbl)
+
+    # slider
+    slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, group)
+    slider.setRange(0, n_steps)
+    init_val = int(round((initial - minimum) / step))
+    slider.setValue(init_val)
+    hbox.addWidget(slider)
+
+    # display label
+    val_lbl = QtWidgets.QLabel(f"{initial:.3g}", group)
+    val_lbl.setStyleSheet("color: white;")
+    hbox.addWidget(val_lbl)
+
+    # when slider moves, compute float, update label & call callback
+    def _on_val(v: int):
+        fv = minimum + v * step
+        # format with sensible precision
+        val_lbl.setText(f"{fv:.3g}")
+        on_value_changed(fv)
+
+    slider.valueChanged.connect(_on_val)
+
+    slider.setEnabled(enabled)
+
+    vbox.addLayout(hbox)
+    return slider, val_lbl
+
+def setup_labels(parent, location, size, color, set_text=False):
     label = QtWidgets.QLabel(parent)
     label.setGeometry(QtCore.QRect(location[0], location[1], size[0], size[1]))
     label.setAlignment(QtCore.Qt.AlignCenter)
@@ -36,13 +74,35 @@ def setup_labels(parent,location,size,color, set_text = False):
     if set_text:
         label.setText(str(set_text))
     return label
-def setup_pushButton(parent, location, size, color, function):
+
+def setup_pushButton(parent, location, size, color, function, enabled):
     PushButton = QtWidgets.QPushButton(parent)
     PushButton.setGeometry(QtCore.QRect(location[0], location[1], size[0], size[1]))
     PushButton.setStyleSheet(color)
     PushButton.clicked.connect(function)
+    PushButton.setEnabled(enabled)
     return PushButton
 
+def update_slider(slider, label, new_value, minimum, maximum, step, format_spec):
+    new_val = max(minimum, min(maximum, new_value))
+    int_tick = int(round((new_val - minimum) / step))
+    slider.blockSignals(True)
+    slider.setValue(int_tick)
+    formatted_val = format_spec.format(new_val)
+    label.setText(f"{formatted_val}")
+    slider.blockSignals(False)
+
+def update_slider_blur(slider, label, new_value, minimum, maximum, step, format_spec):
+    value_slider = (float(new_value) - 1.0) / 2.0
+    new_val = max(minimum, min(maximum, new_value))
+    int_tick = int(round((value_slider - minimum) / step))
+    slider.blockSignals(True)
+    slider.setValue(int_tick)
+    formatted_val = format_spec.format(new_val)
+    label.setText(f"{formatted_val}")
+    slider.blockSignals(False)
+
+# ----------------------------------- Images functions ---------------------------------------
 def cv2_to_pixmap(cv_image):
     height, width = cv_image.shape[:2]
     bytes_per_line = width
@@ -50,62 +110,17 @@ def cv2_to_pixmap(cv_image):
     pixmap = QtGui.QPixmap.fromImage(q_image)
     return pixmap
 
-def update_image(scene, image, intensity,blur_kernel, brightness):
-    scene.clear()
-    adjusted_image = cv2.convertScaleAbs(image, alpha=intensity, beta=brightness)
-    if isinstance(blur_kernel, tuple):
-        blur_kernel = blur_kernel
-    else:
-        blur_kernel = (blur_kernel, blur_kernel)
-    if blur_kernel[0] > 0 :
-        blurred = cv2.GaussianBlur(adjusted_image, blur_kernel, 0)
-    else :
-        blurred = adjusted_image
-    pixmap = cv2_to_pixmap(blurred)
-    item = QtWidgets.QGraphicsPixmapItem(pixmap)
-    scene.addItem(item)
-    return blurred
+def cv2_to_qpixmap(cv_img: np.ndarray) -> QPixmap:
+    """
+    Convert an OpenCV BGR uint8 image to QPixmap for display.
+    """
+    # 1) Convert BGR → RGB
+    rgb = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+    h, w, ch = rgb.shape
+    bytes_per_line = ch * w
 
-def load_init_image(scene, image_path):
-    if image_path is not None and os.path.exists(image_path) :
-        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        normalized_image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
-        ## check if you wantn clahe
-        # clahe = cv2.createCLAHE(clipLimit=9.0, tileGridSize=(15,15))
-        # image = clahe.apply(image)
+    # 2) Wrap in QImage
+    qt_image = QImage(rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
 
-        pixmap = cv2_to_pixmap(normalized_image)
-        scene.clear()
-        item = QtWidgets.QGraphicsPixmapItem(pixmap)
-        scene.addItem(item)
-        return normalized_image
-    else :
-        scene.clear()
-        return None
-    
-def load_mask_image(scene,image_contours):
-    height, width, channel = image_contours.shape
-    bytes_per_line = 3 * width
-    q_image = QtGui.QImage(image_contours.data, width, height, bytes_per_line, QtGui.QImage.Format_RGB888)
-    pixmap = QPixmap.fromImage(q_image)
-    scene.clear()
-    item = QtWidgets.QGraphicsPixmapItem(pixmap)
-    scene.addItem(item)
-
-def thresholding(image,intensity, brightness, th_value, blur_kernel, scene):
-    if isinstance(blur_kernel, tuple):
-        blur_kernel = blur_kernel
-    else:
-        blur_kernel = (blur_kernel, blur_kernel)
-    #print("blur_kernel", blur_kernel)
-    adjusted_image = cv2.convertScaleAbs(image, alpha=intensity, beta=brightness)
-    if blur_kernel[0] > 0 :
-        blurred = cv2.GaussianBlur(adjusted_image, blur_kernel, 0)
-    else :
-        blurred = adjusted_image
-    _, thresh = cv2.threshold(blurred, th_value, 255, cv2.THRESH_BINARY)
-    scene.clear()
-    pixmap= cv2_to_pixmap(thresh)
-    item = QtWidgets.QGraphicsPixmapItem(pixmap)
-    scene.addItem(item)
-    return thresh, blurred
+    # 3) Convert to QPixmap
+    return QPixmap.fromImage(qt_image)

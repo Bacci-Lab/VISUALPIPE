@@ -10,3 +10,5 @@ scipy==1.15.1
 seaborn
 statsmodels
 openpyxl
+imagecodecs
+skimage
