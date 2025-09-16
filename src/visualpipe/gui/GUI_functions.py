@@ -102,6 +102,17 @@ def update_slider_blur(slider, label, new_value, minimum, maximum, step, format_
     label.setText(f"{formatted_val}")
     slider.blockSignals(False)
 
+def add_radio_button_group(parent:QtWidgets.QWidget, labels:list[str], layout:QtWidgets.QLayout, function, init_id=0):
+    radio_group = QtWidgets.QButtonGroup(parent)
+    for i, label in enumerate(labels):
+        radio_button = QtWidgets.QRadioButton(label, parent)
+        radio_button.setStyleSheet("color: white;")
+        radio_group.addButton(radio_button, id=i)
+        layout.addWidget(radio_button)
+    radio_group.button(init_id).setChecked(True)
+    radio_group.buttonClicked[int].connect(function)
+    return radio_button
+
 # ----------------------------------- Images functions ---------------------------------------
 def cv2_to_pixmap(cv_image):
     height, width = cv_image.shape[:2]

@@ -24,7 +24,7 @@ class RedGUI(QtWidgets.QMainWindow):
 
         #------------------------- Main settings -------------------------
         self.setObjectName("MainWindow")
-        self.setGeometry(500, 50, 1341, 750)
+        self.setGeometry(500, 50, 1341, 770)
         self.setStyleSheet("""
             background-color: rgb(104, 104, 104);
             gridline-color: rgb(213, 213, 213);
@@ -57,7 +57,7 @@ class RedGUI(QtWidgets.QMainWindow):
         self.tabWidget.setTabPosition(QtWidgets.QTabWidget.North)
         self.tabWidget.setDocumentMode(True)
         self.tabWidget.setObjectName("tabWidget")
-        self.tabWidget.setGeometry(20, 30, 1301, 680)
+        self.tabWidget.setGeometry(20, 30, 1301, 700)
         self.tabWidget.setStyleSheet("background-color: rgb(104, 104, 104);\ncolor: white;")
         
         self.categorize_cells_tab = QtWidgets.QWidget(self.centralwidget)
@@ -192,7 +192,8 @@ class CategorizeCells(object):
         self.ops = ops
 
         self.save_dir = None
-
+        self.currentBackgroundImage_left  = None
+        self.currentBackgroundImage_right = None
         # Initialize tracking lists
         self.currentRedObjects = []
         self.currentGreenObjects = []
@@ -202,21 +203,7 @@ class CategorizeCells(object):
         self.setupUi()
 
         if self.output_dir is not None:
-            self.save_dir = os.path.join(self.output_dir, 'red_channel')
-
-            if cell_info is not None and ops is not None:
-                self.load_data_in_GUI()
-            
-            else :
-                if cell_info is None:
-                    out = self.set_cell_info()
-                    if out == -1 :
-                        raise Exception("No valid stat.npy file.")
-
-                if ops is None:
-                    out = self.set_ops()
-                    if out == -1 :
-                        raise Exception("No valid ops.npy file.")
+            self.update_UI()    
 
     def setupUi(self):
         
@@ -256,6 +243,10 @@ class CategorizeCells(object):
         self.red_view = RedGreenView()
         self.verticalLayout_red_green.addWidget(self.red_view)
 
+        self.radio_hbox_left = QtWidgets.QHBoxLayout()
+        self.verticalLayout_red_green.addLayout(self.radio_hbox_left)
+        self.radio_group_left = GUI_functions.add_radio_button_group(self.left_frame, ["Adjusted Red Channel", "Red Channel", "Green Channel"], self.radio_hbox_left, self.change_background_left, 0)
+
         self.horizontalLayout.addWidget(self.left_frame)
 
         #_____________________________________________________
@@ -282,6 +273,10 @@ class CategorizeCells(object):
         self.green_view = GreenView()
         self.verticalLayout_only_green.addWidget(self.green_view)
 
+        self.radio_hbox_right = QtWidgets.QHBoxLayout()
+        self.verticalLayout_only_green.addLayout(self.radio_hbox_right)
+        self.radio_group_right = GUI_functions.add_radio_button_group(self.right_frame, ["Adjusted Red Channel", "Red Channel", "Green Channel"], self.radio_hbox_right, self.change_background_right, 0)
+
         self.horizontalLayout.addWidget(self.right_frame)
         
         #_____________________________________________________
@@ -299,6 +294,8 @@ class CategorizeCells(object):
 
     def update_UI(self):
         self.save_dir = os.path.join(self.output_dir, 'red_channel')
+        self.currentBackgroundImage_left  = os.path.join(self.save_dir, "adjusted_image.png")
+        self.currentBackgroundImage_right = os.path.join(self.save_dir, "adjusted_image.png")
 
         out = self.set_cell_info()
         if out == -1 :
@@ -402,7 +399,7 @@ class CategorizeCells(object):
     def load_data_in_GUI(self):
 
         if self.save_dir is None :
-            print("Please first select output folder.")
+            GUI_functions.show_warning_popup(self.centralwidget, "Please first select output folder.")
             return -2
         
         # Load red_green_cells.npy file
@@ -419,16 +416,16 @@ class CategorizeCells(object):
                 print("red_mask.npy doesn't exist. Compute masks first.")
                 return -1
         
-        # Check existence of adjusted_image.jpg file
-        background_image_path = os.path.join(self.save_dir, 'adjusted_image.jpg')
+        # Check existence of adjusted_image.png file
+        background_image_path = os.path.join(self.save_dir, 'adjusted_image.png')
         if not os.path.exists(background_image_path):
-            print("adjusted_image.jpg doesn't exist. Compute masks first.")
+            print("adjusted_image.png doesn't exist. Compute masks first.")
             return -1
             
-        self.red_view.background_image_path = background_image_path
+        self.red_view.background_image_path = self.currentBackgroundImage_left
         self.red_view.only_green_cell = only_green_cells
         self.red_view.cell_info = self.cell_info
-        self.green_view.background_image_path = background_image_path
+        self.green_view.background_image_path = self.currentBackgroundImage_right
         self.green_view.only_green_cell = only_green_cells
         self.green_view.cell_info = self.cell_info
 
@@ -444,6 +441,34 @@ class CategorizeCells(object):
         self.lineEdit_Green.setText(str(self.green_cell_num))
 
         return 0
+
+    def change_background_right(self, idx):
+        if idx == 0:
+            self.currentBackgroundImage_right = os.path.join(self.save_dir, "adjusted_image.png")
+        elif idx == 1:
+            self.currentBackgroundImage_right = os.path.join(self.save_dir, "red_image.png")
+        elif idx == 2:
+            self.currentBackgroundImage_right = os.path.join(self.save_dir, "Suite2pMeanImage.png")
+
+        if os.path.exists(self.currentBackgroundImage_right):
+            self.green_view.background_image_path = self.currentBackgroundImage_right
+            self.green_view.setBackgroundImage()
+        else :
+            self.show_warning_popup(f"{self.currentBackgroundImage_right} not found.")
+
+    def change_background_left(self, idx):
+        if idx == 0:
+            self.currentBackgroundImage_left = os.path.join(self.save_dir, "adjusted_image.png")
+        elif idx == 1:
+            self.currentBackgroundImage_left = os.path.join(self.save_dir, "red_image.png")
+        elif idx == 2:
+            self.currentBackgroundImage_left = os.path.join(self.save_dir, "Suite2pMeanImage.png")
+
+        if os.path.exists(self.currentBackgroundImage_left):
+            self.red_view.background_image_path = self.currentBackgroundImage_left
+            self.red_view.setBackgroundImage()
+        else :
+            self.show_warning_popup(f"{self.currentBackgroundImage_left} not found.")
 
     def retranslateUi(self):
         _translate = QtCore.QCoreApplication.translate
