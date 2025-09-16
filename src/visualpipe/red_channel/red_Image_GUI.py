@@ -851,13 +851,16 @@ class RedImageAdjust(object):
         self.scene_mask.addItem(item)
 
     def reset_UI(self):
-        self.red_frame_path = None
+        basepath = Path(self.save_folder).parent.parent.absolute()
+        _, self.red_frame_path = red_cell_function.get_red_channel(basepath)
         self.image = self.load_init_image()
         self.present_image = self.image
         self.scene_mask.clear()
         self.set_green_image()
-
-        self.set_enabled_elements(False)
+        if self.red_frame_path is not None :
+            self.set_enabled_elements(True)
+        else :
+            self.set_enabled_elements(False)
     
     #--------------------------------------------- Signal handlers ---------------------------------------------
 
@@ -944,7 +947,6 @@ class RedImageAdjust(object):
         self.registration_pushButton.setStyleSheet(
             "background-color: rgb(159, 181, 189); color: white;"
         )
-        print("image motion is corrected")
         self.update_image()
         self.no_shift_image = self.present_image
         self.present_image = shifted
