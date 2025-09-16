@@ -129,7 +129,8 @@ def percentile_contrast_stretch(image):
 def image_shift(suite2p_meanImage, red,
                 upsample_factor: int = 10,
                 fill_mode: str = 'constant',
-                fill_value: float = 0):
+                fill_value: float = 0,
+                savepath: str = ''):
     """
     Compute and apply the translation that aligns `red` to `suite2p_meanImage`.
 
@@ -149,6 +150,7 @@ def image_shift(suite2p_meanImage, red,
         suite2p_meanImage = Image.fromarray(suite2p_meanImage)
         suite2p_meanImage = suite2p_meanImage.resize((new_width, new_height), Image.Resampling.LANCZOS)
         suite2p_meanImage = np.asarray(suite2p_meanImage)
+        cv2.imwrite(os.path.join(savepath, 'suite2p_meanImage_resized.png'), suite2p_meanImage)
 
     elif suite2p_meanImage.shape[0] < red.shape[0]:
         og_width = red.shape[0]
@@ -159,6 +161,7 @@ def image_shift(suite2p_meanImage, red,
         red = Image.fromarray(red)
         red = red.resize((new_width, new_height), Image.Resampling.LANCZOS)
         red = np.asarray(red)
+        cv2.imwrite(os.path.join(savepath, 'red_resized.png'), red)
 
     # 1) Estimate subpixel shift that moves `red` → `suite2p_meanImage`
     (dy, dx), error, diffphase = phase_cross_correlation(
@@ -185,7 +188,7 @@ def image_shift(suite2p_meanImage, red,
 
     return shifted, (dy, dx), magnitude, angle, direction
 
-def save_shifted_as_gray_png(shifted: np.ndarray,
+def save_as_gray_png(shifted: np.ndarray,
                              path: str) -> None:
     """
     Normalize a 2D array to 8-bit, replicate it across R,G,B and save as a PNG.

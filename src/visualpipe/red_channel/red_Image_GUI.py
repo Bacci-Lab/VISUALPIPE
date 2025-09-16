@@ -774,6 +774,8 @@ class RedImageAdjust(object):
         print('Green channel mean image loaded.')
 
         self.green_image = red_cell_function.percentile_contrast_stretch(mean_img)
+        save_green_image_path = os.path.join(self.save_folder, "Suite2pMeanImage.png")
+        red_cell_function.save_as_gray_png(self.green_image, save_green_image_path)
 
         return 0
     
@@ -934,14 +936,10 @@ class RedImageAdjust(object):
 
     def registration(self):
         self.registration_flag = True
-        shifted, _, _, _, _ = red_cell_function.image_shift(self.green_image, self.present_image)
+        shifted, _, _, _, _ = red_cell_function.image_shift(self.green_image, self.present_image, savepath=self.save_folder)
         
-        Save_Redshifted_Path = os.path.join(self.save_folder, "shifted_red.png")
-        Save_red_Path = os.path.join(self.save_folder, "red_image.png")
-        Save_Green_meanImage_Path = os.path.join(self.save_folder, "Suite2pMeanImage.png")
-        red_cell_function.save_shifted_as_gray_png(shifted, Save_Redshifted_Path)
-        red_cell_function.save_shifted_as_gray_png(self.image, Save_red_Path)
-        red_cell_function.save_shifted_as_gray_png(self.green_image, Save_Green_meanImage_Path)
+        save_red_shifted_path = os.path.join(self.save_folder, "shifted_red.png")
+        red_cell_function.save_as_gray_png(shifted, save_red_shifted_path)
         
         self.registration_pushButton.setStyleSheet(
             "background-color: rgb(159, 181, 189); color: white;"
@@ -1027,17 +1025,16 @@ class RedImageAdjust(object):
     
     def save_image(self):
         if not os.path.exists(self.save_folder) : os.mkdir(self.save_folder) # Create save_folder
-        save_background_path = os.path.join(self.save_folder, "adjusted_image.jpg")
+        save_background_path = os.path.join(self.save_folder, "adjusted_image.png")
         save_mask_path = os.path.join(self.save_folder, "red_mask.npy")
-        save_mask_path_image = os.path.join(self.save_folder, "red_mask.jpg")
-        save_green_image_path = os.path.join(self.save_folder, "Suite2pMeanImage.png")
-
-        red_cell_function.save_shifted_as_gray_png(self.green_image, save_green_image_path)
+        save_mask_path_image = os.path.join(self.save_folder, "red_mask.png")
+        save_red_image_path = os.path.join(self.save_folder, "red_image.png")
 
         if self.detect_ROI is not None:
-            cv2.imwrite(save_background_path,  self.updated_image)
+            cv2.imwrite(save_background_path, self.updated_image)
             np.save(save_mask_path,  self.detect_ROI)
             cv2.imwrite(save_mask_path_image, self.image_contours)
+            red_cell_function.save_as_gray_png(self.image, save_red_image_path)
             print("red masks saved")
         else:
             GUI_functions.show_warning_popup("Please first detect masks")
