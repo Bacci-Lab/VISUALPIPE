@@ -505,6 +505,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
         
         #------------------------- Set window properties -------------------------
         self.setWindowTitle("Visualization GUI")
+        self.setObjectName("MainWindow")
         self.setStyleSheet("""
             background-color: rgb(85, 85, 85);
             gridline-color: rgb(213, 213, 213);
@@ -547,7 +548,7 @@ class VisualizationGUI(QtWidgets.QMainWindow):
 
         self.main_vis_ui = MainVisUI(self.first_tab, self.cell_info, self.background_image_path,
                                      self.protocol_validity, self.speed_corr, self.facemotion_corr, self.pupil_corr)
-        self.red_img_adjust_ui = RedImageAdjust(self.second_tab, self.save_red_folder, self.red_tif_path)
+        self.red_img_adjust_ui = RedImageAdjust(self.second_tab, self.save_red_folder, self.red_tif_path, center=True)
         self.categorize_cells_ui = CategorizeCells(self.third_tab, self.output_folder, self.cell_info, self.ops)
         self.data_vis_ui = TimeSeriesUI(self.fourth_tab, self.fluorescence, self.time, self.speed, self.facemotion, self.pupil, self.photodiode, self.stimuli_intervals)
 

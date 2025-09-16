@@ -460,7 +460,7 @@ class CategorizeCells(object):
 
 class RedImageAdjust(object):
 
-    def __init__(self, centralwidget, save_folder=None, red_frame_path=None, green_image=None):
+    def __init__(self, centralwidget, save_folder=None, red_frame_path=None, green_image=None, center=False):
         self.centralwidget = centralwidget
         self.save_folder = save_folder
         self.red_frame_path = red_frame_path
@@ -471,7 +471,7 @@ class RedImageAdjust(object):
         self.present_image = None
         self.enabled = False
 
-        self.setupUi()
+        self.setupUi(center)
         
         if save_folder is not None :
             if self.red_frame_path is not None :
@@ -482,11 +482,19 @@ class RedImageAdjust(object):
             if green_image is None :
                 self.set_green_image()
 
-    def setupUi(self):
+    def setupUi(self, center):
         
         #------------------------- Main settings -------------------------
         label_color = "color: rgb(255, 255, 255);"
-
+        main_window = self.centralwidget
+        if center :
+            while main_window.objectName() != "MainWindow" :
+                main_window = main_window.parent()
+            aw = 1280
+            parent_w = main_window.width()
+            margin = (parent_w-aw)//2
+        else :
+            margin = 0
         #------------------------- LAYOUT -------------------------
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
         self.verticalLayout.setObjectName("verticalLayout")
@@ -505,24 +513,24 @@ class RedImageAdjust(object):
         #------------------------- First graphic view -------------------------
 
         self.graphicsView = QtWidgets.QGraphicsView(self.frame)
-        self.graphicsView.setGeometry(QtCore.QRect(0, 30, 520, 520))
+        self.graphicsView.setGeometry(QtCore.QRect(margin, 30, 520, 520))
         self.graphicsView.setObjectName("graphicsView")
         self.scene = QtWidgets.QGraphicsScene()
         self.graphicsView.setScene(self.scene)
-        self.label_red_image = GUI_functions.setup_labels(self.frame,(0, 3),(520, 23), label_color)
+        self.label_red_image = GUI_functions.setup_labels(self.frame,(margin, 3),(520, 23), label_color)
 
         #------------------------- Second graphic view -------------------------
         self.mask_graphicsView = QtWidgets.QGraphicsView(self.frame)
-        self.mask_graphicsView.setGeometry(QtCore.QRect(761, 30, 520, 520))
+        self.mask_graphicsView.setGeometry(QtCore.QRect(margin + 761, 30, 520, 520))
         self.mask_graphicsView.setObjectName("mask_graphicsView")
         self.scene_mask = QtWidgets.QGraphicsScene()
         self.mask_graphicsView.setScene(self.scene_mask)
-        self.label_detected_mask = GUI_functions.setup_labels(self.frame,(761, 3),(520, 23), label_color)
+        self.label_detected_mask = GUI_functions.setup_labels(self.frame,(margin + 761, 3),(520, 23), label_color)
 
         #------------------------------------- Vessel settings -----------------------------------
         self.group_vessel = QtWidgets.QGroupBox("Vessel settings", self.frame)
         self.group_vessel.setStyleSheet("color: white;")
-        self.group_vessel.setGeometry(545, 30, 190, 100)
+        self.group_vessel.setGeometry(margin +545, 30, 190, 100)
 
         # 2) give it a vertical layout
         vbox = QtWidgets.QVBoxLayout(self.group_vessel)
@@ -563,7 +571,7 @@ class RedImageAdjust(object):
         # -------------------------------------- Image settings ------------------------------------
         self.group_Image = QtWidgets.QGroupBox("Image settings", self.frame)
         self.group_Image.setStyleSheet("color: white;")
-        self.group_Image.setGeometry(545, 140, 190, 100)
+        self.group_Image.setGeometry(margin + 545, 140, 190, 100)
 
         # 2) give it a vertical layout
         vbox2 = QtWidgets.QVBoxLayout(self.group_Image)
@@ -598,7 +606,7 @@ class RedImageAdjust(object):
         # --------------------------------------- ROI settings --------------------------------------
         self.group_ROI = QtWidgets.QGroupBox("ROI settings", self.frame)
         self.group_ROI.setStyleSheet("color: white;")
-        self.group_ROI.setGeometry(545, 250, 190, 180)
+        self.group_ROI.setGeometry(margin + 545, 250, 190, 180)
 
         # 2) give it a vertical layout
         vbox3 = QtWidgets.QVBoxLayout(self.group_ROI)
@@ -667,12 +675,12 @@ class RedImageAdjust(object):
         vbox3.addStretch()
         
         #--------------------------------------------- PushButton -------------------------------------
-        self.registration_pushButton = GUI_functions.setup_pushButton(self.frame, (540, 460), (95, 23), label_color, self.registration, self.enabled)
-        self.undo_reg_pushButton = GUI_functions.setup_pushButton(self.frame, (645, 460), (95, 23), label_color, self.undo_registration, self.enabled)
-        self.pushloadParameter = GUI_functions.setup_pushButton(self.frame, (540, 490), (95, 23),  label_color, self.load_parameters, self.enabled)
-        self.pushsaveParameter = GUI_functions.setup_pushButton(self.frame, (645, 490), (95, 23),  label_color, self.save_parameters, self.enabled)
-        self.pushmask = GUI_functions.setup_pushButton(self.frame, (540, 520), (95, 23), label_color, self.show_mask, self.enabled)
-        self.pushSave = GUI_functions.setup_pushButton(self.frame, (645, 520), (95, 23), label_color, self.save_image, self.enabled)
+        self.registration_pushButton = GUI_functions.setup_pushButton(self.frame, (margin+540, 460), (95, 23), label_color, self.registration, self.enabled)
+        self.undo_reg_pushButton = GUI_functions.setup_pushButton(self.frame, (margin+645, 460), (95, 23), label_color, self.undo_registration, self.enabled)
+        self.pushloadParameter = GUI_functions.setup_pushButton(self.frame, (margin+540, 490), (95, 23),  label_color, self.load_parameters, self.enabled)
+        self.pushsaveParameter = GUI_functions.setup_pushButton(self.frame, (margin+645, 490), (95, 23),  label_color, self.save_parameters, self.enabled)
+        self.pushmask = GUI_functions.setup_pushButton(self.frame, (margin+540, 520), (95, 23), label_color, self.show_mask, self.enabled)
+        self.pushSave = GUI_functions.setup_pushButton(self.frame, (margin+645, 520), (95, 23), label_color, self.save_image, self.enabled)
 
         self.retranslateUi()
         QtCore.QMetaObject.connectSlotsByName(self.centralwidget)
