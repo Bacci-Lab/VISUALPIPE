@@ -421,7 +421,7 @@ def compare_clusters_traces(wt_cluster, ko_cluster, cluster_data, time, xticks=N
         plt.show()
     plt.close()
 
-def pie_chart_clusters(percentages, n_clusters_joint, group, save_path=None, fig_name='', show=True):
+def pie_chart_clusters(percentages, n_clusters_joint, group, attr, save_path=None, fig_name='', show=True):
     """
     Plot a pie chart of the percentage of neurons in each cluster for a given group.
 
@@ -449,12 +449,12 @@ def pie_chart_clusters(percentages, n_clusters_joint, group, save_path=None, fig
     plt.axis('equal')
 
     if save_path is not None:
-        fig.savefig(os.path.join(save_path, f"{fig_name}_{group}_cluster_pie.jpg"))
+        fig.savefig(os.path.join(save_path, f"{fig_name}_{group}_cluster_pie_{attr}.jpg"))
     if show:
         plt.show()
     plt.close()
 
-def plot_avg_cluster_traces_group(cluster_id, joint_cluster_data, time, xticks=None, save_path=None, fig_name='', show=True):
+def plot_avg_cluster_traces_group(cluster_id, joint_cluster_data, time, attr, xticks=None, save_path=None, fig_name='', show=True):
     """
     Plot the average traces for a given cluster in both WT and KO groups to compare their responses.
 
@@ -494,19 +494,19 @@ def plot_avg_cluster_traces_group(cluster_id, joint_cluster_data, time, xticks=N
     plt.fill_between(time, mean_ko - sem_ko, mean_ko + sem_ko, alpha=0.3, color='red', label=f'KO (n={n_ko})')
     plt.plot(time, mean_ko, color='red')
 
-    plt.title(f'Cluster {cluster_id}: Average Z-score Traces (WT vs KO)')
+    plt.title(f'Cluster {cluster_id}: Average {attr} (WT vs KO)')
     plt.xlabel('Time (s)')
     plt.ylabel('Z-scored ΔF/F')
     plt.xticks(xticks)
     plt.legend()
 
     if save_path is not None :
-        fig.savefig(os.path.join(save_path, f"{fig_name}_cluster{cluster_id}_WTvsKO.jpg"))
+        fig.savefig(os.path.join(save_path, f"{fig_name}_cluster{cluster_id}_WTvsKO_{attr}.jpg"))
     if show:
         plt.show()
     plt.close()
     
-def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, xticks=None, save_path=None, fig_name='', show=True):
+def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, attr, xticks=None, save_path=None, fig_name='', show=True):
     """
     Plot raster plots of normalized neural traces for two groups of neurons in the same cluster.
 
@@ -547,7 +547,7 @@ def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, xti
         norm = norm_traces[idx]
         axs[i].imshow(norm, aspect='auto', extent=[time[0], time[-1], 0, norm.shape[0]],
                       cmap='RdBu_r', vmin=-lim, vmax=lim)
-        axs[i].set_title(f'Cluster {cluster_id} - {group} ({norm.shape[0]} neurons)')
+        axs[i].set_title(f'Cluster {cluster_id} - {group} ({norm.shape[0]} neurons) - {attr}')
         axs[i].set_ylabel('Neuron')
         axs[i].set_xlabel('Time (s)')
         if xticks is not None :
@@ -557,26 +557,26 @@ def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, xti
     plt.tight_layout()
 
     if save_path is not None:
-        fig.savefig(os.path.join(save_path, f"{fig_name}_cluster{cluster_id}_rasters.jpg"), dpi=300)
+        fig.savefig(os.path.join(save_path, f"{fig_name}_cluster{cluster_id}_rasters_{attr}.jpg"), dpi=300)
     if show:
         plt.show()
     plt.close()
     
 if __name__ == "__main__":
 
-    excel_sheet_path = "./src/visualpipe/post_analysis/Nathan_sessions.xlsx"
-    save_path = r"C:\Users\mai-an.nguyen\Documents\test"
+    excel_sheet_path = r"Y:\raw-imaging\Nathan\PYR\Nathan_sessions_visualpipe.xlsx"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\vision_survey\Analysis"
 
     #Will be included in all names of saved figures
-    fig_name = 'static-patch-0deg-together-PositiveOnly'
+    fig_name = 'Looming-stim'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = 'vision-survey'
 
     # Write the stimulus type you want to use for clustering
-    sub_protocol = 'static-patch-0'
+    sub_protocol = 'looming-stim'
 
-    attr='z-scores'
+    attr='dFoF0-baseline'  # 'z-scores' or 'dFoF0-baseline'
 
     #Frame rate
     frame_rate = 30
@@ -593,7 +593,7 @@ if __name__ == "__main__":
 
 
 
-    #------------------- Cluster the two groups separately -------------------#
+    """  #------------------- Cluster the two groups separately -------------------#
 
     #To determine the ideal number of clusters
     for group in groups_id.keys():
@@ -624,8 +624,7 @@ if __name__ == "__main__":
     wt_cluster = 0  # <-- change this to the WT cluster index you want to compare
     ko_cluster = 3  # <-- change this to the KO cluster index you want to compare
 
-    compare_clusters_traces(wt_cluster, ko_cluster, cluster_data, time, xticks=xticks, attr=attr, save_path=save_path, fig_name=fig_name, show=False)
-
+    compare_clusters_traces(wt_cluster, ko_cluster, cluster_data, time, xticks=xticks, attr=attr, save_path=save_path, fig_name=fig_name, show=False)"""
 
 
 
@@ -636,7 +635,7 @@ if __name__ == "__main__":
     find_nb_clusters(norm_traces, max_clusters=max_clusters, save_path=save_path, fig_name=fig_name, show=False)
     
     # Set number of clusters for joint clustering
-    n_clusters_joint = 5  # choose based on elbow/Dunn index as before
+    n_clusters_joint = 4  # choose based on elbow/Dunn index as before
 
     #------------------- Run KMeans clustering on the combined data
     kmeans = KMeans(n_clusters=n_clusters_joint, n_init=50).fit(norm_traces)
@@ -675,9 +674,9 @@ if __name__ == "__main__":
         }
 
         # Plot raster plots
-        plot_raster_cluster_group(k, norm_traces, idx_wt, idx_ko, time, xticks, save_path, fig_name, show=False)
+        plot_raster_cluster_group(k, norm_traces, idx_wt, idx_ko, time, attr, xticks, save_path, fig_name, show=True)
         # Plot traces
-        plot_avg_cluster_traces_group(k, joint_cluster_data[k], time, xticks, save_path, fig_name, show=False)
+        plot_avg_cluster_traces_group(k, joint_cluster_data[k], time, attr, xticks, save_path, fig_name, show=True)
 
     # Normalize to percentages
     wt_percentages = 100 * wt_cluster_counts / np.sum(group_labels == 'WT')
@@ -689,7 +688,7 @@ if __name__ == "__main__":
     print(cluster_proportions)
     
     # Plot pie chart for WT
-    pie_chart_clusters(wt_percentages, n_clusters_joint, 'WT', save_path, fig_name, show=False)
+    pie_chart_clusters(wt_percentages, n_clusters_joint, 'WT', save_path, fig_name, show=True)
 
     # Plot pie chart for KO
-    pie_chart_clusters(ko_percentages, n_clusters_joint, 'KO', save_path, fig_name, show=False)
+    pie_chart_clusters(ko_percentages, n_clusters_joint, 'KO', save_path, fig_name, show=True)
