@@ -24,7 +24,7 @@ def get_valid_neurons_session(validity, protocol_list):
     
     return valid_neurons
 
-def get_centered_neurons(stimuli_df, neurons_list, trials, attr, frame_rate = 30, plot = False):
+def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, frame_rate = 30):
     """
     Function to get the indices of neurons that have their maximal response in the center stimulus.
     """
@@ -74,7 +74,6 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, frame_rate = 30
                 traces = np.concatenate([trials[period][stim_id][neurons, :] for period in period_names], axis = 1)
                 avg_trace = np.mean(traces, axis=0)
                 all_avg_traces.append(avg_trace)
-
             time = np.linspace(0, len(all_avg_traces[0]), len(all_avg_traces[0])) / frame_rate - 1
             # Determine global min and max
             global_min = min([trace.min() for trace in all_avg_traces])
@@ -203,9 +202,9 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 all_neurons += neurons
                 proportion = 100 * len(valid_neurons) / trials[period_names[1]][0].shape[0]
                 proportion_list.append(proportion)
-                print(f"Proportion responding neurons: {proportion}, Number of responding neurons: {neurons}")
+                print(f"Proportion responding neurons: {proportion}, Number of responsive neurons: {neurons}")
             else:
-                centered_neurons, non_centered = get_centered_neurons(stimuli_df, valid_neurons, trials, attr, frame_rate = 30, plot)
+                centered_neurons, non_centered = get_centered_neurons(stimuli_df, valid_neurons, trials, attr, plot, frame_rate = 30)
                 all_neurons += len(centered_neurons)
                 proportion = 100 * len(centered_neurons) / trials[period_names[1]][0].shape[0]
                 proportion_list.append(proportion)
@@ -320,7 +319,8 @@ def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity,
 
 def plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name):
     """
-    Function to plot the % of responsive neurons per session for WT and KO groups.
+    Function to plot the % of responsive neurons per session for WT and KO groups,
+    and save the values in an Excel file.
     """
     color = {'WT': 'skyblue', 'KO': 'orange'}
     x_ticks = []
@@ -329,22 +329,37 @@ def plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name):
     offset = 0.75  # spacing between WT and KO
 
     fig, ax = plt.subplots(figsize=(6, 6))
+    results = []
 
     for i, key in enumerate(groups_id.keys()):
-        
         x = offset * i
         x_ticks.append(x)
         x_labels.append(key)
         proportions = proportions_groups[groups_id[key]]
-        mean_proportion = np.mean(proportions) # Bar height: mean
+        mean_proportion = np.mean(proportions)  # Bar height: mean
 
+        # Plot
         ax.bar(x, mean_proportion, width=width, color=color[key], edgecolor='black', label=key)
         ax.scatter([x] * len(proportions), proportions, color='black', zorder=10)
 
-    if len(proportions_groups) == 2 :
-        # Mann–Whitney U test
+        # Store values
+        for p in proportions:
+            results.append({
+                "Group": key,
+                "Proportion": p
+            })
+        results.append({
+            "Group": key,
+            "Proportion": "Mean",
+            "Value": mean_proportion
+        })
+
+    # Statistics
+    stats_result = {}
+    if len(proportions_groups) == 2:
         stat, p = mannwhitneyu(proportions_groups[0], proportions_groups[1], alternative='two-sided')
-    
+        stats_result = {"Test": "Mann-Whitney U", "U-statistic": stat, "p-value": p}
+
         # Annotate p-value
         y_max = max(np.max(proportions_groups[0]), np.max(proportions_groups[1])) + 1
         ax.plot(x_ticks, [y_max, y_max], color='black', linewidth=1.5)
@@ -354,13 +369,20 @@ def plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name):
     ax.set_xticks(x_ticks)
     ax.set_xticklabels(x_labels, ha='right')
     ax.set_ylabel('Proportion of neurons')
-    ax.set_title(f'% of {str(valid_sub_protocols)+'-responsive' if not get_centered else 'centered'} neurons')
-    #ax.legend()
+    ax.set_title(f'% of {str(valid_sub_protocols)+"-responsive" if not get_centered else "centered"} neurons')
     plt.tight_layout()
-    
-    # save figure
+
+    # Save figure
     fig.savefig(os.path.join(save_path, f"{fig_name}_barplot_%responsive.jpeg"), dpi=300)
     plt.show()
+
+    # Save Excel
+    df = pd.DataFrame(results)
+    excel_path = os.path.join(save_path, f"{fig_name}_%responsive.xlsx")
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="Values", index=False)
+        if stats_result:
+            pd.DataFrame([stats_result]).to_excel(writer, sheet_name="Statistics", index=False)
 
 def plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, protocols):
     
@@ -713,19 +735,19 @@ if __name__ == "__main__":
     #-----------------------INPUTS-----------------------#
 
     excel_sheet_path = r"Y:\raw-imaging\Nathan\PYR\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\vision_survey\Analysis"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'looming'
+    fig_name = 'CenterVsfbRF_Iso_centered'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "vision-survey"
+    protocol_name = "surround-mod"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['looming-stim']  
+    sub_protocols = ['center', 'surround-iso_ctrl']  
     # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['looming-stim'] 
-    ''''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
+    valid_sub_protocols = ['center'] 
+    '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
         'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up-right',
         'quick-spatial-mapping-down-left', 'quick-spatial-mapping-down-right'''
@@ -737,7 +759,7 @@ if __name__ == "__main__":
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
     # Decide if you want to only keep neurons that are centered
-    get_centered = True
+    get_centered = True  # True or False
 
     #----------------------------------------------------#
     df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
