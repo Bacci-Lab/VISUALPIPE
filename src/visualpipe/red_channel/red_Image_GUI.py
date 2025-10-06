@@ -775,6 +775,7 @@ class RedImageAdjust(object):
 
         self.green_image = red_cell_function.percentile_contrast_stretch(mean_img)
         save_green_image_path = os.path.join(self.save_folder, "Suite2pMeanImage.png")
+        if not os.path.exists(self.save_folder) : os.mkdir(self.save_folder)
         red_cell_function.save_as_gray_png(self.green_image, save_green_image_path)
 
         return 0
