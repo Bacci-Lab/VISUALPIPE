@@ -115,6 +115,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     #---------------------------------- Compute speed ----------------------------------
     print("Computing speed")
     speed, speed_time_stamps = compute_speed(base_path)
+    speed = np.abs(speed) #only take norm of speed
     print("    ------------> Done")
 
     #---------------------------------- Resample facemotion, pupil and speed traces ----------------------------------
