@@ -15,9 +15,9 @@ from visualpipe.analysis.ca_imaging import CaImagingDataManager
 
 def graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid):
     """
-    Function to plot the average z-scores for all neurons if get_valid is False or only responsive neurons if get_valid is True.
+    Function to plot the average z-scores or dF/F0 - baseline for all neurons if get_valid is False or only responsive neurons if get_valid is True.
     """
-    
+    print(trials.keys())
     if attr == 'dFoF0-baseline':
         z_score_periods = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
     elif attr == 'z_scores':
@@ -33,6 +33,8 @@ def graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, va
     sem = {}     # dict to store SEMs
     magnitude = {protocol:[] for protocol in protocols}
     neurons_count = {protocol: None for protocol in protocols}
+    
+    excel_dict = {}
     # Loop through each protocol and plot the average z-scores
     for protocol in protocols:
         idx = all_protocols.index(protocol)
@@ -60,10 +62,16 @@ def graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, va
         # Concatenate all 3 periods along time axis
         y_axis[protocol] = np.concatenate(avg_trace)
         sem[protocol] = np.concatenate(sem_trace)
+        excel_dict[f'average_{protocol}'] = y_axis[protocol]
+        excel_dict[f'sem_{protocol}'] = sem[protocol]
+        nb_neurons = neurons_count[protocol]
 
+    
     # ---- Plot the averaged z-score for all protocols ------#
     time = np.linspace(0, len(y_axis[protocols[0]]), len(y_axis[protocols[0]]))
     time = time/frame_rate - dt_prestim # Shift the time by the duration of the baseline so the stimulus period starts at 0
+
+    excel_dict['Time (s)'] = time
 
     for protocol in protocols:
         plt.plot(time, y_axis[protocol], label=protocol)
@@ -83,7 +91,168 @@ def graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, va
 
     plt.show()
 
+    # Create DataFrame and save to Excel
+    df = pd.DataFrame(excel_dict)
+    cols = ['Time (s)']+ [c for c in df.columns if c if c not in ['Time (s)']] 
+    df = df[cols]
+    summary_row = pd.DataFrame({'nb_neurons': [nb_neurons]})
+    df = pd.concat([summary_row, df], ignore_index=True)
+    excel_path = os.path.join(save_path, f"{file_name}_averages_{attr}.xlsx")
+    df.to_excel(excel_path, index=False)
+
     return magnitude, neurons_count
+
+def plot_per_trial(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid):
+    """
+    Function to plot the average z-scores or dF/F0 - baseline per trial for all neurons if get_valid is False or only responsive neurons if get_valid is True.
+    """
+    if attr == 'dFoF0-baseline':
+        periods = ['pre_trial_fluorescence', 'trial_fluorescence', 'post_trial_fluorescence']
+    elif attr == 'z_scores':
+        periods = ['pre_trial_zscores', 'trial_zscores', 'post_trial_zscores']
+    
+    # One subplot per protocol
+    fig, ax = plt.subplots(1, len(protocols), figsize=(6 * len(protocols), 6), squeeze=False)
+    ax = ax[0]
+
+    file1 = f"perTrial_{file_name}_{attr}_{'responsive' if get_valid else 'allneurons'}.jpeg"
+
+    y_axis = {}  # dict to store mean zscores for each protocol
+    sem = {}     # dict to store SEMs
+    magnitude = {protocol:[] for protocol in protocols}
+    neurons_count = {protocol: None for protocol in protocols}
+    
+    excel_dict = {}
+    # Loop through each protocol and plot the average z-scores
+    for protocol in protocols:
+        idx = all_protocols.index(protocol)
+        print(f"\nProtocol: {protocol}, Index: {idx}")
+        y_axis[protocol] = {}
+        sem[protocol] = {}
+        n_trials = len(trials['trial_fluorescence'][idx][0])
+        magnitude[protocol] = {trial: [] for trial in range(0,n_trials)}
+        for trial in range(0,n_trials):
+            avg_trial, sem_trial = [], []
+            for period in periods:
+                if not get_valid:
+                    zscores = trials[period][list(trials[period].keys())[idx]][:,trial] # shape: (neurons, time)
+                elif get_valid:
+                    zscores = trials[period][list(trials[period].keys())[idx]][valid_neurons, trial] # shape: (neurons, time)
+                neurons = zscores.shape[0]
+                avg_zscore = np.mean(zscores, axis=0)
+                sem_period = stats.sem(zscores, axis=0)
+                avg_trial.append(avg_zscore)
+                sem_trial.append(sem_period)
+
+                #Compute the magnitude of the response for each neuron as the mean z-score during the stimulus period
+                if period == 'trial_fluorescence' or period == 'trial_zscores':
+                    for n in range(0,neurons):
+                        zneuron = zscores[n, int(frame_rate*0.5):] # exclude the first 0.5 seconds because of GCaMP's slow kinetics
+                        magnitude[protocol][trial].append(np.mean(zneuron))
+
+            # Concatenate all 3 periods along time axis
+            y_axis[protocol][trial] = np.concatenate(avg_trial)
+            sem[protocol][trial] = np.concatenate(sem_trial)
+            excel_dict[f'average_{protocol}_trial{int(trial)+1}'] = y_axis[protocol][trial]
+            excel_dict[f'sem_{protocol}_trial{int(trial)+1}'] = sem[protocol][trial]
+                
+        neurons_count[protocol] = neurons
+
+
+    
+    # ---- Plot the averaged z-score for all protocols ------#
+    time = np.linspace(0, len(y_axis[protocols[0]][0]), len(y_axis[protocols[0]][0]))
+    time = time/frame_rate - dt_prestim # Shift the time by the duration of the baseline so the stimulus period starts at 0
+
+    excel_dict['Time (s)'] = time
+
+    for i, protocol in enumerate(protocols):
+        excel_dict[f'nb_neurons_{protocol}'] = [neurons_count[protocol]] + ['']*(len(time)-1)
+        n_trials = list(y_axis[protocol].keys())
+        for trial in n_trials:
+            ax[i].plot(time, y_axis[protocol][trial], label=f'Trial {int(trial)+1}')
+            ax[i].fill_between(time,
+                            y_axis[protocol][trial] - sem[protocol][trial],
+                            y_axis[protocol][trial] + sem[protocol][trial],
+                            alpha=0.4)
+        ax[i].set_title(f'{protocol}, {neurons_count[protocol]} neurons')
+        ax[i].axvline(0, color='k', linestyle='--', linewidth=1)
+        ax[i].set_xlabel("Time (s)")
+        ax[i].set_ylabel(f"Average {attr}")
+        ax[i].legend()
+        ax[i].set_xticks(np.arange(-1, round(time[-1]) + 1, 1))
+
+    plt.suptitle(f"Mean {attr} ± SEM ({'Responsive Neurons' if get_valid else 'All Neurons'})")
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, file1), dpi=300)
+    plt.show()
+
+    # Create DataFrame and save to Excel
+    pd.DataFrame(excel_dict).to_excel(os.path.join(save_path, file1.replace('.jpeg', '.xlsx')), index=False)
+
+    return magnitude, neurons_count
+
+
+def plot_magnitude_per_trial(file_name, save_path, magnitude, protocols, get_valid):
+    """
+    Plot the average response magnitude (mean z-score or dF/F0 during stimulus)
+    for each trial, one subplot per protocol.
+    
+    Parameters
+    ----------
+    file_name : str
+        Base name for output files.
+    save_path : str
+        Directory to save figures and Excel output.
+    magnitude : dict
+        Output from plot_per_trial(), containing {protocol: {trial: [values per neuron]}}.
+    protocols : list
+        List of protocol names (same order as used in plot_per_trial()).
+    get_valid : bool
+        If True, indicates magnitudes correspond to responsive neurons only.
+    """
+
+    fig, ax = plt.subplots(1, len(protocols), figsize=(6 * len(protocols), 6), squeeze=False)
+    ax = ax[0]
+
+    file2 = f"perTrial_magnitude_{file_name}_{'responsive' if get_valid else 'allneurons'}.jpeg"
+
+    excel_dict = {}
+
+    for i, protocol in enumerate(protocols):
+        trials = list(magnitude[protocol].keys())
+        mean_mag = []
+        sem_mag = []
+
+        # Compute mean ± SEM across neurons for each trial
+        for trial in trials:
+            trial_values = np.array(magnitude[protocol][trial])
+            mean_mag.append(np.mean(trial_values))
+            sem_mag.append(stats.sem(trial_values))
+
+        mean_mag = np.array(mean_mag)
+        sem_mag = np.array(sem_mag)
+
+        # ---- Plot ----
+        ax[i].bar(range(1, len(trials) + 1), mean_mag, yerr=sem_mag, capsize=5, alpha=0.7)
+        ax[i].set_title(protocol)
+        ax[i].set_xlabel("Trial")
+        ax[i].set_ylabel("Mean Response Magnitude")
+        ax[i].set_xticks(range(1, len(trials) + 1))
+        ax[i].grid(alpha=0.3)
+
+        # Store for Excel
+        excel_dict[f'mean_magnitude_{protocol}'] = mean_mag
+        excel_dict[f'sem_magnitude_{protocol}'] = sem_mag
+
+    # ---- Global formatting ----
+    plt.suptitle(f"Response Magnitude per Trial ({'Responsive' if get_valid else 'All'} Neurons)")
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, file2), dpi=300)
+    plt.show()
+
+    # ---- Save to Excel ----
+    pd.DataFrame(excel_dict).to_excel(os.path.join(save_path, file2.replace('.jpeg', '.xlsx')), index=False)
 
 def cmi(magnitude, neurons_count, protocols):
     """ 
@@ -274,22 +443,22 @@ def plot_cdf_magnitudes(magnitude, protocols, attr, file_name, save_path, get_va
 if __name__ == "__main__":
 
     #--------------------INPUTS------------------#
-    base_path = r"Y:\raw-imaging\Nathan\PYR\112 female\Visual\14_03_2025\TSeries-03142025-007"
-    id_version = '3'
-    file_name = 'CenterVsIso'
+    base_path = r"Y:\raw-imaging\Nathan\VIPcre-CB1tdTom\1st batch\fod+fog female\Visual\2025_03_28\TSeries-03282025-005"
+    id_version = '4'
+    file_name = 'test'
 
     # Get metadata to define data path
     unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
     data_path = os.path.join(base_path, "_".join([unique_id, 'output', id_version]))
 
     # Define save path
-    save_path = data_path
+    save_path = r'Y:\raw-imaging\Nathan\VIPcre-CB1tdTom\1st batch\fod+fog female\Visual\2025_03_28\TSeries-03282025-005\2025_03_28_15-45-51_output_2\Post-analysis'
 
     # --------------------------------- Define stimulus of interests --------------------------------- #
     #This is the list of stimuli you want to use to select the responsive neurons. A responsive neurons is responsive in at least one of these stimuli
-    protocol_validity = ['center']  
+    protocol_validity = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0']  
     # Write the protocols you want to plot
-    protocols = ['center-surround-iso', 'center-surround-cross']
+    protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0']
     # Decide if you want to plot the dFoF0 baseline substraced or the z-scores
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
@@ -337,11 +506,11 @@ if __name__ == "__main__":
     #---------------------------------Plots-------------------------------------------#
     # Plot averages +/- SEM and get a dictionary of the magnitude of responses for all protocols
 
-    # To plot all neurons together
+    """     # To plot all neurons together
     magnitude_all, neurons_count_all = graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid = False)
     cmi_all, median_cmi_all = cmi(magnitude_all, neurons_count_all, protocols)
     allneurons_cmi = plot_cmi(cmi_all, median_cmi_all, file_name, attr, save_path, get_valid=False)
-    boxplot_all = plot_boxplot_magnitudes(magnitude_all, protocols, attr, file_name, save_path, get_valid = False)
+    boxplot_all = plot_boxplot_magnitudes(magnitude_all, protocols, attr, file_name, save_path, get_valid = False) """
 
     # To plot only responsive neurons
     magnitude_responsive, neurons_count_responsive = graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid = True)
@@ -349,3 +518,5 @@ if __name__ == "__main__":
     responsive_cmi = plot_cmi(cmi_responsive, median_cmi_responsive, file_name, attr, save_path, get_valid=True)
     boxplot_responsive = plot_boxplot_magnitudes(magnitude_responsive, protocols, attr, file_name, save_path, get_valid = True)
     cdf_= plot_cdf_magnitudes(magnitude_responsive, protocols, attr, file_name, save_path, get_valid=True)
+    magnitude_trial, neurons_count = plot_per_trial(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid = True)
+    plot_magnitude_per_trial(file_name, save_path, magnitude_trial, protocols, get_valid = True)
