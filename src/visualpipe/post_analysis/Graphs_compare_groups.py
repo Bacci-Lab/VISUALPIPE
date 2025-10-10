@@ -168,12 +168,16 @@ def compute_suppression(magnitude, protocol_surround='center-surround-iso'):
 def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered, plot):
     if attr == 'dFoF0-baseline':
         period_names = ['norm_averaged_baselines', 'norm_trial_averaged_ca_trace', 'norm_post_trial_averaged_ca_trace']
+        trial_periods = ['pre_trial_fluorescence', 'trial_fluorescence', 'post_trial_fluorescence']
     elif attr == 'z_scores':
         period_names = ['pre_trial_averaged_zscores', 'trial_averaged_zscores', 'post_trial_averaged_zscores']
+        trial_periods = ['pre_trial_zscores', 'trial_zscores', 'post_trial_zscores']
+
     
     suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = [], [], [], [], [], [], [], [], []
-
+    perTrials_groups = {group: {} for group in list(groups_id.keys())} #Will contain the average response per trial for each protocol, per group
     for key in groups_id.keys():
+        perTrials = {protocol: {} for protocol in sub_protocols} #Will contain the average response per trial for each protocol, for one group
 
         print(f"\n-------------------------- Processing {key} group --------------------------")
 
@@ -215,7 +219,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
             for protocol in sub_protocols:
 
                 stim_id = stimuli_df[stimuli_df.name == protocol].index[0]
-
+                n_trials = trials['trial_fluorescence'][stim_id].shape[1]
                 # Get z-scores from responsive-neurons for that protocol from pre, stim and post periods and concatenate along time
                 traces_sep = [trials[period][stim_id][valid_neurons, :] for period in period_names]
                 traces_concat = np.concatenate(traces_sep, axis=1)
@@ -236,6 +240,20 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 
                 #Store the average response of each neuron to that protocol
                 magnitude[protocol].append(mean_trial_value_per_neurons)
+
+                for trial in range(0,n_trials):
+                    avg_trial = []
+                    #We need to compute the average baseline per neuron for each trial to be able to compute dF/F0 - baseline
+                    baseline = np.mean(trials['pre_trial_fluorescence'][stim_id][valid_neurons, trial, :], axis=1)  # average per neuron over time
+                    for trial_period in trial_periods:
+                        trial_trace = trials[trial_period][stim_id][valid_neurons, trial, :]
+                        trial_trace_baselined = trial_trace - baseline[:, np.newaxis]  # subtract baseline per neuron
+                        avg_period = np.mean(trial_trace_baselined, axis=0) # average over neurons
+                        avg_trial.append(avg_period)
+                    avg_trial = np.concatenate(avg_trial, axis=0)
+                    perTrials[protocol][trial] = avg_trial
+        perTrials_groups[key] = perTrials
+            
         for protocol in magnitude.keys():
             magnitude[protocol] = np.concatenate(magnitude[protocol])
 
@@ -265,8 +283,9 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         cmi_groups.append(cmi)
         proportions_groups.append(proportion_list)
         individual_groups.append(single_neurons_group)
+        
 
-    return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups
+    return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups, perTrials_groups
 
 def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity, save_path, attr):
     """
@@ -322,7 +341,9 @@ def plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name):
     Function to plot the % of responsive neurons per session for WT and KO groups,
     and save the values in an Excel file.
     """
-    color = {'WT': 'skyblue', 'KO': 'orange'}
+    palette = ['skyblue', 'orange', 'green', 'red']  # add more colors if needed
+    group_keys = list(groups_id.keys())
+    color = {k: palette[i] for i, k in enumerate(group_keys)}
     x_ticks = []
     x_labels = []
     width = 0.5
@@ -445,18 +466,21 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
     """
     groups = list(groups_id.keys())
     # Select colors for each group and protocol
-    if len(protocols) == 1:
-        colors = {groups[0]: {protocols[0]: 'skyblue'},
-                  groups[1]: {protocols[0]: 'orange'}}
-    elif len(protocols) == 2:
-        colors = {groups[0]: {protocols[0]: 'skyblue', protocols[1]: 'steelblue'},
-                  groups[1]: {protocols[0]: 'orange', protocols[1]: 'peru'}}
+    group_palette = ['skyblue', 'orange', 'green', 'red', 'purple']  
+    protocol_palette = ['steelblue', 'peru', 'yellow', 'pink']
+    #create a figure with subplots 
+    n_groups = len(groups)
+    n_subplots = n_groups + 1  if n_groups >= 2 else n_groups
+    fig, axs = plt.subplots(1, n_subplots, figsize=(n_subplots*8.5, 7))
+    # Ensure axs is always a 1D array, even if n_subplots == 1
+    if n_subplots == 1:
+        axs = np.array([axs])
 
-    # Create a figure with subplots
-    fig, axs = plt.subplots(1, 3, figsize=(3*8.5, 7))
     # Build a dict for DataFrame export
     excel_dict = {}
+    colors = {}
     for i, group in enumerate(groups):
+        colors[group] = {}
         avg = avg_groups[groups_id[group]]
         sem = sem_groups[groups_id[group]]
         neurons = nb_neurons[groups_id[group]]
@@ -469,39 +493,46 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
         # Save time only once
         if "Time (s)" not in excel_dict:
             excel_dict["Time (s)"] = time
+        if n_groups>=2:
+            for protocol in protocols:
+                group_color = group_palette[i % len(group_palette)]
+                # Store data for Excel
+                # Add avg & sem columns to dict
+                avg_col_name = f"{group}_{protocol}_avg"
+                sem_col_name = f"{group}_{protocol}_sem"
+                excel_dict[avg_col_name] = avg[protocol][:min_len].tolist()
+                excel_dict[sem_col_name] = sem[protocol][:min_len].tolist()
 
-        for protocol in protocols:
-            # Store data for Excel
-            # Add avg & sem columns to dict
-            avg_col_name = f"{group}_{protocol}_avg"
-            sem_col_name = f"{group}_{protocol}_sem"
-            excel_dict[avg_col_name] = avg[protocol][:min_len]
-            excel_dict[sem_col_name] = sem[protocol][:min_len]
-
-            axs[2].plot(time, avg[protocol][:min_len], color=colors[group][protocol], label=f"{group}, {protocol}, {neurons} neurons")
-            axs[2].fill_between(time,
-                            avg[protocol][:min_len] - sem[protocol][:min_len],
-                            avg[protocol][:min_len] + sem[protocol][:min_len],
-                            color=colors[group][protocol], alpha=0.3)
+                axs[-1].plot(time, avg[protocol][:min_len], color=group_color, label=f"{group}, {protocol}, {neurons} neurons")
+                axs[-1].fill_between(time,
+                                avg[protocol][:min_len] - sem[protocol][:min_len],
+                                avg[protocol][:min_len] + sem[protocol][:min_len],
+                                color=group_color, alpha=0.3)
             
         # plot each group separately
-        for protocol in protocols:
-            axs[i].plot(time, avg[protocol][:min_len], color=colors[group][protocol], label=f"{group} {protocol}, {neurons} neurons")
+        for j,protocol in enumerate(protocols):
+            if n_groups ==1:
+                avg_col_name = f"{group}_{protocol}_avg"
+                sem_col_name = f"{group}_{protocol}_sem"
+                excel_dict[avg_col_name] = avg[protocol][:min_len].tolist()
+                excel_dict[sem_col_name] = sem[protocol][:min_len].tolist()
+            protocol_color = protocol_palette[j % len(protocol_palette)]
+            axs[i].plot(time, avg[protocol][:min_len], color=protocol_color, label=f"{group} {protocol}, {neurons} neurons")
             axs[i].fill_between(time,
                             avg[protocol][:min_len] - sem[protocol][:min_len],
-                            avg[protocol][:min_len] + sem[protocol][:min_len], color=colors[group][protocol],
+                            avg[protocol][:min_len] + sem[protocol][:min_len], color=protocol_color,
                             alpha=0.3)
         axs[i].set_xticks(np.arange(-1, time[-1] + 1, 1))
         axs[i].set_xlabel("Time (s)")
         axs[i].set_ylabel('Average dF/F0 - baseline' if attr == 'dFoF0-baseline' else 'Average z-scored dF/F0')
         axs[i].set_title(f"Average {attr} for {str(protocol_validity)+'-responsive neurons' if not get_centered else 'centered neurons'} for {group}s")
         axs[i].legend(loc='upper left', bbox_to_anchor=(1.05, 1))
-
-    axs[2].set_xticks(np.arange(-1, time[-1] + 1, 1))
-    axs[2].set_xlabel("Time (s)")
-    axs[2].set_ylabel('Average dF/F0 - baseline' if attr == 'dFoF0-baseline' else 'Average z-scored dF/F0')
-    axs[2].set_title(f"Average {attr} for {str(protocol_validity)+'-responsive neurons' if not get_centered else 'centered neurons'} comparing groups")
-    axs[2].legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+    if n_groups>=2:
+        axs[-1].set_xticks(np.arange(-1, time[-1] + 1, 1))
+        axs[-1].set_xlabel("Time (s)")
+        axs[-1].set_ylabel('Average dF/F0 - baseline' if attr == 'dFoF0-baseline' else 'Average z-scored dF/F0')
+        axs[-1].set_title(f"Average {attr} for {str(protocol_validity)+'-responsive neurons' if not get_centered else 'centered neurons'} comparing groups")
+        axs[-1].legend(loc='upper left', bbox_to_anchor=(1.05, 1))
 
     # Hide the unused subplot (bottom-right)
     fig.tight_layout()
@@ -513,6 +544,51 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
     df = pd.DataFrame(excel_dict)
     excel_path = os.path.join(save_path, f"{fig_name}_averages_{attr}.xlsx")
     df.to_excel(excel_path, index=False)
+
+def plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path):
+    """
+    Function to plot the average z-scores or dF/F0 - baseline per trial for all neurons if get_valid is False or only responsive neurons if get_valid is True.
+    """
+
+    magnitude_all = {group:{} for group in groups_id.keys()}
+    
+    excel_dict = {}
+    for group in groups_id.keys():
+        # One subplot per protocol
+        fig, ax = plt.subplots(1, len(sub_protocols), figsize=(6 * len(sub_protocols), 6), squeeze=False)
+        ax = ax[0]
+        file1 = f"{group}_perTrial_{fig_name}_{attr}_responsive.jpeg"
+        magnitude = {protocol: [] for protocol in sub_protocols}
+        neurons = nb_neurons[groups_id[group]]
+        for i, protocol in enumerate(sub_protocols):
+            time = np.linspace(0, len(perTrials_groups[group][protocol][0]), len(perTrials_groups[group][protocol][0]))
+            time = time/frame_rate - dt_prestim # Shift the time by the duration of the baseline so the stimulus period starts at 0
+            excel_dict['Time (s)'] = time
+            excel_dict[f'nb_neurons_{protocol}'] = [neurons] + ['']*(len(time)-1)
+            n_trials = perTrials_groups[group][protocol].keys().__len__()
+            print(n_trials)
+            for trial in range(n_trials):
+                trial_trace = perTrials_groups[group][protocol][trial]
+                mag_response = np.mean(trial_trace[int(frame_rate*0.5):])  # average over time, exclude first 0.5s  
+                magnitude[protocol].append(mag_response)
+                ax[i].plot(time, trial_trace, label=f'Trial {int(trial)+1}')
+            ax[i].set_title(f'{protocol}')
+            ax[i].axvline(0, color='k', linestyle='--', linewidth=1)
+            ax[i].set_xlabel("Time (s)")
+            ax[i].set_ylabel(f"Average {attr}")
+            ax[i].legend()
+            ax[i].set_xticks(np.arange(-1, round(time[-1]) + 1, 1))
+        plt.suptitle(f"Mean {attr} ({neurons} responsive neurons) per trial for {group}s")
+        plt.tight_layout()
+        plt.savefig(os.path.join(save_path, file1), dpi=300)
+        plt.show()
+
+        magnitude_all[group] = magnitude
+
+        # Create DataFrame and save to Excel
+        pd.DataFrame(excel_dict).to_excel(os.path.join(save_path, file1.replace('.jpeg', '.xlsx')), index=False)
+
+    return magnitude_all
 
 def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
     """
@@ -675,11 +751,11 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
     - save_path: string, folder where to save the figure
     - get_valid: bool, if True, only responsive neurons were used (affects title and filename)"""
     groups = list(groups_id.keys())
-    fname = f"cdf_{file_name}_{attr}_{groups[0]}_vs_{groups[1]}_responsiveNeurons.png"
+    fname = f"cdf_{file_name}_{attr}_responsiveNeurons.png"
     title = f'Cumulative distribution of neuron response magnitudes ({attr})\n(Responsive neurons)'
     plt.figure(figsize=(6, 6))
-    colors = {groups[0]: 'skyblue',
-                groups[1]: 'orange'}
+    palette = ['skyblue', 'orange', 'green', 'red', 'purple']
+    colors = {group: palette[i % len(palette)] for i, group in enumerate(groups)}
     stats_text = []
     if len(sub_protocols) > 1:
         print(f"Cannot plot CDFs for more than 1 protocol. Please select 1 protocol to compare WT and KOs.")
@@ -701,21 +777,21 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, file_n
             data_sorted = np.sort(data)
             cdf = np.arange(1, len(data_sorted) + 1) / len(data_sorted)
             plt.plot(data_sorted, cdf, label=f"{group} {protocol}", color=colors[group], lw=2)
-
-        # Perform statistical test (pairwise Mann–Whitney U)
-        p = mannwhitneyu(magnitude_groups[0][protocol], magnitude_groups[1][protocol], alternative='two-sided').pvalue
-        # Put text in bottom-right corner of the axes
-        plt.text(0.95, 0.05,  # relative position in axes coords
-            f"p = {p:.3e}",
-            transform=plt.gca().transAxes,
-            fontsize=10,
-            ha='right', va='bottom',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7, edgecolor="none"))
-        # Add stats text on the plot
-        y_pos = 0.95
-        for line in stats_text:
-            plt.text(1.05, y_pos, line, transform=plt.gca().transAxes, fontsize=8, va='top')
-            y_pos -= 0.05
+        if len(groups) == 2:
+            # Perform statistical test (pairwise Mann–Whitney U)
+            p = mannwhitneyu(magnitude_groups[0][protocol], magnitude_groups[1][protocol], alternative='two-sided').pvalue
+            # Put text in bottom-right corner of the axes
+            plt.text(0.95, 0.05,  # relative position in axes coords
+                f"p = {p:.3e}",
+                transform=plt.gca().transAxes,
+                fontsize=10,
+                ha='right', va='bottom',
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7, edgecolor="none"))
+            # Add stats text on the plot
+            y_pos = 0.95
+            for line in stats_text:
+                plt.text(1.05, y_pos, line, transform=plt.gca().transAxes, fontsize=8, va='top')
+                y_pos -= 0.05
 
         # Styling
         plt.xlabel(f'Response magnitude (Mean of {attr} excluding first 0.5s)')
@@ -734,39 +810,43 @@ if __name__ == "__main__":
 
     #-----------------------INPUTS-----------------------#
 
-    excel_sheet_path = r"Y:\raw-imaging\Nathan\PYR\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\surround_mod\Analysis"
+    excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
+    save_path = r"Y:\raw-imaging\Nathan\VIPcre-CB1tdTom\Visualpipe_postanalysis\2orientations8contrasts"
     
     #Will be included in all names of saved figures
-    fig_name = 'CenterVsfbRF_Iso_centered'
+    fig_name = 'fullField_4contrasts_90deg'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "surround-mod"
+    protocol_name = "2orientations-8contrasts"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center', 'surround-iso_ctrl']  
+    sub_protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-1.0-90.0']  
     # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['center'] 
+    valid_sub_protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-1.0-90.0'] 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
         'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up-right',
         'quick-spatial-mapping-down-left', 'quick-spatial-mapping-down-right'''
     
+    
     #Frame rate
     frame_rate = 30
+
+    #dt_prestim: duration of the baseline period before stimulus onset (in seconds)
+    dt_prestim = 1
 
     # Decide if you want to plot the dFoF0 baseline substraced or the z-scores
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
     # Decide if you want to only keep neurons that are centered
-    get_centered = True  # True or False
+    get_centered = False  # True or False
 
     #----------------------------------------------------#
     df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
-    groups_id = {'WT': 0, 'KO': 1}
+    groups_id = {'WT': 0}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered = get_centered, plot=False) 
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups, perTrials_groups = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered = get_centered, plot=False) 
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
     #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable='CMI')
     
@@ -783,8 +863,11 @@ if __name__ == "__main__":
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
     graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
-    histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
+    if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2:
+        histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
     #plot the distribution of suppression index
-    histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
+    if len(list(groups_id.keys())) == 2 and 'center' in sub_protocols:
+        histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
     # Plot CDFs of neuron response magnitudes comparing groups
     plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, fig_name, save_path) 
+    magnitude_all = plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
