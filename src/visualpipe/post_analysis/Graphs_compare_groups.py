@@ -569,6 +569,7 @@ def plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame
             print(n_trials)
             for trial in range(n_trials):
                 trial_trace = perTrials_groups[group][protocol][trial]
+                excel_dict[f'{group}_{protocol}_trial{int(trial)+1}'] = trial_trace
                 mag_response = np.mean(trial_trace[int(frame_rate*0.5):])  # average over time, exclude first 0.5s  
                 magnitude[protocol].append(mag_response)
                 ax[i].plot(time, trial_trace, label=f'Trial {int(trial)+1}')
@@ -814,13 +815,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\VIPcre-CB1tdTom\Visualpipe_postanalysis\2orientations8contrasts"
     
     #Will be included in all names of saved figures
-    fig_name = 'fullField_4contrasts_90deg'
+    fig_name = 'fullField_0.05contrasts_90deg'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "2orientations-8contrasts"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-1.0-90.0']  
+    sub_protocols = ['center-grating-0.05-90.0']  
     # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
     valid_sub_protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-1.0-90.0'] 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
