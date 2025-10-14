@@ -67,6 +67,7 @@ def load_data_session(path:str) :
     npz_files = glob.glob(os.path.join(path, "*protocol_validity_2.npz"))
     if len(npz_files) == 1:
         validity = np.load(npz_files[0], allow_pickle=True)
+        validity = dict(validity)
     else:
         raise FileNotFoundError(f"Expected exactly one .npz file in {path}, found {len(npz_files)} files")      
     
