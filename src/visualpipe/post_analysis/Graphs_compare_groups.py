@@ -15,7 +15,7 @@ import visualpipe.post_analysis.utils as utils
 def get_valid_neurons_session(validity, protocol_list):
    # Dictionary to store responsive neurons for each protocol
     valid_data = {protocol : validity[protocol] 
-                 if protocol in validity.files 
+                 if protocol in validity
                  else print(f"{protocol} does not exist in validity file.") 
                  for protocol in protocol_list}
     
@@ -952,18 +952,18 @@ if __name__ == "__main__":
     #-----------------------INPUTS-----------------------#
 
     excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\VIPcre-CB1tdTom\Visualpipe_postanalysis\2orientations8contrasts"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\vision_survey\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'FullfieldGrating_4contrasts'
+    fig_name = 'looming-stim_1stSessions'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "2orientations-8contrasts"
+    protocol_name = "vision-survey"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-1.0-90.0']  
+    sub_protocols = ['looming-stim-1.0']  
     # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['center-grating-0.05-90.0', 'center-grating-0.19-90.0', 'center-grating-0.32-90.0', 'center-grating-1.0-90.0'] 
+    valid_sub_protocols = ['looming-stim-1.0'] 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
         'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up-right',
@@ -985,7 +985,7 @@ if __name__ == "__main__":
     #----------------------------------------------------#
     df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
-    groups_id = {'WT': 0}  # keys are group names, e.g 'WT': 0, 'KO': 1
+    groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
     suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, get_centered = get_centered, plot=False) 
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
