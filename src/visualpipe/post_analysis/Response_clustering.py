@@ -34,7 +34,7 @@ def get_valid_neurons_session(validity, protocol):
     """
     # Dictionary to store responsive neurons for each protocol
     valid_data = {protocol : validity[protocol] 
-                 if protocol in validity.files 
+                 if protocol in validity 
                  else print(f"{protocol} does not exist in validity file.") }
     
     valid_neuron_lists = [np.where(data[:, 0] == 1,)[0] for data in valid_data.values()] # change to -1 if you want negative responsive neurons
@@ -449,7 +449,8 @@ def pie_chart_clusters(percentages, n_clusters_joint, group, attr, save_path=Non
     plt.axis('equal')
 
     if save_path is not None:
-        fig.savefig(os.path.join(save_path, f"{fig_name}_{group}_cluster_pie_{attr}.jpg"))
+        file_name = f"{fig_name}_{group}_cluster_pie_{attr}.jpg"
+        fig.savefig(os.path.join(save_path, file_name))
     if show:
         plt.show()
     plt.close()
@@ -564,11 +565,11 @@ def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, att
     
 if __name__ == "__main__":
 
-    excel_sheet_path = r"Y:\raw-imaging\Nathan\PYR\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\vision_survey\Analysis"
+    excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\vision_survey\Analysis"
 
     #Will be included in all names of saved figures
-    fig_name = 'Looming-stim'
+    fig_name = 'Looming-stim-1stSessions'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = 'vision-survey'
@@ -591,9 +592,8 @@ if __name__ == "__main__":
 
     normalized_traces_groups, single_traces_groups, magnitude_groups, response_mean_groups, all_neurons_groups, mouse_avg_zscore_groups, mouse_sem_zscore_groups = process_group(df, groups_id, sub_protocol, frame_rate, attr=attr)
 
-
-
-    """  #------------------- Cluster the two groups separately -------------------#
+    """
+    #------------------- Cluster the two groups separately -------------------#
 
     #To determine the ideal number of clusters
     for group in groups_id.keys():
@@ -624,7 +624,7 @@ if __name__ == "__main__":
     wt_cluster = 0  # <-- change this to the WT cluster index you want to compare
     ko_cluster = 3  # <-- change this to the KO cluster index you want to compare
 
-    compare_clusters_traces(wt_cluster, ko_cluster, cluster_data, time, xticks=xticks, attr=attr, save_path=save_path, fig_name=fig_name, show=False)"""
+    compare_clusters_traces(wt_cluster, ko_cluster, cluster_data, time, xticks=xticks, attr=attr, save_path=save_path, fig_name=fig_name, show=False) """
 
 
 
@@ -633,7 +633,7 @@ if __name__ == "__main__":
     #To determine the ideal number of clusters
     norm_traces = np.concatenate(normalized_traces_groups, axis=0)
     find_nb_clusters(norm_traces, max_clusters=max_clusters, save_path=save_path, fig_name=fig_name, show=False)
-    
+
     # Set number of clusters for joint clustering
     n_clusters_joint = 4  # choose based on elbow/Dunn index as before
 
@@ -688,7 +688,7 @@ if __name__ == "__main__":
     print(cluster_proportions)
     
     # Plot pie chart for WT
-    pie_chart_clusters(wt_percentages, n_clusters_joint, 'WT', save_path, fig_name, show=True)
+    pie_chart_clusters(wt_percentages, n_clusters_joint, 'WT', attr = attr, save_path=save_path, fig_name=fig_name, show=True)
 
     # Plot pie chart for KO
-    pie_chart_clusters(ko_percentages, n_clusters_joint, 'KO', save_path, fig_name, show=True)
+    pie_chart_clusters(ko_percentages, n_clusters_joint, 'KO', attr = attr, save_path=save_path, fig_name=fig_name, show=True) 
