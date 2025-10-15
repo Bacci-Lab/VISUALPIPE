@@ -18,7 +18,7 @@ def get_spont_stim(visual_stim:VisualStim):
             if stimuli_name not in spont_stimuli_name :
                 spont_stimuli_name.append(stimuli_name)
                 analyze_pupil.append(1)
-        elif 'black' in stimuli_name :
+        elif 'black' in stimuli_name and 'sweeping' not in stimuli_name:
             if stimuli_name not in spont_stimuli_name :
                 spont_stimuli_name.append(stimuli_name)
                 analyze_pupil.append(0)
