@@ -2,6 +2,7 @@
 This module provides a function to run a batch process for running visual pipelines on a list of file paths.
 """
 from pipeline import visual_pipe
+import traceback
 
 def run_batch(filepath) :
     """
@@ -33,6 +34,7 @@ def run_batch(filepath) :
         except Exception as e :
             print(f"Pipeline failed for {path}")
             print(e)
+            traceback.print_exc()
             failed_runs.append(path)
 
     print('#-------------------------------------------------------------------------#')
@@ -49,6 +51,6 @@ def run_batch(filepath) :
 if __name__ == "__main__":
 
     # Change filepath of the text file containing the list of sessions to run
-    filepath = 'C:/Users/mai-an.nguyen/Downloads/test.txt'
+    filepath = r'Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log/looming_paths.txt'
     
     run_batch(filepath)
