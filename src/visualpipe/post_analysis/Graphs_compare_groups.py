@@ -210,10 +210,10 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
             validity, trials, stimuli_df = utils.load_data_session(session_path) #load data of that session
 
             # Special case of looming protocol 100% contrast which has different naming between vision-survey and looming-sweeping-log protocols
-            stimuli_df['name'] = stimuli_df['name'].replace('looming-stim', 'looming-stim-1.0')
+            stimuli_df['name'] = stimuli_df['name'].replace('looming-stim', 'looming-stim-log-1.0')
             for stim_name in list(validity.keys()):  #same in the validity file
                 if stim_name == 'looming-stim':
-                    validity['looming-stim-1.0'] = validity.pop(stim_name)
+                    validity['looming-stim-log-1.0'] = validity.pop(stim_name)
 
             valid_neurons = get_valid_neurons_session(validity, valid_sub_protocols) #get indices of responsive neurons (based on the validy-protocol(s)) for that session
             
@@ -245,7 +245,11 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 if len(single_neurons_group[protocol]) == 0:
                     single_neurons_group[protocol] = traces_concat
                 else:
-                    single_neurons_group[protocol] = np.vstack([single_neurons_group[protocol], traces_concat])
+                    min_len = min(single_neurons_group[protocol].shape[1], traces_concat.shape[1])
+                    single_neurons_group[protocol] = np.vstack([
+                        single_neurons_group[protocol][:, :min_len],
+                        traces_concat[:, :min_len]])
+                    #single_neurons_group[protocol] = np.vstack([single_neurons_group[protocol], traces_concat])
 
                 avg_session_trace = np.mean(traces_concat, axis=0) # average trace of all neurons in that session and for that protocol
                 avg_data[protocol].append(avg_session_trace)
@@ -297,7 +301,14 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
         # Concatenate all neuron arrays into one array per protocol
         for protocol in sub_protocols:
-            avg_data[protocol] = np.stack(avg_data[protocol], axis=0)
+            #avg_data[protocol] = np.stack(avg_data[protocol], axis=0)
+            min_len = min(arr.shape[-1] for arr in avg_data[protocol])
+
+            # Truncate all arrays to that length
+            trimmed_arrays = [arr[..., :min_len] for arr in avg_data[protocol]]
+
+            # Now stack safely
+            avg_data[protocol] = np.stack(trimmed_arrays, axis=0)
             sessions_mag = mag_trials_sessions[key][protocol]  # list of lists: n_sessions x n_trials
 
             # Convert to array (n_sessions, n_trials)
@@ -588,10 +599,12 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
     excel_path = os.path.join(save_path, f"{fig_name}_averages_{attr}.xlsx")
     df.to_excel(excel_path, index=False)
 
+"""
+
 def plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path):
-    """
+    
     Function to plot the average z-scores or dF/F0 - baseline per trial for all neurons if get_valid is False or only responsive neurons if get_valid is True.
-    """
+    
     
     excel_dict = {}
     for group in groups_id.keys():
@@ -623,7 +636,64 @@ def plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame
         plt.show()
 
         # Create DataFrame and save to Excel
-        pd.DataFrame(excel_dict).to_excel(os.path.join(save_path, file1.replace('.jpeg', '.xlsx')), index=False)
+        pd.DataFrame(excel_dict).to_excel(os.path.join(save_path, file1.replace('.jpeg', '.xlsx')), index=False)"""
+
+def plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path):
+    """
+    Function to plot the average z-scores or dF/F0 - baseline per trial for all neurons if get_valid is False or only responsive neurons if get_valid is True.
+    """
+    excel_dict = {}
+    for group in groups_id.keys():
+        # One subplot per protocol
+        fig, ax = plt.subplots(1, len(sub_protocols), figsize=(6 * len(sub_protocols), 6), squeeze=False)
+        ax = ax[0]
+        file1 = f"{group}_perTrial_{fig_name}_{attr}_responsive.jpeg"
+        neurons = nb_neurons[groups_id[group]]
+
+        for i, protocol in enumerate(sub_protocols):
+            # Get trial traces
+            trials = list(perTrials_groups[group][protocol].values())
+
+            # Find minimal trial length
+            min_len = min(len(tr) for tr in trials)
+            # Truncate all to same length
+            trials = [tr[:min_len] for tr in trials]
+
+            # Build time vector
+            time = np.linspace(0, min_len, min_len) / frame_rate - dt_prestim
+
+            # Save to excel_dict (note: same length for all)
+            excel_dict['Time (s)'] = time
+            excel_dict[f'nb_neurons_{protocol}'] = [neurons] + [''] * (len(time) - 1)
+
+            n_trials = len(trials)
+            print(f"{group} - {protocol}: {n_trials} trials (length={min_len})")
+
+            for trial_idx, trial_trace in enumerate(trials):
+                excel_dict[f'{group}_{protocol}_trial{trial_idx + 1}'] = trial_trace
+                ax[i].plot(time, trial_trace, label=f'Trial {trial_idx + 1}')
+
+            ax[i].set_title(f'{protocol}')
+            ax[i].axvline(0, color='k', linestyle='--', linewidth=1)
+            ax[i].set_xlabel("Time (s)")
+            ax[i].set_ylabel(f"Average {attr}")
+            ax[i].legend()
+            ax[i].set_xticks(np.arange(-1, round(time[-1]) + 1, 1))
+
+        plt.suptitle(f"Mean {attr} ({neurons} responsive neurons) per trial for {group}s")
+        plt.tight_layout()
+        plt.savefig(os.path.join(save_path, file1), dpi=300)
+        plt.show()
+
+        # ✅ Ensure consistent column lengths
+        min_len_all = min(len(v) for v in excel_dict.values())
+        excel_dict = {k: v[:min_len_all] for k, v in excel_dict.items()}
+
+        # Create DataFrame and save to Excel
+        pd.DataFrame(excel_dict).to_excel(
+            os.path.join(save_path, file1.replace('.jpeg', '.xlsx')),
+            index=False
+        )
 
 def magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials, sub_protocols, groups_id):
     """
@@ -952,18 +1022,18 @@ if __name__ == "__main__":
     #-----------------------INPUTS-----------------------#
 
     excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\vision_survey\Analysis"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'looming-stim_1stSessions'
+    fig_name = 'looming-stim_test'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "vision-survey"
+    protocol_name = "looming-sweeping-log"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['looming-stim-1.0']  
+    sub_protocols = ['looming-stim-log-1.0']  
     # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['looming-stim-1.0'] 
+    valid_sub_protocols = ['looming-stim-log-1.0'] 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
         'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up-right',
