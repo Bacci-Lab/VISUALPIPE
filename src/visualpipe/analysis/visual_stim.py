@@ -369,7 +369,7 @@ class VisualStim(object):
         
     def set_stim_categories(self) :
         for stimuli_name in self.protocol_names :
-            if 'grey' in stimuli_name or 'black' in stimuli_name:
+            if 'grey' in stimuli_name or 'black' in stimuli_name and 'sweeping' not in stimuli_name:
                 self.stim_cat.append(0)
                 if 'black' in stimuli_name :
                     self.analyze_pupil.append(0)
