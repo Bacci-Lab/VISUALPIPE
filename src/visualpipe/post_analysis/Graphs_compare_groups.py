@@ -8,6 +8,7 @@ import pandas as pd
 import seaborn as sns
 import sys
 from scipy.ndimage import gaussian_filter1d
+import re
 sys.path.append("./src")
 
 import visualpipe.post_analysis.utils as utils
@@ -23,6 +24,120 @@ def get_valid_neurons_session(validity, protocol_list):
     valid_neurons = np.unique(np.concatenate(valid_neuron_lists))  # Get unique indices of valid neurons
     
     return valid_neurons
+
+def populations_overlap(validity, protocol_groups):
+    group_neurons = {}
+    for group_name, protocols in protocol_groups.items():
+        combined = set()
+        for prot in protocols:
+            if prot in validity:
+                data = validity[prot]
+                valid_neurons = set(np.where(data[:, 0] == 1)[0])
+                combined |= valid_neurons
+            else:
+                print(f"{prot} does not exist in validity file.")
+        group_neurons[group_name] = combined
+
+    group_names = list(group_neurons.keys())
+    exclusives = {}
+    intersections = {}
+
+    # Compute exclusives
+    for g_name in group_names:
+        other_sets = [group_neurons[other] for other in group_names if other != g_name]
+        only_g = group_neurons[g_name] - set().union(*other_sets)
+        exclusives[g_name] = only_g
+
+    # Compute pairwise intersections
+    for i in range(len(group_names)):
+        for j in range(i + 1, len(group_names)):
+            g_i = group_names[i]
+            g_j = group_names[j]
+            overlap = group_neurons[g_i] & group_neurons[g_j]
+            key = f"{g_i} & {g_j}"
+            intersections[key] = overlap
+
+    total_union = set().union(*group_neurons.values())
+    return exclusives, intersections, total_union
+
+
+def plot_protocol_overlap(groups_id, df, protocol_groups, save_path, fig_name):
+    overlaps = {}
+
+    # === Compute overlaps per session ===
+    for group in groups_id.keys():
+        overlaps[group] = {}
+        df_filtered = df[df["Genotype"] == group]
+
+        for k in range(len(df_filtered)):
+            mouse_id = df_filtered["Mouse_id"].iloc[k]
+            session_id = df_filtered["Session_id"].iloc[k]
+            output_id = df_filtered["Output_id"].iloc[k]
+            session_path = os.path.join(df_filtered["Session_path"].iloc[k],
+                                        f"{session_id}_output_{output_id}")
+
+            validity, _, _ = utils.load_data_session(session_path)
+            exclusives, intersections, total_union = populations_overlap(validity, protocol_groups)
+
+            # Exclusives
+            for protocol in exclusives.keys():
+                percent = 100 * len(exclusives[protocol]) / len(total_union)
+                overlaps[group].setdefault(protocol, []).append(percent)
+
+            # Intersections
+            for intersect in intersections.keys():
+                percent = 100 * len(intersections[intersect]) / len(total_union)
+                overlaps[group].setdefault(intersect, []).append(percent)
+
+    # === Prepare plot ===
+    all_keys = sorted(
+        set([key for group in overlaps.values() for key in group.keys()])
+    )
+
+    x = np.arange(len(all_keys))  # positions for each condition
+    width = 0.2                    # horizontal offset for each group
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    colors = {0: 'skyblue', 1: 'orange', 2: 'salmon', 3: 'grey'}
+    n_groups = len(groups_id)
+    offsets = np.linspace(-width*(n_groups-1)/2, width*(n_groups-1)/2, n_groups)
+
+    # === Plot individual points ===
+    for g_idx, group in enumerate(groups_id.keys()):
+        color = colors[g_idx]
+        for k, key in enumerate(all_keys):
+            points = overlaps[group].get(key, [])
+            ax.scatter(np.full(len(points), x[k] + offsets[g_idx]),
+                       points,
+                       color=color, label=group if k == 0 else "", alpha=0.8, s=60)
+
+    # === Styling ===
+    ax.set_xticks(x)
+    ax.set_xticklabels(all_keys, rotation=45, ha='right')
+    ax.set_ylabel('% of neurons')
+    ax.set_title('Exclusive and overlapping responsive neuron populations (individual sessions)')
+    ax.legend(title='Group', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+
+    # === Save figure ===
+    fig.savefig(os.path.join(save_path, f"{fig_name}_ProtocolOverlaps.png"), dpi=300)
+    plt.show()
+
+    # === Save Excel ===
+    # Convert overlaps dict to DataFrame with keys as rows and groups as columns
+    df_out = pd.DataFrame(index=all_keys, columns=groups_id.keys())
+    for group in groups_id.keys():
+        for key in all_keys:
+            values = overlaps[group].get(key, [])
+            df_out.loc[key, group] = ', '.join(f'{v:.2f}' for v in values)
+
+    excel_path = os.path.join(save_path, f"{fig_name}_ProtocolOverlaps.xlsx")
+    df_out.to_excel(excel_path)
+    print(f"Excel file saved to: {excel_path}")
+
+    return overlaps
+    
+
 
 def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, frame_rate = 30):
     """
@@ -111,6 +226,90 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, frame_rat
         # Plot not centered neurons
         plot_for_neurons(not_centered, 'Not Centered Neurons') 
     return centered_neurons, not_centered
+
+
+def plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr, contrasts):
+    pattern = r'[-]([\d.]+)$'
+    
+    # Extract contrast values and protocol types
+    contrast_values = []
+    protocol_type = []
+    for protocol in sub_protocols:
+        stim = protocol.split('-')[0:-1]
+        stim = '-'.join(stim)
+        match = re.search(pattern, protocol)
+        if match:
+            contrast = float(match.group(1))
+            contrast_values.append(contrast)
+        if stim not in protocol_type:
+            protocol_type.append(stim)
+    contrast_values = sorted(np.unique(contrast_values))
+    
+    # Create a single figure
+    fig, ax = plt.subplots(1, len(contrasts), figsize=(6 * len(sub_protocols), 6), squeeze=False)
+    with pd.ExcelWriter(os.path.join(save_path, f"{fig_name}_MItocontrol_{attr}.xlsx")) as writer:
+        for i,contrast in enumerate(contrast_values):
+            protocol1 = f'{protocol_type[0]}-{contrast}'
+            protocol2 = f'{protocol_type[1]}-{contrast}'
+            print(f"Computing MI at contrast {contrast} using protocols {protocol1} and {protocol2}")
+            # Loop over groups and plot on the same axes
+            MI_groups = {group: [] for group in groups_id.keys()}
+            for group in groups_id.keys():
+                magnitude = magnitude_groups[groups_id[group]]
+                MI_list = []
+                MI = (magnitude[protocol2] - magnitude[protocol1])/ (magnitude[protocol2] + magnitude[protocol1])
+                MI_groups[group] = MI
+            MI_WT = MI_groups[list(groups_id.keys())[0]]
+            MI_KO = MI_groups[list(groups_id.keys())[1]]
+            genotype = [list(groups_id.keys())[0]] * len(MI_WT) + [list(groups_id.keys())[1]] * len(MI_KO)
+            labels = ['<-1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '>1.5']
+            bins = [-float('inf'), -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, float('inf')]
+            labels_list = []
+            for l in [MI_WT, MI_KO]:
+                labeled = pd.cut(l, bins=bins, labels=labels)
+                labels_list += labeled.astype(str).tolist()
+            df = pd.DataFrame({"Genotype" : genotype, "MI" : pd.Categorical(labels_list, categories=labels, ordered=True)})
+            ax[0, i].set_title(f'Contrast: {contrast}')
+            sns.histplot(df, x="MI", hue="Genotype", common_norm = False, shrink=.8,
+                stat="percent", element='step', ax=ax[0, i], alpha=0)
+            ax[0, i].set_ylabel('Proportion of neurons (%)')
+            ax[0, i].tick_params(rotation=45)
+            stat_mwu, p_value_mwu = mannwhitneyu(np.array(MI_WT), np.array(MI_KO), alternative='two-sided')
+            p_value_1 = wilcoxon(np.array(MI_WT), alternative='two-sided')[1]
+            p_value_2 = wilcoxon(np.array(MI_KO), alternative='two-sided')[1]
+            textstr = (
+                f'{list(groups_id.keys())[0]} median = {np.median(MI_WT):.2f}, p (vs 0) = {p_value_1:.3g}\n'
+                f'{list(groups_id.keys())[1]} median = {np.median(MI_KO):.2f}, p (vs 0) = {p_value_2:.3g}\n'
+                f'{list(groups_id.keys())[0]} vs {list(groups_id.keys())[1]} (Mann–Whitney) p = {p_value_mwu:.3g}'
+            )
+            # Position textbox on plot
+            ax[0, i].text(0.99, 0.97, textstr,
+                        transform=ax[0, i].transAxes,
+                        fontsize=9, verticalalignment='top', horizontalalignment='right',
+                        bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.85))
+            
+            #save in an excel sheet
+            # Count neurons per bin per genotype
+            bin_counts = df.groupby(["Genotype", "MI"], observed=False).size().reset_index(name="Count")
+
+            # Pivot so that each column is a genotype
+            pivot_df = bin_counts.pivot(index="MI", columns="Genotype", values="Count").fillna(0)
+
+            # Optionally convert counts to percentages
+            pivot_df_percent = pivot_df.div(pivot_df.sum(axis=0), axis=1) * 100
+            # Save to Excel sheet for this contrast
+            pivot_df_percent.to_excel(writer, sheet_name=f"contrast_{contrast}")
+    fig.suptitle(f"MI for {protocol_type[1]} vs {protocol_type[0]} for {list(groups_id.keys())[0]} and {list(groups_id.keys())[1]} neurons",
+             fontsize=14) 
+    fig.tight_layout()
+    
+    
+    fig.savefig(os.path.join(save_path, f"{fig_name}_MItoControl_{attr}.jpeg"), dpi=300)
+    plt.show()
+    
+
+
+
 
 def compute_cmi(magnitude, protocol_cross='center-surround-cross', protocol_iso='center-surround-iso'):
     """Compute the CMI (Center Magnitude Index) for the specified protocols.
@@ -390,6 +589,47 @@ def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity,
         print(f"Current protocols: {sub_protocols}")
         return None
 
+def mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr):
+    """
+    Plot the mean ± SEM of response magnitude to each protocol for both groups.
+    """
+    palette = ['skyblue', 'orange', 'green', 'red']  # extend if needed
+    group_keys = list(groups_id.keys())
+    color = {k: palette[i % len(palette)] for i, k in enumerate(group_keys)}
+    width = 0.5
+    offset = (len(group_keys) + 1) * width  # spacing between protocols
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    x_ticks = []
+    x_labels = []
+
+    for i, protocol in enumerate(sub_protocols):
+        for j, key in enumerate(group_keys):
+            x = offset * i + width * j
+            x_ticks.append(x)
+            x_labels.append(f'{protocol}\n{key}')
+            magnitudes = magnitude_groups[groups_id[key]][protocol]
+            mean_magnitude = np.mean(magnitudes)
+            sem_magnitude = np.std(magnitudes) / np.sqrt(len(magnitudes))
+
+            # Plot bar + error
+            ax.bar(x, mean_magnitude, width=width, color=color[key], edgecolor='black', label=key if i == 0 else "")
+            ax.errorbar(x, mean_magnitude, yerr=sem_magnitude, fmt='none', ecolor='black', capsize=5, linewidth=1.2)
+
+    # Labeling
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(x_labels, rotation=45, ha='right')
+    ax.set_ylabel('Magnitude of response')
+    ax.set_title(f'Mean ± SEM of response magnitude ({attr})')
+    ax.legend()
+
+    plt.tight_layout()
+
+    # Save figure
+    fig.savefig(os.path.join(save_path, f"{fig_name}_mean_magnitude_{attr}.jpeg"), dpi=300)
+    plt.show()
+
 def plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name):
     """
     Function to plot the % of responsive neurons per session for WT and KO groups,
@@ -599,44 +839,6 @@ def graph_averages(frame_rate, groups_id, fig_name, attr, save_path, protocols, 
     excel_path = os.path.join(save_path, f"{fig_name}_averages_{attr}.xlsx")
     df.to_excel(excel_path, index=False)
 
-"""
-
-def plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path):
-    
-    Function to plot the average z-scores or dF/F0 - baseline per trial for all neurons if get_valid is False or only responsive neurons if get_valid is True.
-    
-    
-    excel_dict = {}
-    for group in groups_id.keys():
-        # One subplot per protocol
-        fig, ax = plt.subplots(1, len(sub_protocols), figsize=(6 * len(sub_protocols), 6), squeeze=False)
-        ax = ax[0]
-        file1 = f"{group}_perTrial_{fig_name}_{attr}_responsive.jpeg"
-        neurons = nb_neurons[groups_id[group]]
-        for i, protocol in enumerate(sub_protocols):
-            time = np.linspace(0, len(perTrials_groups[group][protocol][0]), len(perTrials_groups[group][protocol][0]))
-            time = time/frame_rate - dt_prestim # Shift the time by the duration of the baseline so the stimulus period starts at 0
-            excel_dict['Time (s)'] = time
-            excel_dict[f'nb_neurons_{protocol}'] = [neurons] + ['']*(len(time)-1)
-            n_trials = perTrials_groups[group][protocol].keys().__len__()
-            print(n_trials)
-            for trial in range(n_trials):
-                trial_trace = perTrials_groups[group][protocol][trial]
-                excel_dict[f'{group}_{protocol}_trial{int(trial)+1}'] = trial_trace
-                ax[i].plot(time, trial_trace, label=f'Trial {int(trial)+1}')
-            ax[i].set_title(f'{protocol}')
-            ax[i].axvline(0, color='k', linestyle='--', linewidth=1)
-            ax[i].set_xlabel("Time (s)")
-            ax[i].set_ylabel(f"Average {attr}")
-            ax[i].legend()
-            ax[i].set_xticks(np.arange(-1, round(time[-1]) + 1, 1))
-        plt.suptitle(f"Mean {attr} ({neurons} responsive neurons) per trial for {group}s")
-        plt.tight_layout()
-        plt.savefig(os.path.join(save_path, file1), dpi=300)
-        plt.show()
-
-        # Create DataFrame and save to Excel
-        pd.DataFrame(excel_dict).to_excel(os.path.join(save_path, file1.replace('.jpeg', '.xlsx')), index=False)"""
 
 def plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path):
     """
@@ -1025,21 +1227,26 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'looming-stim_test'
+    fig_name = 'BlackSweepRespExclusiv'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "looming-sweeping-log"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['looming-stim-log-1.0']  
+    sub_protocols = ['black-sweeping-log-0.0', 'black-sweeping-log-0.1', 'black-sweeping-log-0.4','black-sweeping-log-1.0']  
     # List of protocol(s) used to select responsive neurons. If contains several protocols, neurons will be selected if they are responsive to at least one of the protocols in the list.
-    valid_sub_protocols = ['looming-stim-log-1.0'] 
+    valid_sub_protocols = ['black-sweeping-log-0.0', 'black-sweeping-log-0.1', 'black-sweeping-log-0.4','black-sweeping-log-1.0'] 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
         'quick-spatial-mapping-up-left', 'quick-spatial-mapping-up-right',
         'quick-spatial-mapping-down-left', 'quick-spatial-mapping-down-right'''
-    
-    
+    'black-sweeping-log-0.0', 'black-sweeping-log-0.1', 'black-sweeping-log-0.4','black-sweeping-log-1.0'
+    'white-sweeping-log-0.0', 'white-sweeping-log-0.1', 'white-sweeping-log-0.4','white-sweeping-log-1.0', 'black-sweeping-log-0.0', 'black-sweeping-log-0.1', 'black-sweeping-log-0.4','black-sweeping-log-1.0'
+    'looming-stim-log-1.0', 'looming-stim-log-0.4', 'looming-stim-log-0.1', 'looming-stim-log-0.0'
+    'black-sweeping-log-0.0', 'black-sweeping-log-0.1', 'black-sweeping-log-0.4','black-sweeping-log-1.0'
+    'dimming-circle-log-0.0', 'dimming-circle-log-0.1', 'dimming-circle-log-0.4','dimming-circle-log-1.0'
+
+
     #Frame rate
     frame_rate = 30
 
@@ -1083,3 +1290,18 @@ if __name__ == "__main__":
     plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, fig_name, save_path) 
     plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
     magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials, sub_protocols, groups_id)
+    mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
+    plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr, contrasts=[0.05, 0.14, 0.37, 1.0])
+
+
+
+    #If you want to plot the overlap between protocols, uncomment and define the protocol groups below
+    """protocol_groups = {
+        'black-sweeping': ['black-sweeping-log-0.0', 'black-sweeping-log-0.1', 'black-sweeping-log-0.4','black-sweeping-log-1.0'],
+        'white-sweeping': ['white-sweeping-log-0.0', 'white-sweeping-log-0.1', 'white-sweeping-log-0.4','white-sweeping-log-1.0']
+    }"""
+
+
+    #plot_protocol_overlap(groups_id, df, protocol_groups, save_path, fig_name)
+
+
