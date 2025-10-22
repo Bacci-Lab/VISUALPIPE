@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
 save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
 protocol_type = 'looming-sweeping-log'
-sub_protocols = ['white-sweeping-log-0.0', 'white-sweeping-log-0.1', 'white-sweeping-log-0.4','white-sweeping-log-1.0']
+sub_protocols = ['looming-stim-log-1.0', 'looming-stim-log-0.4', 'looming-stim-log-0.1', 'looming-stim-log-0.0']
 groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
 
@@ -22,7 +22,7 @@ import numpy as np
 import visualpipe.analysis.speed_around_stim as Speed_around_stim
 import visualpipe.post_analysis.utils as utils
 
-def average_speed_stim(df, groups_id, sub_protocols, pre_time=2.0, post_time=7.0):
+def average_speed_stim(df, groups_id, sub_protocols, variable = 'Speed', pre_time=2.0, post_time=7.0):
     """
     For each genotype group:
         - Loops over sessions
@@ -50,7 +50,7 @@ def average_speed_stim(df, groups_id, sub_protocols, pre_time=2.0, post_time=7.0
 
             print(f"\nSession id: {session_id}\n  Mouse id : {mouse_id}\n     Session path: {session_path}")
 
-            _, traces = Speed_around_stim.process_session(session_path, analysis_id, pre_time, post_time)
+            _, traces = Speed_around_stim.process_session(session_path, analysis_id, variable, pre_time, post_time)
 
             # Loop over protocols
             for pname, trials_list in traces.items():
@@ -91,18 +91,14 @@ def average_speed_stim(df, groups_id, sub_protocols, pre_time=2.0, post_time=7.0
     return group_results
 
 
-
-group_results = average_speed_stim(df, groups_id, sub_protocols, pre_time=2.0, post_time=7.0)
-
-
-def plot_speed(group_results, sub_protocols, save_path):
+def plot_behavior(group_results, sub_protocols, save_path, variable = 'Speed'):
     """
     Plot average speed traces for each genotype group and protocol.
     """
     colors = {'WT': 'blue', 'KO': 'red'}
     for pname in sub_protocols:
         plt.figure(figsize=(10, 6))
-        plt.suptitle(f"Average Speed Traces - Protocol: {pname}", fontsize=16)
+        plt.suptitle(f"Average {variable} Traces - Protocol: {pname}", fontsize=16)
         for group_name, protocols in group_results.items():
             if pname in protocols:
                 time_vector = protocols[pname]['time']
@@ -112,11 +108,11 @@ def plot_speed(group_results, sub_protocols, save_path):
                 plt.plot(time_vector, mean_trace, color = colors[group_name], label=f"{group_name} (n={all_traces.shape[0]})")
                 plt.fill_between(time_vector, mean_trace - sem_trace, mean_trace + sem_trace, color = colors[group_name], alpha=0.3)
                 plt.xlabel("Time (s)")
-                plt.ylabel("Speed (cm/s)")
+                plt.ylabel("Speed (cm/s)" if variable=='Speed' else variable)
         plt.legend()
-        plt.savefig(os.path.join(save_path, f"Average_Speed_{pname}.png"))
+        plt.savefig(os.path.join(save_path, f"Average_{variable}_{pname}.png"))
         plt.show()
 
-
-plot_speed(group_results, sub_protocols, save_path)
+group_results = average_speed_stim(df, groups_id, sub_protocols, 'FaceMotion', pre_time=2.0, post_time=7.0)
+plot_behavior(group_results, sub_protocols, save_path, 'FaceMotion')
 

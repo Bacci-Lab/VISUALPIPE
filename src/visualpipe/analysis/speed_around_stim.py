@@ -7,7 +7,7 @@ sys.path.append("./src")
 import visualpipe.analysis.photodiode as Photodiode
 import visualpipe.utils.general_functions as General_functions
 
-def process_session(session_path, analysis_id, pre_time=2.0, post_time=7.0):
+def process_session(session_path, analysis_id, variable = 'Speed', pre_time=2.0, post_time=7.0):
     """
     Process a session to extract speed traces around all stimuli.
 
@@ -96,7 +96,7 @@ def process_session(session_path, analysis_id, pre_time=2.0, post_time=7.0):
         raise FileNotFoundError("No HDF5 file found in session folder")
     h5_path = os.path.join(h5_path, h5_files[0])
     with h5py.File(h5_path, 'r') as f:
-        speed = f['Behavioral/Speed'][:]
+        speed = f[f'Behavioral/{variable}'][:]
 
     def extract_speed_traces(speed, onsets, order, contrast_ids, protocol_ids, protocol_names, contrasts,
                          pre_time, post_time):
