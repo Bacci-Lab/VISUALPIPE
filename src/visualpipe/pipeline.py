@@ -104,6 +104,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     ca_img_dm.save_mean_image(base_path)
     ca_img_dm.save_max_proj_image(base_path)
     detected_roi = ca_img_dm._list_ROIs_idx
+    print('Sampling frequency:', ca_img_dm.fs)
     print('Original number of neurons :', len(detected_roi))
 
     #---------------------------------- Load Camera data ----------------------------------
@@ -546,10 +547,11 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     return save_dir
 
 if __name__ == "__main__":
+    
+    #base_path = r""
+    #save_dir = visual_pipe(base_path)
 
-    try :
-        save_dir = visual_pipe(input_gui=True)
-        print("Session's analysis completed successfully")
-        print(f'Output folder : {save_dir}')
-    except Exception as e :
-        print(e)
+    save_dir = visual_pipe(input_gui=True)
+    
+    print("Session's analysis completed successfully")
+    print(f'Output folder : {save_dir}')
