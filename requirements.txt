@@ -11,4 +11,4 @@ seaborn
 statsmodels
 openpyxl
 imagecodecs
-skimage
+scikit-image
