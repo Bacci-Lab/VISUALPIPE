@@ -24,7 +24,9 @@ class Trial(object):
         self.ca_attr = attr
         self.auc_thr = auc_thr
         self.dt_pre_stim = dt_pre_stim
-        max_post_stim = np.min(visual_stim.interstim) - dt_pre_stim
+        nb_frames = len(ca_img.time_stamps)
+        max_post_stim = np.min([np.min(visual_stim.interstim) - dt_pre_stim, 
+                                (nb_frames - round(ca_onset_idxes[-1] + visual_stim.duration[-1] * ca_img.fs)) /ca_img.fs])
         if dt_post_stim <= max_post_stim :
             self.dt_post_stim = dt_post_stim
         else : 
@@ -76,7 +78,7 @@ class Trial(object):
         stim_dt = self.visual_stim.protocol_df['duration'][stimulus_id]
         pre_trial_nb_frames = round(self.dt_pre_stim * self.ca_img.fs)
         trial_nb_frames = round((stim_dt + self.dt_post_stim) * self.ca_img.fs)
-        ptrial_nb_frames = round(self.dt_post_stim_plot * self.ca_img.fs)
+        ptrial_nb_frames = np.floor(self.dt_post_stim_plot * self.ca_img.fs)
 
         for i in onset_idx_list:
             baseline_i = trace[roi_id][i-pre_trial_nb_frames : i]
