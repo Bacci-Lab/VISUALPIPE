@@ -107,7 +107,10 @@ def process_group(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:
             print(f"\nSession id: {session_id}\n  Mouse id : {mouse_id}\n     Session path: {session_path}")
 
             validity, trials, stimuli_df = utils.load_data_session(session_path)
-
+            stimuli_df['name'] = stimuli_df['name'].replace('looming-stim', 'looming-stim-log-1.0')
+            for stim_name in list(validity.keys()):  #same in the validity file
+                if stim_name == 'looming-stim':
+                    validity['looming-stim-log-1.0'] = validity.pop(stim_name)
             # Determine which neurons are valid
             valid_neurons = get_valid_neurons_session(validity, sub_protocol)
             nb_valid_neurons = len(valid_neurons)
@@ -136,7 +139,10 @@ def process_group(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:
                 magnitude.append(trial_traces[i][idx])
     
         #This one will be used to plot average responses per cluster (not normalized)
-        single_traces = np.concatenate(single_traces, axis=0)
+        min_len = min(arr.shape[-1] for arr in single_traces)
+        # Truncate all arrays to that length
+        trimmed_arrays = [arr[..., :min_len] for arr in single_traces]
+        single_traces = np.concatenate(trimmed_arrays, axis=0)
         magnitudes_array = np.array(magnitude)
         
         #This one will be used to cluster only based on response shape (normalized)
@@ -144,7 +150,10 @@ def process_group(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:
         print(f"\nNumber of {key} neurons: {all_neurons}")
 
         # Concatenate all neuron arrays into one array per protocol
-        avg_data = np.stack(avg_data, axis=0)
+        min_len = min(arr.shape[-1] for arr in avg_data)
+        # Truncate all arrays to that length
+        trimmed_arrays = [arr[..., :min_len] for arr in avg_data]
+        avg_data = np.stack(trimmed_arrays, axis=0)
 
         # Compute average and SEM across neurons
         mouse_avg_zscore = np.mean(avg_data, axis=0)
@@ -497,7 +506,7 @@ def plot_avg_cluster_traces_group(cluster_id, joint_cluster_data, time, attr, xt
 
     plt.title(f'Cluster {cluster_id}: Average {attr} (WT vs KO)')
     plt.xlabel('Time (s)')
-    plt.ylabel('Z-scored ΔF/F')
+    plt.ylabel(f'Average {attr}')
     plt.xticks(xticks)
     plt.legend()
 
@@ -566,16 +575,16 @@ def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, att
 if __name__ == "__main__":
 
     excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\vision_survey\Analysis"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
 
     #Will be included in all names of saved figures
-    fig_name = 'Looming-stim-1stSessions'
+    fig_name = 'Dimming100%'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = 'vision-survey'
+    protocol_name = 'looming-sweeping-log'
 
     # Write the stimulus type you want to use for clustering
-    sub_protocol = 'looming-stim'
+    sub_protocol = 'dimming-circle-log-1.0'
 
     attr='dFoF0-baseline'  # 'z-scores' or 'dFoF0-baseline'
 
@@ -632,10 +641,10 @@ if __name__ == "__main__":
 
     #To determine the ideal number of clusters
     norm_traces = np.concatenate(normalized_traces_groups, axis=0)
-    find_nb_clusters(norm_traces, max_clusters=max_clusters, save_path=save_path, fig_name=fig_name, show=False)
-
+    find_nb_clusters(norm_traces, max_clusters=max_clusters, save_path=save_path, fig_name=fig_name, show=True)
+    
     # Set number of clusters for joint clustering
-    n_clusters_joint = 4  # choose based on elbow/Dunn index as before
+    n_clusters_joint = 5  # choose based on elbow/Dunn index as before
 
     #------------------- Run KMeans clustering on the combined data
     kmeans = KMeans(n_clusters=n_clusters_joint, n_init=50).fit(norm_traces)
