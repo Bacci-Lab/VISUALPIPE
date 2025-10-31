@@ -86,6 +86,13 @@ def process_session(session_path, analysis_id, variable = 'Speed', pre_time=2.0,
                     protocol_names.append(protocol_name)
 
     contrasts = np.unique(visual_stim['contrast'])
+    """for name in protocol_names:
+        if name == 'looming-stim':
+            new_name = 'looming-stim-log'
+            protocol_names[protocol_names.index(name)] = new_name
+    contrast_ids = np.array([1.0 if c is None else c for c in contrast_ids], dtype=float)
+    contrasts = np.unique(contrast_ids)"""
+    """contrasts = np.array(contrasts.tolist(), dtype=float)"""
 
     # ---------------------------
     # Load speed data from HDF5
