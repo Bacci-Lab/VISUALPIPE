@@ -15,6 +15,7 @@ import sys
 sys.path.append("./src")
 
 import visualpipe.post_analysis.utils as utils
+import visualpipe.post_analysis.Graphs_compare_groups as compare_groups
 
 def get_valid_neurons_session(validity, protocol):
     """
@@ -42,7 +43,7 @@ def get_valid_neurons_session(validity, protocol):
     
     return valid_neurons
 
-def process_group(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:float, attr:str='z-scores'):
+def process_data(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:float, attr:str='z-scores'):
     """
     Process all neurons from a given group of mice and compute their 
     (1) normalized traces to be used for clustering, 
@@ -571,6 +572,25 @@ def plot_raster_cluster_group(cluster_id, norm_traces, idx_wt, idx_ko, time, att
     if show:
         plt.show()
     plt.close()
+
+def plot_adaptation_index(k, sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3):
+    groups = list(groups_id.keys())
+    AI = compare_groups.adaptation_index(sub_protocols, groups_id, mag_trial_indiv, first, last)
+    
+    for protocol in sub_protocols: 
+        list1 = AI[groups[0]][protocol]
+        list2 = AI[groups[1]][protocol]
+        
+        compare_groups.histplot(
+            sub_protocols=sub_protocols,
+            list1=list1,
+            list2=list2,
+            groups=groups,
+            save_path=save_path,
+            fig_name=f"{fig_name}_{protocol}_cluster{k}",
+            attr=attr,
+            variable="AI"
+        )
     
 if __name__ == "__main__":
 
@@ -578,13 +598,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
 
     #Will be included in all names of saved figures
-    fig_name = 'Dimming100%'
+    fig_name = 'Looming100%'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = 'looming-sweeping-log'
 
     # Write the stimulus type you want to use for clustering
-    sub_protocol = 'dimming-circle-log-1.0'
+    sub_protocol = 'looming-stim-log-1.0'
 
     attr='dFoF0-baseline'  # 'z-scores' or 'dFoF0-baseline'
 
@@ -599,7 +619,7 @@ if __name__ == "__main__":
 
     groups_id = {'WT': 0, 'KO': 1}
 
-    normalized_traces_groups, single_traces_groups, magnitude_groups, response_mean_groups, all_neurons_groups, mouse_avg_zscore_groups, mouse_sem_zscore_groups = process_group(df, groups_id, sub_protocol, frame_rate, attr=attr)
+    normalized_traces_groups, single_traces_groups, magnitude_groups, response_mean_groups, all_neurons_groups, mouse_avg_zscore_groups, mouse_sem_zscore_groups = process_data(df, groups_id, sub_protocol, frame_rate, attr=attr)
 
     """
     #------------------- Cluster the two groups separately -------------------#
@@ -640,7 +660,10 @@ if __name__ == "__main__":
     #-------------To cluster WT and KO together and then compare % of neurons in each cluster------------#
 
     #To determine the ideal number of clusters
-    norm_traces = np.concatenate(normalized_traces_groups, axis=0)
+    min_len = min(arr.shape[1] for arr in normalized_traces_groups)
+    print(f'Minimum length of normalized traces for truncating: {min_len}')
+    norm_traces = np.concatenate([arr[:, :min_len] for arr in normalized_traces_groups], axis=0)
+
     find_nb_clusters(norm_traces, max_clusters=max_clusters, save_path=save_path, fig_name=fig_name, show=True)
     
     # Set number of clusters for joint clustering
@@ -650,9 +673,8 @@ if __name__ == "__main__":
     kmeans = KMeans(n_clusters=n_clusters_joint, n_init=50).fit(norm_traces)
     cluster_labels = kmeans.labels_
     
-    all_traces = np.concatenate(single_traces_groups, axis=0)
+    all_traces = np.concatenate([arr[:, :min_len] for arr in single_traces_groups], axis=0)
     group_labels = np.array(['WT'] * all_neurons_groups[groups_id['WT']] + ['KO'] * all_neurons_groups[groups_id['KO']])
-
     # Time axis
     time = (np.arange(all_traces.shape[1]) / frame_rate) - 1
     xticks = np.arange(-1, time[-1] + 1, 1)
@@ -701,3 +723,82 @@ if __name__ == "__main__":
 
     # Plot pie chart for KO
     pie_chart_clusters(ko_percentages, n_clusters_joint, 'KO', attr = attr, save_path=save_path, fig_name=fig_name, show=True) 
+
+
+    #Compute magnitudes for each trial for that protocol
+    valid_sub_protocols = {'looming': ['looming-stim-log-1.0']}
+    group_name = 'looming'
+    # Decide if you want to only keep neurons that are centered
+    get_centered = False  # True or False
+    # Decide on the way to calculate the amplitude of response
+    magnitude_method = 'auc' #'auc', 'peak' or 'filtered_peak', 'mean'
+    selection_method = 'any'
+    frame_rate = 30
+    attr = 'dFoF0-baseline'
+
+    _, _, _, nb_neurons, _, _, _, _, _, _, _, _, _, mag_trial_indiv = compare_groups.process_group(df, groups_id, attr, valid_sub_protocols, [sub_protocol], protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False)
+
+    # Concatenate magnitudes of WTs and KOs and keep track of the group label
+    all_mag_trials = {}
+    group_labels = []
+    for group in ['WT', 'KO']:
+        for protocol in [sub_protocol]:
+            mag_array = mag_trial_indiv[group][protocol]  # shape: (n_neurons_group, n_trials)
+            if protocol not in all_mag_trials:
+                all_mag_trials[protocol] = mag_array
+            else:
+                all_mag_trials[protocol] = np.vstack([all_mag_trials[protocol], mag_array])
+        group_labels.extend([group]*nb_neurons[groups_id[group]])
+    group_labels = np.array(group_labels)
+    cluster_ids = np.unique(cluster_labels)
+
+    # Prepare dictionary for magnitudes per cluster
+    mag_trial_indiv_per_cluster = {cluster: {group: {} for group in list(groups_id.keys())} 
+                                for cluster in range(n_clusters_joint)}
+
+    for protocol in [sub_protocol]:
+        for k in cluster_ids:
+            idx_cluster = np.where(cluster_labels == k)[0]
+            # split by group
+            for group in ['WT', 'KO']:
+                idx_group_cluster = idx_cluster[group_labels[idx_cluster] == group]
+                mag_array = all_mag_trials[protocol][idx_group_cluster, :]
+                mag_trial_indiv_per_cluster[k][group][protocol] = mag_array
+
+    joint_cluster_data = {}  # store mean/SEM per cluster per group
+
+    """for protocol in [sub_protocol]:
+        for k in cluster_ids:
+            idx_cluster = np.where(cluster_labels == k)[0]  # all neurons in cluster k
+
+            joint_cluster_data[k] = {}
+            for group in ['WT', 'KO']:
+                # indices of neurons in this cluster AND group
+                idx_group_cluster = idx_cluster[group_labels[idx_cluster] == group]
+
+                # get traces corresponding to these neurons
+                traces_group_k = all_traces[idx_group_cluster]
+
+                # compute mean & SEM
+                mean_trace = np.mean(traces_group_k, axis=0) if len(idx_group_cluster) > 0 else np.zeros(all_traces.shape[1])
+                if len(idx_group_cluster) <= 0:
+                    print('empty')
+                sem_trace = stats.sem(traces_group_k, axis=0) if len(idx_group_cluster) > 1 else np.zeros(all_traces.shape[1])
+
+                joint_cluster_data[k][group] = {
+                    'mean': mean_trace,
+                    'sem': sem_trace,
+                    'n': len(idx_group_cluster)
+                }
+
+            # Optional: plot the average traces
+            plot_avg_cluster_traces_group(k, joint_cluster_data[k], time, attr, xticks, save_path, fig_name, show=True)"""
+
+
+    AI_clusters = {}  # dictionary to store adaptation indices per cluster
+
+
+    for k in range(n_clusters_joint): 
+        plot_adaptation_index(k, [sub_protocol], groups_id, mag_trial_indiv_per_cluster[k], attr, fig_name, save_path, first=3, last=3)
+
+    
