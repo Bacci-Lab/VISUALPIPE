@@ -78,7 +78,7 @@ class Trial(object):
         stim_dt = self.visual_stim.protocol_df['duration'][stimulus_id]
         pre_trial_nb_frames = round(self.dt_pre_stim * self.ca_img.fs)
         trial_nb_frames = round((stim_dt + self.dt_post_stim) * self.ca_img.fs)
-        ptrial_nb_frames = np.floor(self.dt_post_stim_plot * self.ca_img.fs)
+        ptrial_nb_frames = int(np.floor(self.dt_post_stim_plot * self.ca_img.fs))
 
         for i in onset_idx_list:
             baseline_i = trace[roi_id][i-pre_trial_nb_frames : i]
