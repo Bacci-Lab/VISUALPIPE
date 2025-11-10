@@ -24,7 +24,8 @@ class VisualStim(object):
         self.stim_cat: list = []
         self.analyze_pupil: list = []
 
-        self.divided_by_contrast = ['looming-stim-log', 'dimming-circle-log', 'black-sweeping-log', 'white-sweeping-log', 'looming-stim-lin', 'dimming-circle-lin', 'black-sweeping-lin', 'white-sweeping-lin', 'drifting-grating', 'center']
+        self.divided_by_contrast = ['looming-stim-log', 'dimming-circle-log', 'black-sweeping-log', 'white-sweeping-log', 'looming-stim-lin', 'dimming-circle-lin', 'black-sweeping-lin', 'white-sweeping-lin', 'drifting-grating']
+        self.divided_by_radius_and_contrast = ['center', 'size-tuning-contrast-log', 'size-tuning-contrast-lin']
         self.center_surround = ["center-surround", "center-surround_high_contrast", "center-surround_low_contrast"]
 
         self.get_protocol(base_path)
@@ -84,8 +85,15 @@ class VisualStim(object):
         surround_type, surround_names, id_s = self.get_surround_mod_type(visual_stim)
         sp_angle, sp_names, id_sp = self.get_stat_patch_angle(visual_stim)
         cg_contrast_angle, cg_names, id_cg = self.get_cg_contrast_angle(visual_stim)
-        st_size_contrast, st_names, id_st = self.get_st_size_contrast(visual_stim)
         
+        for stim in self.divided_by_radius_and_contrast :
+            stim_size_contrast, stim_names, id_stim = self.get_stim_by_radius_and_contrast(visual_stim, stim)
+            
+            if stim_size_contrast is not None :
+                self.separate_subtype_stimuli(stim_size_contrast, stim_names, id_stim)
+                radius = True
+                contrast = True
+                
         for stim in self.divided_by_contrast :
             stim_contrast, stim_names, id_stim = self.get_stim_by_contrast(visual_stim, stim)
             
@@ -111,6 +119,7 @@ class VisualStim(object):
             self.separate_subtype_stimuli(surround_type, surround_names, id_s)
             angle_surround = True
             contrast_surround = True
+            radius = True
         
         if sp_angle is not None :
             self.separate_subtype_stimuli(sp_angle, sp_names, id_sp)
@@ -120,11 +129,6 @@ class VisualStim(object):
             self.separate_subtype_stimuli(cg_contrast_angle, cg_names, id_cg)
             contrast = True
             angle = True
-
-        if st_size_contrast is not None :
-            self.separate_subtype_stimuli(st_size_contrast, st_names, id_st)
-            contrast = True
-            radius = True
         
         self.build_df()
 
@@ -187,23 +191,32 @@ class VisualStim(object):
         if 'surround' in self.protocol_names :
             id_s = self.protocol_df[self.protocol_df['name'] == 'surround'].index[0]
             occ_stim_idx = np.where(np.array(self.order) == id_s )[0]
-            if len(np.unique(visual_stim['contrast-surround'][occ_stim_idx])) <= 1 :
-                s_names = ["iso_ctrl", "cross_ctrl"]
-                surround_type = ['iso_ctrl' if angle_s == 0 and id == id_s 
-                                 else 'cross_ctrl' if id == id_s 
+
+            if len(np.unique(visual_stim['contrast-surround'][occ_stim_idx])) > 1\
+                and len(np.unique(visual_stim['radius'][occ_stim_idx])) > 1 :
+                surround_type = [f'iso_ctrl-{round(radius)}-{round(cs*100)/100}' if angle_s == 0 and id == id_s 
+                                 else f'cross_ctrl-{round(radius)}-{round(cs*100)/100}' if id == id_s 
                                  else None 
-                                 for id, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle-surround'])]
-            else :
-                surround_type = [f'iso_ctrl-{round(cs*10)/10}' if angle_s == 0 and id == id_s 
-                                 else f'cross_ctrl-{round(cs*10)/10}' if id == id_s 
+                                 for id, angle_s, cs, radius in zip(visual_stim['protocol_id'], visual_stim['angle-surround'], visual_stim['contrast-surround'], visual_stim['radius'])]
+                s_names = list(set(surround_type))
+                if None in s_names:
+                    s_names.remove(None)
+
+            elif len(np.unique(visual_stim['contrast-surround'][occ_stim_idx])) > 1 :
+                surround_type = [f'iso_ctrl-{round(cs*100)/100}' if angle_s == 0 and id == id_s 
+                                 else f'cross_ctrl-{round(cs*100)/100}' if id == id_s 
                                  else None 
                                  for id, angle_s, cs in zip(visual_stim['protocol_id'], visual_stim['angle-surround'], visual_stim['contrast-surround'])]
                 s_names = list(set(surround_type))
                 if None in s_names:
                     s_names.remove(None)
-
-                if len(s_names) < 2 :
-                    surround_type = None
+            
+            else :
+                s_names = ["iso_ctrl", "cross_ctrl"]
+                surround_type = ['iso_ctrl' if angle_s == 0 and id == id_s 
+                                 else 'cross_ctrl' if id == id_s 
+                                 else None 
+                                 for id, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle-surround'])]
         else :
             surround_type = None
             s_names = None
@@ -227,6 +240,24 @@ class VisualStim(object):
             id_stim = None
 
         return stim_contrast, stim_names, id_stim
+    
+    def get_stim_by_radius_and_contrast(self, visual_stim, stimuli):
+        if stimuli in self.protocol_names :
+            id_stim = self.protocol_df[self.protocol_df['name'] == stimuli].index[0]
+            stim_size_contrast = [f"{round(radius)}-{round(contrast*100)/100}" if id == id_stim else None for id, radius, contrast in zip(visual_stim['protocol_id'], visual_stim['radius'], visual_stim['contrast'])]
+            stim_names = list(set(stim_size_contrast))
+            if None in stim_names:
+                stim_names.remove(None)
+
+            if len(stim_names) < 4 :
+                stim_size_contrast = None
+                self.divided_by_contrast.append(stimuli)
+        else :
+            stim_size_contrast = None
+            stim_names = None
+            id_stim = None
+
+        return stim_size_contrast, stim_names, id_stim
 
     def get_stat_patch_angle(self, visual_stim):
         if 'static-patch' in self.protocol_names :
@@ -261,23 +292,6 @@ class VisualStim(object):
             id_cg = None
 
         return cg_contrast_angle, cg_names, id_cg
-
-    def get_st_size_contrast(self, visual_stim):
-        if 'size-tuning-contrast-log' in self.protocol_names or 'size-tuning-contrast-lin' in self.protocol_names :
-            id_st = self.protocol_df[(self.protocol_df['name'] == 'size-tuning-contrast-log') | (self.protocol_df['name'] == 'size-tuning-contrast-lin')].index[0]
-            st_size_contrast = [f"{round(radius)}-{round(contrast*100)/100}" if id == id_st else None for id, radius, contrast in zip(visual_stim['protocol_id'], visual_stim['radius'], visual_stim['contrast'])]
-            st_names = list(set(st_size_contrast))
-            if None in st_names:
-                st_names.remove(None)
-
-            if len(st_names) < 2 :
-                st_size_contrast = None
-        else :
-            st_size_contrast = None
-            st_names = None
-            id_st = None
-
-        return st_size_contrast, st_names, id_st
 
     def separate_subtype_stimuli(self, subtype_stim_order, subtype_stim_names, id_stim) :
         protocol_name = self.protocol_names[id_stim]
@@ -396,9 +410,9 @@ class VisualStim(object):
         self.protocol_df.to_excel(save_path)
 
 if __name__ == "__main__":
-    import visualpipe.analysis.Photodiode as Photodiode
-    import visualpipe.utils.General_functions as General_functions
-    import visualpipe.analysis.Ca_imaging as Ca_imaging
+    import visualpipe.analysis.photodiode as Photodiode
+    import visualpipe.utils.general_functions as General_functions
+    import visualpipe.analysis.ca_imaging as Ca_imaging
 
     base_path = "Y:/raw-imaging/TESTS/Mai-An/visual_test/16-00-59"
 
