@@ -110,6 +110,7 @@ class VisualStim(object):
                 angle_surround = True
                 contrast = True
                 contrast_surround = True
+                radius = True
 
         if qsm_loc is not None :
             self.separate_subtype_stimuli(qsm_loc, qsm_names, id_qsm)
@@ -174,12 +175,22 @@ class VisualStim(object):
 
     def get_cs_mod_type(self, visual_stim, stimuli):
         if stimuli in self.protocol_names:
-            cs_names = ["iso", "cross"]
             id_cs = self.protocol_df[self.protocol_df['name'] == stimuli].index[0]
-            cs_type = ['iso' if angle_s == angle and id == id_cs 
-                        else 'cross' if id == id_cs 
-                        else None 
-                        for id, angle, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle'], visual_stim['angle-surround'])]
+            occ_stim_idx = np.where(np.array(self.order) == id_cs )[0]
+            if len(np.unique(visual_stim['radius'][occ_stim_idx])) > 1 :
+                cs_type = [f'iso-{contrast}' if angle_s == angle and id == id_cs 
+                            else f'cross-{radius}-{contrast}' if id == id_cs 
+                            else None 
+                            for id, angle, angle_s, radius, contrast in zip(visual_stim['protocol_id'], visual_stim['angle'], visual_stim['angle-surround'], visual_stim['radius'], visual_stim['contrast-surround'])]
+                cs_names = list(set(cs_type))
+                if None in cs_names:
+                    cs_names.remove(None)
+            else :
+                cs_names = ["iso", "cross"]
+                cs_type = ['iso' if angle_s == angle and id == id_cs 
+                            else 'cross' if id == id_cs 
+                            else None 
+                            for id, angle, angle_s in zip(visual_stim['protocol_id'], visual_stim['angle'], visual_stim['angle-surround'])]
         else :
             cs_type = None
             cs_names = None
