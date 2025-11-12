@@ -9,7 +9,7 @@ import datetime
 import sys
 sys.path.append("./src")
 
-from visualpipe.analysis.speed_computation import compute_speed
+from analysis.speed_computation import compute_speed
 from analysis.ca_imaging import CaImagingDataManager
 from analysis.face_camera import FaceCamDataManager
 from analysis.visual_stim import VisualStim

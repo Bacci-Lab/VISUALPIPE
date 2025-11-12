@@ -6,7 +6,7 @@ import json
 from PyQt5.QtCore import QStringListModel
 from pathlib import Path
 
-from visualpipe.red_channel.red_cell_function import get_red_channel
+from red_channel.red_cell_function import get_red_channel
 
 class InputWindow(QtWidgets.QMainWindow):
     def __init__(self):

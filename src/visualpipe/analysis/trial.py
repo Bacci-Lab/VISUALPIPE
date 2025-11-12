@@ -11,8 +11,8 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoLocator
 import seaborn as sns
 
-from visualpipe.analysis.ca_imaging import CaImagingDataManager
-from visualpipe.analysis.visual_stim import VisualStim
+from analysis.ca_imaging import CaImagingDataManager
+from analysis.visual_stim import VisualStim
 
 class Trial(object):
 

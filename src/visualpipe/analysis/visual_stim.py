@@ -4,7 +4,7 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 
-import visualpipe.utils.figures as figures
+import utils.figures as figures
 
 class VisualStim(object):
     

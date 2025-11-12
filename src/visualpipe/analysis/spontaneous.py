@@ -6,7 +6,7 @@ from tqdm import tqdm
 from scipy.stats import spearmanr, zscore
 from scipy.ndimage import gaussian_filter1d
 
-from visualpipe.analysis.visual_stim import VisualStim
+from analysis.visual_stim import VisualStim
 
 def get_spont_stim(visual_stim:VisualStim):
     spont_stimuli_name = []

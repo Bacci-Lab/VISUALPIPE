@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import datetime
 
-import visualpipe.utils.figures as figures
-import visualpipe.utils.general_functions as general_functions
+import utils.figures as figures
+import utils.general_functions as general_functions
 
 def get_timestamp_start(base_path) :
     NIdaq_path = os.path.join(base_path, "NIdaq.start.npy")
