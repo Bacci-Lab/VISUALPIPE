@@ -23,6 +23,26 @@ def load_session_data(session_path):
     if 'looming-stim' in validity:
         validity['looming-stim-log-1.0'] = validity.pop('looming-stim')
 
+    stimuli_df['name'] = stimuli_df['name'].replace('center', 'center-20-1.0')
+    if 'center' in validity:
+        validity['center-20-1.0'] = validity.pop('center')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround-cross', 'center-surround_high_contrast-cross-20.0-1.0')
+    if 'center-surround-cross' in validity:
+        validity['center-surround_high_contrast-cross-20.0-1.0'] = validity.pop('center-surround-cross')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround-iso', 'center-surround_high_contrast-iso-1.0')
+    if 'center-surround-iso' in validity:
+        validity['center-surround_high_contrast-iso-1.0'] = validity.pop('center-surround-iso')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('surround-iso_ctrl', 'surround-iso_ctrl-20-1.0')
+    if 'surround-iso_ctrl' in validity:
+        validity['surround-iso_ctrl-20-1.0'] = validity.pop('surround-iso_ctrl')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('surround-cross_ctrl', 'surround-cross_ctrl-20-1.0')
+    if 'surround-cross_ctrl' in validity:
+        validity['surround-cross_ctrl-20-1.0'] = validity.pop('surround-cross_ctrl')
+
     return validity, trials, stimuli_df
 
 def get_period_names(attr):
