@@ -76,7 +76,7 @@ class FaceCamDataManager(object) :
                 return None, None
         
         faceitOutput = np.load(face_it_path, allow_pickle=True)
-        facemotion = (faceitOutput['motion_energy'])
+        facemotion = (faceitOutput['motion_energy_without_grooming'])
         pupil = (faceitOutput['pupil_dilation_blinking_corrected'])
         return facemotion, pupil
             
