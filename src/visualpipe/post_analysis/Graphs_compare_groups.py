@@ -27,9 +27,9 @@ def load_session_data(session_path):
     if 'center' in validity:
         validity['center-20-1.0'] = validity.pop('center')
 
-    stimuli_df['name'] = stimuli_df['name'].replace('center-surround-cross', 'center-surround_high_contrast-cross-20.0-1.0')
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround-cross', 'center-surround_high_contrast-cross-20-1.0')
     if 'center-surround-cross' in validity:
-        validity['center-surround_high_contrast-cross-20.0-1.0'] = validity.pop('center-surround-cross')
+        validity['center-surround_high_contrast-cross-20-1.0'] = validity.pop('center-surround-cross')
 
     stimuli_df['name'] = stimuli_df['name'].replace('center-surround-iso', 'center-surround_high_contrast-iso-1.0')
     if 'center-surround-iso' in validity:
@@ -262,14 +262,9 @@ def compute_cmi(magnitude, protocol_cross='center-surround-cross', protocol_iso=
     Returns:
         float: The computed CMI value.
     """
-    accepted_protocols = ['center', 'center-surround-iso', 'center-surround-cross', 'surround-iso_ctrl', 'surround-cross_ctrl']
     
-    if protocol_cross not in accepted_protocols :
-        raise ValueError(f"Protocol '{protocol_cross}' is not in the accepted protocols: {accepted_protocols}")
     if protocol_cross not in magnitude.keys():
         raise ValueError(f"Protocol '{protocol_cross}' is not in the magnitude keys: {magnitude.keys()}")
-    if protocol_iso not in accepted_protocols :
-        raise ValueError(f"Protocol '{protocol_iso}' is not in the accepted protocols: {accepted_protocols}")
     if protocol_iso not in magnitude.keys():
         raise ValueError(f"Protocol '{protocol_iso}' is not in the magnitude keys: {magnitude.keys()}")
         
@@ -277,7 +272,7 @@ def compute_cmi(magnitude, protocol_cross='center-surround-cross', protocol_iso=
         
     return cmi
 
-def compute_suppression(magnitude, protocol_surround='center-surround-iso'):
+def compute_suppression(magnitude, protocol_center = 'center', protocol_surround='center-surround-iso'):
     """Compute the suppression index for the specified protocols.
     
     Args:
@@ -289,20 +284,30 @@ def compute_suppression(magnitude, protocol_surround='center-surround-iso'):
         float: The computed suppression index value.
     """
 
-    accepted_protocols = ['center-surround-iso', 'center-surround-cross']
     suppression = []
-    if protocol_surround not in accepted_protocols :
-        print(f"Protocol '{protocol_surround}' is not in the accepted protocols: {accepted_protocols}")
-    elif protocol_surround not in magnitude.keys():
+    if protocol_surround not in magnitude.keys():
         print(f"Protocol '{protocol_surround}' is not in the magnitude keys: {magnitude.keys()}")
-    elif 'center' not in magnitude.keys():
-        print(f"Protocol 'center' is not in the magnitude keys: {magnitude.keys()}")
+    elif protocol_center not in magnitude.keys():
+        print(f"Protocol {protocol_center} is not in the magnitude keys: {magnitude.keys()}")
         
     else:
-        suppression = 1 - magnitude[protocol_surround] / magnitude['center']
+        suppression = 1 - magnitude[protocol_surround] / magnitude[protocol_center]
 
     return suppression
 
+def compute_ITI(magnitude, center = 'center-20-1.0', inverse = 'surround-iso_ctrl-20-1.0', full_field = 'center-surround_high_contrast-iso-1.0'):
+
+    ITI = []
+    if center not in magnitude.keys():
+        print(f"Protocol '{center}' is not in the magnitude keys: {magnitude.keys()}")
+    elif inverse not in magnitude.keys():
+        print(f"Protocol '{inverse}' is not in the magnitude keys: {magnitude.keys()}")
+    elif full_field not in magnitude.keys():
+        print(f"Protocol '{full_field}' is not in the magnitude keys: {magnitude.keys()}")
+
+    else:
+        ITI = 0.5 + (magnitude[inverse] - magnitude[center]) / (2*((magnitude[center]-magnitude[full_field])+(magnitude[inverse] - magnitude [full_field])))
+    return ITI
 
 def preferred_contrast(groups_id, mag_per_session, sub_protocols):
     """
@@ -362,7 +367,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
     #Define trial period names based on attribute
     period_names, trial_periods = get_period_names(attr)
     # Initialize group-level containers
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups, mag_per_session = [], [], [], [], [], [], [], [], [], []
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, mag_per_session = [], [], [], [], [], [], [], [], [], [], []
     perTrials_groups = {group: {} for group in list(groups_id.keys())} #Will contain the average response per trial for each protocol, per group
     mag_trials = {group: {} for group in list(groups_id.keys())} #Will contain the magnitude of the response to each protocol for each trial of each protocol, per group
     sem_trials = {group: {} for group in list(groups_id.keys())} #Will contain the SEM of the response to each protocol for each trial of each protocol, per group
@@ -401,7 +406,16 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
             valid_neurons, proportion = select_neurons(validity, valid_sub_protocols, selection_method, group_name,
                    get_centered, stimuli_df, trials, period_names, attr, plot) #extract responsive neurons (and centered if get_centered = True)
-            
+            #Uncomment if you want to select inverse-tuned neurons
+            """valid_neurons = np.array(valid_neurons)
+            ff_id = stimuli_df[stimuli_df.name == 'center-surround_high_contrast-iso-1.0'].index[0]
+            inverse10_id = stimuli_df[stimuli_df.name == 'surround-iso_ctrl-10-1.0'].index[0]
+            inverse20_id = stimuli_df[stimuli_df.name == 'surround-iso_ctrl-20-1.0'].index[0]
+            ff_response = trials[period_names[1]][ff_id][valid_neurons,int(0.5*frame_rate):].mean(axis=1)
+            inverse10_response = trials[period_names[1]][inverse10_id][valid_neurons,int(0.5*frame_rate):].mean(axis=1)
+            inverse20_response = trials[period_names[1]][inverse20_id][valid_neurons,int(0.5*frame_rate):].mean(axis=1)
+            mask = (inverse10_response > ff_response) | (inverse20_response > ff_response)
+            valid_neurons = valid_neurons[mask]"""
             all_neurons+=len(valid_neurons)
             proportion_list.append(proportion)
             print(f"Proportion of centered responsive neurons: {proportion}, Number of centered responsive neurons: {len(valid_neurons)}"
@@ -441,6 +455,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
                 # Now compute the average response per trial for each neuron, subtracting the baseline of that trial
                 session_mag_list = []
+                
                 for trial in range(0,n_trials):
                     avg_trial = []
                     # Only compute baseline if attr == 'dFoF0-baseline'
@@ -473,11 +488,15 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         for protocol in magnitude.keys():
             magnitude[protocol] = np.concatenate(magnitude[protocol])
 
-        if protocol_name == "surround-mod" and len(sub_protocols) == 2:
+        if "surround-mod" in protocol_name and len(sub_protocols) == 2:
             cmi = compute_cmi(magnitude, sub_protocols[1], sub_protocols[0])
-            suppression = compute_suppression(magnitude, sub_protocols[1])
-        else :
+            suppression = compute_suppression(magnitude, sub_protocols[0], sub_protocols[1])
+            ITI = []
+        elif 'surround-mod' in protocol_name and len(sub_protocols) == 3:
+            ITI = compute_ITI(magnitude, sub_protocols[0], sub_protocols[1], sub_protocols[2])
             cmi, suppression = [], []
+        else :
+            cmi, suppression, ITI = [], [], []
 
         print(f"\nNumber of {key} neurons: {all_neurons}")
 
@@ -518,12 +537,14 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         avg_groups.append(avg)
         sem_groups.append(sem)
         cmi_groups.append(cmi)
+        ITI_groups.append(ITI)
         proportions_groups.append(proportion_list)
         individual_groups.append(single_neurons_group)
         mag_per_session.append(single_neurons_session)
+        """perTrials_groups, mag_trials, sem_trials, mag_trial_indiv = [], [], [], []"""
         
 
-    return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv
+    return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv
 
 
 
@@ -1208,81 +1229,88 @@ def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, var
     """
     edgecolor = 'black'
     medians = []
-    if len(sub_protocols) == 2 or variable == 'AI':
-        labels_list = []
-        if variable == "CMI":
-            for l in [list1, list2]:
-                bins = [-float('inf'), -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, float('inf')]
-                labels = ['<-1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '>1.5']
-                labeled = pd.cut(l, bins=bins, labels=labels)
-                labels_list += labeled.astype(str).tolist()
-        elif variable == "suppression_index" and 'center' in sub_protocols:
-            for l in [list1, list2]:
-                bins = [-float('inf'), -2, -1.75, -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, float('inf')]
-                labels = ['<-2', '-2 to -1.75', '-1.75 to -1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '1.5 to 1.75', '1.75 to 2', '>2']
-                labeled = pd.cut(l, bins=bins, labels=labels)
-                labels_list += labeled.astype(str).tolist()
-        elif variable == 'AI':
-            for l in [list1, list2]:
-                bins = np.linspace(-1, 1, 17)
-                labels = [f"{round(bins[i],2)} to {round(bins[i+1],2)}" for i in range(len(bins)-1)]
-                labeled = pd.cut(l, bins=bins, labels=labels)
-                labels_list += labeled.astype(str).tolist()
+    labels_list = []
+    if variable == "CMI":
+        for l in [list1, list2]:
+            bins = [-float('inf'), -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, float('inf')]
+            labels = ['<-1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '>1.5']
+            labeled = pd.cut(l, bins=bins, labels=labels)
+            labels_list += labeled.astype(str).tolist()
+    elif variable == "suppression_index":
+        for l in [list1, list2]:
+            bins = [-float('inf'), -2, -1.75, -1.5, -1.25, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, float('inf')]
+            labels = ['<-2', '-2 to -1.75', '-1.75 to -1.5', '-1.5 to -1.25', '-1.25 to -1', '-1 to -0.75', '-0.75 to -0.5', '-0.5 to -0.25', '-0.25 to 0', '0 to 0.25', '0.25 to 0.5', '0.5 to 0.75', '0.75 to 1', '1 to 1.25', '1.25 to 1.5', '1.5 to 1.75', '1.75 to 2', '>2']
+            labeled = pd.cut(l, bins=bins, labels=labels)
+            labels_list += labeled.astype(str).tolist()
+    elif variable == 'AI':
+        for l in [list1, list2]:
+            bins = np.linspace(-1, 1, 17)
+            labels = [f"{round(bins[i],2)} to {round(bins[i+1],2)}" for i in range(len(bins)-1)]
+            labeled = pd.cut(l, bins=bins, labels=labels)
+            labels_list += labeled.astype(str).tolist()
+    elif variable == 'ITI':
+        for l in [list1, list2]:
+            bins = np.linspace(0, 1, 11)
+            labels = ['0 to 0.1', '0.1 to 0.2', '0.2 to 0.3', '0.3 to 0.4', '0.4 to 0.5', '0.5 to 0.6', '0.6 to 0.7', '0.7 to 0.8', '0.8 to 0.9', '0.9 to 1']
+            labeled = pd.cut(l, bins=bins, labels=labels)
+            labels_list += labeled.astype(str).tolist()
 
-        else :
-            raise Exception("Variable must be 'CMI' or 'suppression_index', and sub_protocols must contain 'center' for suppression index.")
+    else :
+        raise Exception("Variable must be 'CMI', 'suppression_index', 'AI' or 'ITI'")
 
-        # Perform Mann–Whitney U test between WT and KO
-        stat_mwu, p_value_mwu = mannwhitneyu(np.array(list1), np.array(list2), alternative='two-sided')
+    # Perform Mann–Whitney U test between WT and KO, and one-sample Wilcoxon tests against 0 or 0.5 for each group
+    stat_mwu, p_value_mwu = mannwhitneyu(np.array(list1), np.array(list2), alternative='two-sided')
+    if variable == 'ITI':
+        # Compare each list to 0.5
+        p_value_1 = wilcoxon(np.array(list1) - 0.5, alternative='two-sided')[1]
+        p_value_2 = wilcoxon(np.array(list2) - 0.5, alternative='two-sided')[1]
+    else:
+        # Original paired test between lists
         p_value_1 = wilcoxon(np.array(list1), alternative='two-sided')[1]
         p_value_2 = wilcoxon(np.array(list2), alternative='two-sided')[1]
-        
-        genotype = [groups[0]] * len(list1) + [groups[1]] * len(list2)
-        df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
+    
+    genotype = [groups[0]] * len(list1) + [groups[1]] * len(list2)
+    df = pd.DataFrame({"Genotype" : genotype, variable : pd.Categorical(labels_list, categories=labels, ordered=True)})
 
-        fig, ax = plt.subplots(figsize=(8, 7))
-       
-        sns.histplot(df, x=variable, hue="Genotype", common_norm=False, shrink=.8, stat="percent", element='step', ax=ax, alpha=0)
-        plt.ylabel(f'% of neurons')
-        plt.xticks(rotation=45)
-        plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
-        plt.tight_layout()
-        textstr = (
-            f'{groups[0]} median = {np.median(list1):.2f}, p (vs 0) = {p_value_1:.3g}\n'
-            f'{groups[1]} median = {np.median(list2):.2f}, p (vs 0) = {p_value_2:.3g}\n'
-            f'{groups[0]} vs {groups[1]} (Mann–Whitney) p = {p_value_mwu:.3g}'
-        )
-        # Position textbox on plot
-        plt.gca().text(0.99, 0.97, textstr,
-                    transform=plt.gca().transAxes,
-                    fontsize=11, verticalalignment='top', horizontalalignment='right',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.85))
+    fig, ax = plt.subplots(figsize=(8, 7))
+    
+    sns.histplot(df, x=variable, hue="Genotype", common_norm=False, shrink=.8, stat="percent", element='step', ax=ax, alpha=0)
+    plt.ylabel(f'% of neurons')
+    plt.xticks(rotation=45)
+    plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
+    plt.tight_layout()
+    textstr = (
+        f'{groups[0]} median = {np.median(list1):.2f}, p {'(vs 0)' if variable!='ITI' else '(vs 0.5)'} = {p_value_1:.3g}\n'
+        f'{groups[1]} median = {np.median(list2):.2f}, p {'(vs 0)' if variable!='ITI' else '(vs 0.5)'} = {p_value_2:.3g}\n'
+        f'{groups[0]} vs {groups[1]} (Mann–Whitney) p = {p_value_mwu:.3g}'
+    )
+    # Position textbox on plot
+    plt.gca().text(0.99, 0.97, textstr,
+                transform=plt.gca().transAxes,
+                fontsize=11, verticalalignment='top', horizontalalignment='right',
+                bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.85))
 
-        fig.savefig(os.path.join(save_path, f"histplot_{fig_name}_{variable}_{attr}.jpeg"), dpi=300)
-        plt.show()
+    fig.savefig(os.path.join(save_path, f"histplot_{fig_name}_{variable}_{attr}.jpeg"), dpi=300)
+    plt.show()
 
-        # Count neurons per bin per genotype
-        bin_counts = df.groupby(["Genotype", variable], observed=False).size().reset_index(name="Count")
+    # Count neurons per bin per genotype
+    bin_counts = df.groupby(["Genotype", variable], observed=False).size().reset_index(name="Count")
 
-        # Pivot so that each column is a genotype
-        pivot_df = bin_counts.pivot(index=variable, columns="Genotype", values="Count").fillna(0)
+    # Pivot so that each column is a genotype
+    pivot_df = bin_counts.pivot(index=variable, columns="Genotype", values="Count").fillna(0)
 
-        # Optionally convert counts to percentages
-        pivot_df_percent = pivot_df.div(pivot_df.sum(axis=0), axis=1) * 100
+    # Optionally convert counts to percentages
+    pivot_df_percent = pivot_df.div(pivot_df.sum(axis=0), axis=1) * 100
 
-        # Save percentages to Excel
-        with pd.ExcelWriter(os.path.join(save_path, f"{fig_name}_{variable}_{attr}.xlsx")) as writer:
-            pivot_df_percent.to_excel(writer, sheet_name="Percentages")
-    else:
-        print(f"Histogram is not available for {len(sub_protocols)} protocols. Please select 2 protocols to compare.")
-        print(f"Current protocols: {sub_protocols}")
-        return None
+    # Save percentages to Excel
+    with pd.ExcelWriter(os.path.join(save_path, f"{fig_name}_{variable}_{attr}.xlsx")) as writer:
+        pivot_df_percent.to_excel(writer, sheet_name="Percentages")
     
 
 def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
                           individual_groups, sub_protocols, attr, save_path, fig_name,
                           variable='suppression_index'):
-    if not any(cmi_groups) or not any(suppression_groups):
+    if not cmi_groups or not suppression_groups:
         print("No CMI or suppression index data available to plot representative traces.")
         return
     excel_dict = {}
@@ -1319,7 +1347,7 @@ def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_
 
         for protocol in sub_protocols:
             col_name = f"_{group}_{protocol}_representative"
-            excel_dict[col_name] = rep_trace[protocol][:min_len]
+            excel_dict[col_name] = rep_trace[protocol][:min_len]/max_group
             ax[0,i].plot(time, gaussian_filter1d(rep_trace[protocol][:min_len] / max_group, sigma=1), color = 'skyblue' if protocol == sub_protocols[0] else 'orange',
                        label=f"{group} {protocol}", lw=2)
 
@@ -1468,8 +1496,8 @@ def perc_pref_contrast(groups_id, mag_per_session, sub_protocols, attr, fig_name
 
 def plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3):
     groups = list(groups_id.keys())
+    print(mag_trial_indiv.keys())
     AI = adaptation_index(sub_protocols, groups_id, mag_trial_indiv, first, last)
-    
     for protocol in sub_protocols: 
         list1 = AI[groups[0]][protocol]
         list2 = AI[groups[1]][protocol]
@@ -1493,16 +1521,16 @@ if __name__ == "__main__":
     #-----------------------INPUTS-----------------------#
 
     excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\surround-mod-nathan-2CenterRadius\Analysis"
     
     #Will be included in all names of saved figures
     fig_name = 'test'
 
     #Name of the physion protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "looming-sweeping-log"
+    protocol_name = "surround-mod-2CenterRadius"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['looming-stim-log-1.0']  
+    sub_protocols = ['center-10-1.0', 'surround-cross_ctrl-10-1.0', 'center-surround_high_contrast-iso-1.0']
     # Method od selection of responsive neurons: 'any', 'only' or 'and'
        # selection_method:
        # 'any'  -> neurons responsive to at least one protocol in any group
@@ -1510,9 +1538,9 @@ if __name__ == "__main__":
        # 'and'  -> neurons shared between groups
     selection_method = 'any'
     # For the methods 'only' and 'any': you should put the key of the group of protocols you are interested in from valid_sub_protocols. If you want to use method 'and', put None
-    group_name = 'looming'
+    group_name = 'center'
     # Dict of protocol(s) used to select responsive neurons. 
-    valid_sub_protocols = {'looming': ['looming-stim-log-1.0']} 
+    valid_sub_protocols = {'center': ['center-10-1.0', 'center-20-1.0']} 
     # Example of correct valid_sub_protocols {'looming': ['looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0']} 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
@@ -1535,19 +1563,19 @@ if __name__ == "__main__":
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
     # Decide if you want to only keep neurons that are centered
-    get_centered = False  # True or False
+    get_centered = True  # True or False
 
     # Decide on the way to calculate the amplitude of response
-    magnitude_method = 'auc' #'auc', 'peak' or 'filtered_peak', 'mean'
+    magnitude_method = 'mean' #'auc', 'peak' or 'filtered_peak', 'mean'
 
     #----------------------------------------------------#
     df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
     groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False) 
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False) 
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
-    #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable='CMI')
+    #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable="CMI")
     
 
     
@@ -1562,11 +1590,13 @@ if __name__ == "__main__":
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
     graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
-    if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2:
+    if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2 and "surround" in protocol_name:
         histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
     #plot the distribution of suppression index
     if len(list(groups_id.keys())) == 2 and 'center' in sub_protocols:
         histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
+    if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 3 and "surround" in protocol_name:
+        histplot(sub_protocols, ITI_groups[0], ITI_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "ITI")
     # Plot CDFs of neuron response magnitudes comparing groups
     plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, fig_name, save_path) 
     plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
