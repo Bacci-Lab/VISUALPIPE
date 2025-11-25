@@ -237,8 +237,8 @@ class CaImagingDataManager(object):
         
         elif self._f0_method  == 'sliding':
             f0 = gaussian_filter1d(self.fluorescence, sig)
-            f0 = minimum_filter1d(f0, round(win * self.fs), mode='wrap')
-            self.f0 = maximum_filter1d(f0, round(win * self.fs), mode='wrap')
+            f0 = minimum_filter1d(f0, round(win * self.fs), mode='reflect')
+            self.f0 = maximum_filter1d(f0, round(win * self.fs), mode='reflect')
         
         else :
             raise Exception(f"Invalid f0 calculation method selected : {self._f0_method}")
