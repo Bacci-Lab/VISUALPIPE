@@ -226,6 +226,46 @@ def select_neurons(validity, valid_sub_protocols, selection_method, group_name,
     proportion = 100 * len(valid_neurons) / trials[period_names[1]][0].shape[0]
     return valid_neurons, proportion
 
+def normalize_magnitudes(groups_id, sub_protocols, magnitudes_groups,
+                         norm_protocols=['center-20-1.0']):
+
+    normalized_magnitudes = []
+
+    for group in range(len(groups_id)):
+
+        normalized_magnitudes_group = {}
+        magnitudes = magnitudes_groups[group]  # dict: protocol → array(neurons)
+
+        # Collect per-neuron norm arrays
+        norm_arrays = []
+        for norm_protocol in norm_protocols:
+            if norm_protocol not in sub_protocols:
+                raise ValueError(
+                    f"Normalization protocol '{norm_protocol}' not found in sub_protocols."
+                )
+            norm_arrays.append(magnitudes[norm_protocol])
+
+        # norm_arrays: list of arrays (n_neurons,)
+        # stack → shape (n_norm_protocols, n_neurons)
+        norm_stack = np.vstack(norm_arrays)
+
+        # Per-neuron max across normalization protocols
+        # shape: (n_neurons,)
+        norm_values = np.max(norm_stack, axis=0)
+
+        # Avoid division by zero
+        norm_values[norm_values == 0] = np.nan
+
+        # Normalize each protocol per neuron
+        for protocol in sub_protocols:
+            normalized_magnitudes_group[protocol] = (
+                magnitudes[protocol] / norm_values
+            )
+
+        normalized_magnitudes.append(normalized_magnitudes_group)
+
+    return normalized_magnitudes
+    
 
 # --------------------- Compute variables ----------------------------- #
 
@@ -541,7 +581,6 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         proportions_groups.append(proportion_list)
         individual_groups.append(single_neurons_group)
         mag_per_session.append(single_neurons_session)
-        """perTrials_groups, mag_trials, sem_trials, mag_trial_indiv = [], [], [], []"""
         
 
     return suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv
@@ -1524,13 +1563,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\surround-mod-nathan-2CenterRadius\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'test'
+    fig_name = 'CenterVsInverseCross_100%_norm'
 
     #Name of the physion protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod-2CenterRadius"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-10-1.0', 'surround-cross_ctrl-10-1.0', 'center-surround_high_contrast-iso-1.0']
+    sub_protocols = ['center-10-1.0', 'center-20-1.0', 'surround-cross_ctrl-10-1.0', 'surround-cross_ctrl-20-1.0']
     # Method od selection of responsive neurons: 'any', 'only' or 'and'
        # selection_method:
        # 'any'  -> neurons responsive to at least one protocol in any group
@@ -1574,6 +1613,8 @@ if __name__ == "__main__":
     groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
     suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False) 
+    
+    magnitude_groups = normalize_magnitudes(groups_id, sub_protocols, magnitude_groups, norm_protocols = ['center-10-1.0', 'center-20-1.0']) #Uncomment if you want to normalize magnitudes by specific protocols (will take the max of the magnitude of protocols in norm_protocols)
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
     #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable="CMI")
     
