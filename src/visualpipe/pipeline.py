@@ -63,6 +63,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
         motion_filter_kernel = 10
         pupil_filter_kernel = 10
         dFoF_filter_kernel = 10
+        sliding_window = 300
 
     else :
         COMPILE = params.COMPILE
@@ -73,6 +74,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
         neuron_type = params.neuron_type
         starting_delay_2p = params.starting_delay_2p
         num_samples = params.num_samples
+        sliding_window = params.sliding_window
 
         speed_threshold = params.speed_threshold
         facemotion_threshold = params.facemotion_threshold
@@ -165,7 +167,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     print('Number of remaining neurons after alpha calculation :', len(kept_ROI_alpha))
 
     #---------------------------------- Calculation of F0 ----------------------
-    ca_img_dm.compute_F0(percentile=10, win=60)
+    ca_img_dm.compute_F0(percentile=10, win=sliding_window)
     kept_ROI_F0 = ca_img_dm._list_ROIs_idx
     print('Number of remaining neurons after F0 calculation  :', len(kept_ROI_F0))
 
@@ -525,6 +527,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
                 "Neuropil impact factor" : ca_img_dm._neuropil_if,
                 "F0 calculateion method" : F0_method,
                 "2p starting delay" : starting_delay_2p,
+                "sliding window" : sliding_window,
                 "Bootstrapping nb of samples" : num_samples,
                 "Speed threshold" : f"{speed_threshold} (cm/s)",
                 "Facemotion threshold" : f"{facemotion_threshold} (std)",

@@ -6,6 +6,7 @@ F0_method = 'sliding' #sliding or hamming
 neuron_type = 'Other' #PYR or Other
 starting_delay_2p = 0.100
 num_samples = 1000
+sliding_window = 300 #s
 
 speed_threshold = 0.5
 facemotion_threshold = 2
