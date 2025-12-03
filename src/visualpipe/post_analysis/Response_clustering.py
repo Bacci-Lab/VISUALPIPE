@@ -113,7 +113,9 @@ def process_data(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:f
                 if stim_name == 'looming-stim':
                     validity['looming-stim-log-1.0'] = validity.pop(stim_name)
             # Determine which neurons are valid
-            valid_neurons = get_valid_neurons_session(validity, sub_protocol)
+            """valid_neurons = get_valid_neurons_session(validity, sub_protocol)"""
+            valid_neurons, proportion = compare_groups.select_neurons(validity, valid_sub_protocols, selection_method, group_name,
+                   get_centered, stimuli_df, trials, period_names, attr, plot=False) #extract responsive neurons (and centered if get_centered = True)
             nb_valid_neurons = len(valid_neurons)
             all_neurons += nb_valid_neurons
 
@@ -598,7 +600,7 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
 
     #Will be included in all names of saved figures
-    fig_name = 'Looming100%'
+    fig_name = 'LoomingExclusive100%'
 
     #Name of the protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = 'looming-sweeping-log'
@@ -606,7 +608,21 @@ if __name__ == "__main__":
     # Write the stimulus type you want to use for clustering
     sub_protocol = 'looming-stim-log-1.0'
 
+    # Method od selection of responsive neurons: 'any', 'only' or 'and'
+       # selection_method:
+       # 'any'  -> neurons responsive to at least one protocol in any group
+       # 'only' -> neurons exclusive to a specific group (provide group_name)
+       # 'and'  -> neurons shared between groups
+    selection_method = 'only'
+    # For the methods 'only' and 'any': you should put the key of the group of protocols you are interested in from valid_sub_protocols. If you want to use method 'and', put None
+    group_name = 'looming'
+    # Dict of protocol(s) used to select responsive neurons. 
+    valid_sub_protocols = {'looming': ['looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0'],
+                           'dimming': ['dimming-circle-log-0.0', 'dimming-circle-log-0.1', 'dimming-circle-log-0.4','dimming-circle-log-1.0']} 
+
     attr='dFoF0-baseline'  # 'z-scores' or 'dFoF0-baseline'
+
+    get_centered = False
 
     #Frame rate
     frame_rate = 30
@@ -667,7 +683,7 @@ if __name__ == "__main__":
     find_nb_clusters(norm_traces, max_clusters=max_clusters, save_path=save_path, fig_name=fig_name, show=True)
     
     # Set number of clusters for joint clustering
-    n_clusters_joint = 5  # choose based on elbow/Dunn index as before
+    n_clusters_joint = 3  # choose based on elbow/Dunn index as before
 
     #------------------- Run KMeans clustering on the combined data
     kmeans = KMeans(n_clusters=n_clusters_joint, n_init=50).fit(norm_traces)
@@ -736,7 +752,7 @@ if __name__ == "__main__":
     frame_rate = 30
     attr = 'dFoF0-baseline'
 
-    _, _, _, nb_neurons, _, _, _, _, _, _, _, _, _, mag_trial_indiv = compare_groups.process_group(df, groups_id, attr, valid_sub_protocols, [sub_protocol], protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False)
+    _, _, _, nb_neurons, _, _, _, _, _, _, _, _, _, _, mag_trial_indiv = compare_groups.process_group(df, groups_id, attr, valid_sub_protocols, [sub_protocol], protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False)
 
     # Concatenate magnitudes of WTs and KOs and keep track of the group label
     all_mag_trials = {}
