@@ -123,7 +123,7 @@ def populations_overlap(validity, protocol_groups):
     return exclusives, intersections, total_union
 
 
-def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, frame_rate = 30):
+def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, direction = 'max', frame_rate = 30):
     """
     Function to get the indices of neurons that have their maximal response in the center stimulus.
     """
@@ -150,14 +150,17 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, frame_rat
             trial_neuron = trials[period_names[1]][stimulus_id][neuron, int(frame_rate*0.5):]  # Exclude first 0.5s
             magnitudes_neuron[stimulus] = np.mean(trial_neuron)
         # Find the stimulus with max response
-        max_stimulus = max(magnitudes_neuron, key=magnitudes_neuron.get)
+        if direction == 'max':
+            max_stimulus = max(magnitudes_neuron, key=magnitudes_neuron.get)
+        elif direction == 'min':
+            max_stimulus = min(magnitudes_neuron, key=magnitudes_neuron.get)
         if max_stimulus == 'quick-spatial-mapping-center':
             centered_neurons.append(neuron)
         else:
             not_centered.append(neuron)
     proportion_centered = 100*len(centered_neurons)/trials[period_names[1]][0].shape[0]
 
-    if plot:
+    if plot and len(centered_neurons)!=0:
         def plot_for_neurons(neurons, title):
             fig, axes = plt.subplots(3, 3, figsize=(15, 12))
             axes = axes.flatten()
@@ -207,7 +210,7 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, frame_rat
     return centered_neurons, not_centered
 
 def select_neurons(validity, valid_sub_protocols, selection_method, group_name,
-                   get_centered, stimuli_df, trials, period_names, attr, plot):
+                   get_centered, stimuli_df, trials, period_names, attr, plot, direction):
     valid_neurons = get_valid_neurons(validity, valid_sub_protocols,
                                       selection_method=selection_method,
                                       group_name=group_name)
@@ -220,7 +223,7 @@ def select_neurons(validity, valid_sub_protocols, selection_method, group_name,
     
     if get_centered:
         centered_neurons, non_centered = get_centered_neurons(stimuli_df, valid_neurons, trials,
-                                                             attr, plot, frame_rate=30)
+                                                             attr, plot, direction, frame_rate=30)
         valid_neurons = centered_neurons
     
     proportion = 100 * len(valid_neurons) / trials[period_names[1]][0].shape[0]
@@ -445,7 +448,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
             validity, trials, stimuli_df = load_session_data(session_path)
 
             valid_neurons, proportion = select_neurons(validity, valid_sub_protocols, selection_method, group_name,
-                   get_centered, stimuli_df, trials, period_names, attr, plot) #extract responsive neurons (and centered if get_centered = True)
+                   get_centered, stimuli_df, trials, period_names, attr, plot, direction = 'max') #extract responsive neurons (and centered if get_centered = True)
             #Uncomment if you want to select inverse-tuned neurons
             """valid_neurons = np.array(valid_neurons)
             ff_id = stimuli_df[stimuli_df.name == 'center-surround_high_contrast-iso-1.0'].index[0]
@@ -466,7 +469,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 
                 stim_id = stimuli_df[stimuli_df.name == protocol].index[0]
                 n_trials = trials[trial_periods[1]][stim_id].shape[1]
-                all_magnitudes = np.zeros((len(valid_neurons), n_trials))  # each row = a neuron, each column = trial
+                #all_magnitudes = np.zeros((len(valid_neurons), n_trials))  # each row = a neuron, each column = trial
 
                 # Get traces from responsive-neurons for that protocol from pre, stim and post periods and concatenate along time
                 traces_sep = [trials[period][stim_id][valid_neurons, :] for period in period_names]
@@ -495,7 +498,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
                 # Now compute the average response per trial for each neuron, subtracting the baseline of that trial
                 session_mag_list = []
-                
+                """
                 for trial in range(0,n_trials):
                     avg_trial = []
                     # Only compute baseline if attr == 'dFoF0-baseline'
@@ -522,7 +525,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                     mag_trial_indiv[key][protocol] = [all_magnitudes]
                 else:
                     mag_trial_indiv[key][protocol].append(all_magnitudes)
-        perTrials_groups[key] = perTrials # store the average response per trial for each protocol, for that group
+        perTrials_groups[key] = perTrials # store the average response per trial for each protocol, for that group"""
         
         
         for protocol in magnitude.keys():
@@ -550,7 +553,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
             # Now stack safely
             avg_data[protocol] = np.stack(trimmed_arrays, axis=0)
-            sessions_mag = mag_trials_sessions[key][protocol]  # list of lists: n_sessions x n_trials
+            """sessions_mag = mag_trials_sessions[key][protocol]  # list of lists: n_sessions x n_trials
 
             # Convert to array (n_sessions, n_trials)
             mag_arr = np.array(sessions_mag)  # shape (n_sessions, n_trials)
@@ -562,7 +565,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
             mag_trials[key][protocol] = mag_mean_per_trial.tolist()
             sem_trials[key][protocol] = mag_sem_per_trial.tolist()
 
-            mag_trial_indiv[key][protocol] = np.concatenate(mag_trial_indiv[key][protocol], axis=0) #concatenate individual neuron values from different sessions
+            mag_trial_indiv[key][protocol] = np.concatenate(mag_trial_indiv[key][protocol], axis=0) #concatenate individual neuron values from different sessions"""
 
 
         # Compute average and SEM across neurons
@@ -1563,13 +1566,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\surround-mod-nathan-2CenterRadius\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'CenterVsInverseCross_100%_norm'
+    fig_name = 'Center40°VsFullFieldIso_100%'
 
     #Name of the physion protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod-2CenterRadius"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-10-1.0', 'center-20-1.0', 'surround-cross_ctrl-10-1.0', 'surround-cross_ctrl-20-1.0']
+    sub_protocols = ['center-20-1.0', 'center-surround_high_contrast-iso-1.0']
     # Method od selection of responsive neurons: 'any', 'only' or 'and'
        # selection_method:
        # 'any'  -> neurons responsive to at least one protocol in any group
@@ -1579,7 +1582,7 @@ if __name__ == "__main__":
     # For the methods 'only' and 'any': you should put the key of the group of protocols you are interested in from valid_sub_protocols. If you want to use method 'and', put None
     group_name = 'center'
     # Dict of protocol(s) used to select responsive neurons. 
-    valid_sub_protocols = {'center': ['center-10-1.0', 'center-20-1.0']} 
+    valid_sub_protocols = {'center': ['center-20-1.0']} 
     # Example of correct valid_sub_protocols {'looming': ['looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0']} 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
@@ -1602,7 +1605,7 @@ if __name__ == "__main__":
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
     # Decide if you want to only keep neurons that are centered
-    get_centered = True  # True or False
+    get_centered = False  # True or False
 
     # Decide on the way to calculate the amplitude of response
     magnitude_method = 'mean' #'auc', 'peak' or 'filtered_peak', 'mean'
@@ -1612,9 +1615,9 @@ if __name__ == "__main__":
 
     groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False) 
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=True) 
     
-    magnitude_groups = normalize_magnitudes(groups_id, sub_protocols, magnitude_groups, norm_protocols = ['center-10-1.0', 'center-20-1.0']) #Uncomment if you want to normalize magnitudes by specific protocols (will take the max of the magnitude of protocols in norm_protocols)
+    #magnitude_groups = normalize_magnitudes(groups_id, sub_protocols, magnitude_groups, norm_protocols = ['center-10-1.0', 'center-20-1.0']) #Uncomment if you want to normalize magnitudes by specific protocols (will take the max of the magnitude of protocols in norm_protocols)
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
     #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable="CMI")
     
@@ -1631,22 +1634,22 @@ if __name__ == "__main__":
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
     graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
-    if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2 and "surround" in protocol_name:
+    """if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2 and "surround" in protocol_name:
         histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
-    #plot the distribution of suppression index
-    if len(list(groups_id.keys())) == 2 and 'center' in sub_protocols:
+    #plot the distribution of suppression index"""
+    if len(list(groups_id.keys())) == 2 and any('center' in sp for sp in sub_protocols):
         histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
-    if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 3 and "surround" in protocol_name:
-        histplot(sub_protocols, ITI_groups[0], ITI_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "ITI")
+    """if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 3 and "surround" in protocol_name:
+        histplot(sub_protocols, ITI_groups[0], ITI_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "ITI")"""
     # Plot CDFs of neuron response magnitudes comparing groups
-    plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, fig_name, save_path) 
-    plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
-    magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials, sub_protocols, groups_id)
+    #plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, fig_name, save_path) 
+    #plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
+    #magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials, sub_protocols, groups_id)
     mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
-    plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr, contrasts=[0.05, 0.14, 0.37, 1.0])
-    perc_pref_contrast(groups_id, mag_per_session, sub_protocols, attr, fig_name, save_path)
+    #plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr, contrasts=[0.05, 0.14, 0.37, 1.0])
+    #perc_pref_contrast(groups_id, mag_per_session, sub_protocols, attr, fig_name, save_path)
     plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3)
 
-    plot_protocol_overlap(groups_id, df, valid_sub_protocols, save_path, fig_name)
+    #plot_protocol_overlap(groups_id, df, valid_sub_protocols, save_path, fig_name)
 
 
