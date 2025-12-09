@@ -8,6 +8,7 @@ import pandas as pd
 import seaborn as sns
 import sys
 from scipy.ndimage import gaussian_filter1d
+from openpyxl import Workbook
 import re
 sys.path.append("./src")
 
@@ -27,9 +28,9 @@ def load_session_data(session_path):
     if 'center' in validity:
         validity['center-20-1.0'] = validity.pop('center')
 
-    stimuli_df['name'] = stimuli_df['name'].replace('center-surround-cross', 'center-surround_high_contrast-cross-20-1.0')
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround-cross', 'center-surround_high_contrast-cross-20.0-1.0')
     if 'center-surround-cross' in validity:
-        validity['center-surround_high_contrast-cross-20-1.0'] = validity.pop('center-surround-cross')
+        validity['center-surround_high_contrast-cross-20.0-1.0'] = validity.pop('center-surround-cross')
 
     stimuli_df['name'] = stimuli_df['name'].replace('center-surround-iso', 'center-surround_high_contrast-iso-1.0')
     if 'center-surround-iso' in validity:
@@ -751,53 +752,77 @@ def plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_n
 
 
 def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity, save_path, attr):
-    """
-    Function to extract and plot the x and y values for the magnitude of the response to each protocol for both groups.
-    """
 
-    color = {'WT': 'skyblue', 'KO': 'orange'}
+    color = {'WT': 'orange', 'KO': 'skyblue'}
+
     if len(sub_protocols) == 2:
         protocol_x = sub_protocols[0]
         protocol_y = sub_protocols[1]
+
+        # Prepare Excel workbook
+        excel_path = os.path.join(save_path, f"{protocol_x}_vs_{protocol_y}.xlsx")
+        wb = Workbook()
+        wb.remove(wb.active)  # Remove default empty sheet
+
         for group in groups_id.keys():
 
             magnitude = magnitude_groups[groups_id[group]]
             x_values = magnitude[protocol_x]
             y_values = magnitude[protocol_y]
-            # Clamp values
-            x_values = np.clip(x_values, -0.1, 0.5)
-            y_values = np.clip(y_values, -0.1, 0.5)
-            # Define tick positions
-            ticks = np.arange(-0.1, 0.6, 0.1)
-            # Define tick labels (same length as ticks)
-            tick_labels = ['<-0.1'] + [f"{t:.1f}" for t in ticks[1:-1]] + ['>0.5']
-            """ slope, intercept, r_value, p_value, _ = linregress(x_values, y_values)
-            x_fit = np.linspace(min(x_values), max(x_values), 100)
-            y_fit = slope * x_fit + intercept """
 
-            # Create the plot
+            # Clamp values
+            x_values = np.clip(x_values, -0.1, 2.0)
+            y_values = np.clip(y_values, -0.1, 2.0)
+
+            # Add to Excel
+            ws = wb.create_sheet(title=group)
+            ws.append([f"Magnitude_{protocol_x}", f"Magnitude_{protocol_y}"])
+            for x, y in zip(x_values, y_values):
+                ws.append([float(x), float(y)])
+
+            # Scatter plot
             plt.scatter(x_values, y_values, marker='o', c=color[group], alpha=0.5, label=f'{group} neurons')
-            # Plot regression line
-            
-            #plt.plot(x_fit, y_fit, color=color[group], label=f'{group} fit: y = {slope:.2f}x + {intercept:.2f}, p = {p_value:.2g}, r**2 = {(r_value)**2:.3f}')
-        
-        # Add labels
+
         # Add dashed x=y line
-        lims = [-0.1, 0.5]
+        lims = [-0.1, 2.0]
         plt.plot(lims, lims, 'k--', alpha=0.7, label="x = y")
 
+        # FIXED TICKS
+        # Regular ticks from 0 to 2 with 0.5 spacing
+        regular_ticks = np.arange(0, 2.01, 0.5)  # 0, 0.5, 1.0, 1.5, 2.0
+
+        # Add the special edge ticks
+        ticks = np.concatenate(([-0.1], regular_ticks))  # -0.1 and 2.1 are outside the normal range
+        tick_labels = []
+        for t in ticks:
+            if t == -0.1:
+                tick_labels.append("<-0.1")
+            elif t == 2.0:
+                tick_labels.append(">2.0")
+            else:
+                tick_labels.append(f"{t:.1f}")
         plt.xlabel(f"Magnitude of response to {protocol_x}")
         plt.ylabel(f"Magnitude of response to {protocol_y}")
         plt.xticks(ticks, tick_labels)
         plt.yticks(ticks, tick_labels)
-        plt.title(f"Response magnitudes ({attr}) for {str(protocol_validity)+'-responsive' if not get_centered else 'centered'} neurons")
+        plt.title(f"Response magnitudes ({attr}) for "
+                  f"{str(protocol_validity)+'-responsive' if not get_centered else 'centered'} neurons")
         plt.legend()
+
+        # Save figure
+        fig_name = f"{protocol_x}_vs_{protocol_y}"
         plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=300)
         plt.show()
+
+        # Save Excel file
+        wb.save(excel_path)
+        print(f"Excel file saved at: {excel_path}")
+
     else:
         print(f"XY plot is not available for {len(sub_protocols)} protocols. Please select 2 protocols to compare.")
         print(f"Current protocols: {sub_protocols}")
         return None
+
 
 def mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr):
     """
@@ -1369,11 +1394,38 @@ def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_
         else:
             raise ValueError(f"Unknown variable: {variable}")
 
-        # Find representative trace (closest to median)
-        median = np.round(np.median(cmi), 2)
-        print(f"Group {group}: median {variable} = {median}")
-        cmi_id = np.where(np.round(cmi, 2) == median)[0][0]
+        # Compute median
+        median = np.median(cmi)
+        print(f"Group {group}: median {variable} = {median:.2f}")
+
+        # Select traces within ±0.2 around the median
+        mask = np.where(np.abs(cmi - median) <= 0.02)[0]
+
+        if len(mask) == 0:
+            print(f"⚠️ No traces within ±0.2 of the median for group {group}. Using closest value instead.")
+            mask = [np.argmin(np.abs(cmi - median))]
+
+        candidate_ids = mask
+
+        # Compute baseline noise for each candidate trace
+        noise_values = []
+        baseline_len = int(1 * frame_rate)   # = 30 samples for 30 Hz
+
+        for idx in candidate_ids:
+            noise_per_protocol = []
+            for protocol in sub_protocols:
+                trace = individual_groups[id_group][protocol][idx]
+
+                # First second STD
+                noise_per_protocol.append(np.std(trace[:baseline_len]))
+
+            # Mean noise across protocols
+            noise_values.append(np.mean(noise_per_protocol))
+
+        # Representative = least noisy trace
+        cmi_id = candidate_ids[np.argmin(noise_values)]
         rep_cmi = cmi[cmi_id]
+
 
         indiv_traces = individual_groups[id_group]
         rep_trace = {protocol: indiv_traces[protocol][cmi_id] for protocol in sub_protocols}
@@ -1442,7 +1494,7 @@ def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnit
     fname = f"cdf_{file_name}_{attr}_responsiveNeurons.png"
     title = f'Cumulative distribution of neuron response magnitudes ({attr})\n(Responsive neurons)'
     plt.figure(figsize=(6, 6))
-    palette = ['skyblue', 'orange', 'green', 'red', 'purple']
+    palette = ['orange', 'skyblue', 'green', 'red', 'purple']
     colors = {group: palette[i % len(palette)] for i, group in enumerate(groups)}
     stats_text = []
     if len(sub_protocols) > 1:
@@ -1566,13 +1618,13 @@ if __name__ == "__main__":
     save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\surround-mod-nathan-2CenterRadius\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'Center40°VsFullFieldIso_100%'
+    fig_name = 'test'
 
     #Name of the physion protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
     protocol_name = "surround-mod-2CenterRadius"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-20-1.0', 'center-surround_high_contrast-iso-1.0']
+    sub_protocols = ['center-10-0.25','center-surround_low_contrast-iso-0.25']  # e.g. ['center-10-1.0', 'center-20-1.0']
     # Method od selection of responsive neurons: 'any', 'only' or 'and'
        # selection_method:
        # 'any'  -> neurons responsive to at least one protocol in any group
@@ -1582,7 +1634,7 @@ if __name__ == "__main__":
     # For the methods 'only' and 'any': you should put the key of the group of protocols you are interested in from valid_sub_protocols. If you want to use method 'and', put None
     group_name = 'center'
     # Dict of protocol(s) used to select responsive neurons. 
-    valid_sub_protocols = {'center': ['center-20-1.0']} 
+    valid_sub_protocols = {'center': ['center-10-0.25']} 
     # Example of correct valid_sub_protocols {'looming': ['looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0']} 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
@@ -1605,7 +1657,7 @@ if __name__ == "__main__":
     attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
 
     # Decide if you want to only keep neurons that are centered
-    get_centered = False  # True or False
+    get_centered = True  # True or False
 
     # Decide on the way to calculate the amplitude of response
     magnitude_method = 'mean' #'auc', 'peak' or 'filtered_peak', 'mean'
@@ -1615,24 +1667,24 @@ if __name__ == "__main__":
 
     groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=True) 
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False) 
     
     #magnitude_groups = normalize_magnitudes(groups_id, sub_protocols, magnitude_groups, norm_protocols = ['center-10-1.0', 'center-20-1.0']) #Uncomment if you want to normalize magnitudes by specific protocols (will take the max of the magnitude of protocols in norm_protocols)
-    #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
-    #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable="CMI")
+    representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
+                          individual_groups, sub_protocols, attr, save_path, fig_name, variable="suppression_index")
     
 
     
      #-------------------Call the functions to process and plot the data-------------------#
 
     #XY plot of the magnitudes of the responses to the two protocols
-    XY_magnitudes(groups_id, magnitude_groups, sub_protocols, valid_sub_protocols, save_path, attr)
+    #XY_magnitudes(groups_id, magnitude_groups, sub_protocols, valid_sub_protocols, save_path, attr)
     # Plot the % of responsive neurons per session
-    plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
+    #plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
     # Plot the average response during the stim period per session
-    plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, sub_protocols)
+    #plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, sub_protocols)
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
-    graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
+    #graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
     """if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2 and "surround" in protocol_name:
         histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
@@ -1645,10 +1697,10 @@ if __name__ == "__main__":
     #plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, fig_name, save_path) 
     #plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
     #magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials, sub_protocols, groups_id)
-    mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
+    #mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
     #plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr, contrasts=[0.05, 0.14, 0.37, 1.0])
     #perc_pref_contrast(groups_id, mag_per_session, sub_protocols, attr, fig_name, save_path)
-    plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3)
+    #plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3)
 
     #plot_protocol_overlap(groups_id, df, valid_sub_protocols, save_path, fig_name)
 
