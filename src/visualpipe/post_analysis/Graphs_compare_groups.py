@@ -57,6 +57,18 @@ def get_period_names(attr):
         raise ValueError(f"Unknown attribute: {attr}")
     return period_names, trial_periods
 
+def parse_size_contrast(protocol_name):
+    """
+    Extract size (deg) and contrast (0-1) from protocol string.
+    Example: 'size-tuning-contrast-log-20-0.22' -> (20, 0.22)
+    """
+    m = re.search(r'size-tuning-contrast-log-(\d+)-([\d\.]+)', protocol_name)
+    if m:
+        size = float(m.group(1))
+        contrast = float(m.group(2))
+        return size, contrast
+    else:
+        raise ValueError(f"Cannot parse size/contrast from {protocol_name}")
 
 
 def get_valid_neurons(validity, protocol_groups, selection_method='any', group_name='looming'):
@@ -269,7 +281,85 @@ def normalize_magnitudes(groups_id, sub_protocols, magnitudes_groups,
         normalized_magnitudes.append(normalized_magnitudes_group)
 
     return normalized_magnitudes
+
+def reshape_mag_per_session(mag_per_session, sub_protocols, groups_id):
+    """
+    Convert flat mag_per_session into neuron x contrast x size arrays per session,
+    normalizing each neuron to its maximum response across all contrasts and sizes.
+
+    Returns:
+        reshaped[group_name][session_idx] = array of shape n_neurons x n_contrasts x n_sizes (normalized)
+        contrasts = sorted list of unique contrasts
+        sizes = sorted list of unique sizes
+    """
+    # Extract unique sizes and contrasts
+    sizes, contrasts = [], []
+    for proto in sub_protocols:
+        s, c = parse_size_contrast(proto)
+        sizes.append(s)
+        contrasts.append(c)
+    sizes = np.unique(sizes)
+    contrasts = np.unique(contrasts)
+
+    reshaped = {group: [] for group in groups_id}
+    for group in groups_id:
+        group_idx = groups_id[group]
+        n_sessions = len(mag_per_session[group_idx][sub_protocols[0]])
+
+        for session_idx in range(n_sessions):
+            n_neurons = len(mag_per_session[group_idx][sub_protocols[0]][session_idx])
+            array_session = np.zeros((n_neurons, len(contrasts), len(sizes)))
+
+            # Fill the array
+            for proto in sub_protocols:
+                s, c = parse_size_contrast(proto)
+                size_idx = np.where(sizes == s)[0][0]
+                contrast_idx = np.where(contrasts == c)[0][0]
+                array_session[:, contrast_idx, size_idx] = mag_per_session[group_idx][proto][session_idx]
+
+            # --- Normalize each neuron to its maximum response ---
+            max_per_neuron = array_session.max(axis=(1, 2), keepdims=True)
+            max_per_neuron[max_per_neuron == 0] = 1  # avoid division by zero
+            array_session /= max_per_neuron
+
+            reshaped[group].append(array_session)
+
+    return reshaped, contrasts, sizes
+
+
+def export_pref_pct_to_excel(pref_contrast_pct, pref_size_pct, contrasts, sizes, group_id, save_path):
+    """
+    Export preferred contrast and size percentages to a single Excel file per group,
+    with two sheets: 'Contrast' and 'Size'.
     
+    Arguments:
+        pref_contrast_pct: dict[group][contrast][session_idx] = percentage
+        pref_size_pct: dict[group][size][session_idx] = percentage
+        contrasts: list of contrast values
+        sizes: list of size values
+        group_names: list of groups to export (e.g., ['WT', 'KO'])
+        save_path: folder to save Excel files
+    """
+    os.makedirs(save_path, exist_ok=True)
+
+    for group in groups_id.keys():
+        # Preferred contrast sheet
+        contrast_dict = {f'Contrast_{c}': pref_contrast_pct[group][c] for c in contrasts}
+        df_contrast = pd.DataFrame(contrast_dict)
+
+        # Preferred size sheet
+        size_dict = {f'Size_{s}': pref_size_pct[group][s] for s in sizes}
+        df_size = pd.DataFrame(size_dict)
+
+        # Excel writer with two sheets
+        excel_file = os.path.join(save_path, f'preferred_pct_{group}.xlsx')
+        with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
+            df_contrast.to_excel(writer, sheet_name='Contrast', index=False)
+            df_size.to_excel(writer, sheet_name='Size', index=False)
+
+        print(f"Saved preferred percentages Excel (two sheets) for {group}: {excel_file}")
+
+
 
 # --------------------- Compute variables ----------------------------- #
 
@@ -387,6 +477,96 @@ def preferred_contrast(groups_id, mag_per_session, sub_protocols):
                 preferred_contrasts_grouped[group][contrast].append(pct)
 
     return preferred_contrasts_grouped
+
+def preferred_contrast_size_ssi(reshaped, contrasts, sizes):
+    """
+    Calculate preferred contrast, preferred size, percentage of neurons preferring each contrast and size,
+    surround suppression index (SSI) per neuron at its preferred contrast, and SSI per neuron for each contrast.
+
+    Returns:
+        preferred_contrast[group] = concatenated array of preferred contrasts across all sessions
+        preferred_size[group] = concatenated array of preferred sizes across all sessions
+        preferred_contrast_pct[group][contrast] = % neurons preferring each contrast per session
+        preferred_size_pct[group][size] = % neurons preferring each size per session
+        ssi[group] = concatenated array of SSI per neuron at preferred contrast
+        ssi_all_contrasts[group] = concatenated array (n_neurons x n_contrasts) of SSI per neuron for each contrast
+    """
+    preferred_contrast = {}
+    preferred_size = {}
+    preferred_contrast_pct = {}
+    preferred_size_pct = {}
+    ssi_pref = {}
+    ssi_all_contrasts = {}
+
+    for group in reshaped.keys():
+        pref_c_list = []
+        pref_s_list = []
+        ssi_list = []
+        ssi_all_c_list = []
+        preferred_contrast_pct[group] = {c: [] for c in contrasts}
+        preferred_size_pct[group] = {s: [] for s in sizes}
+
+        for session_array in reshaped[group]:
+            n_neurons = session_array.shape[0]
+            n_contrasts = session_array.shape[1]
+            pref_c_neurons = []
+            pref_s_neurons = []
+            ssi_neurons = []
+            ssi_all_neurons = np.zeros((n_neurons, n_contrasts))
+            contrast_counts = {c: 0 for c in contrasts}
+            size_counts = {s: 0 for s in sizes}
+
+            for neuron in range(n_neurons):
+                mags = session_array[neuron]  # n_contrasts x n_sizes
+
+                # Preferred contrast
+                avg_across_sizes = mags.mean(axis=1)
+                contrast_idx = np.argmax(avg_across_sizes)
+                pref_c = contrasts[contrast_idx]
+                pref_c_neurons.append(pref_c)
+                contrast_counts[pref_c] += 1
+
+                # Preferred size at preferred contrast
+                size_idx = np.argmax(mags[contrast_idx])
+                pref_s = sizes[size_idx]
+                pref_s_neurons.append(pref_s)
+                size_counts[pref_s] += 1
+
+                # SSI at preferred contrast
+                R_max = mags[contrast_idx].max()
+                R_at_max_size = mags[contrast_idx, -1]
+                ssi_value = (R_max - R_at_max_size) / R_max if R_max != 0 else 0
+                ssi_neurons.append(ssi_value)
+
+                # SSI for all contrasts
+                for c_idx in range(n_contrasts):
+                    R_max_c = mags[c_idx].max()
+                    R_at_max_size_c = mags[c_idx, -1]
+                    ssi_all_neurons[neuron, c_idx] = (R_max_c - R_at_max_size_c) / R_max_c if R_max_c != 0 else 0
+
+            # Append per-session arrays to group lists
+            pref_c_list.append(np.array(pref_c_neurons))
+            pref_s_list.append(np.array(pref_s_neurons))
+            ssi_list.append(np.array(ssi_neurons))
+            ssi_all_c_list.append(ssi_all_neurons)
+
+            # Percentages per contrast
+            for c in contrasts:
+                pct = 100 * contrast_counts[c] / n_neurons if n_neurons > 0 else 0
+                preferred_contrast_pct[group][c].append(pct)
+
+            # Percentages per size
+            for s in sizes:
+                pct = 100 * size_counts[s] / n_neurons if n_neurons > 0 else 0
+                preferred_size_pct[group][s].append(pct)
+
+        # Concatenate all sessions for this group
+        preferred_contrast[group] = np.concatenate(pref_c_list)
+        preferred_size[group] = np.concatenate(pref_s_list)
+        ssi_pref[group] = np.concatenate(ssi_list)
+        ssi_all_contrasts[group] = np.vstack(ssi_all_c_list)  # n_total_neurons x n_contrasts
+
+    return preferred_contrast, preferred_size, preferred_contrast_pct, preferred_size_pct, ssi_pref, ssi_all_contrasts
 
 
 def adaptation_index(sub_protocols, groups_id, mag_trial_indiv, first=3, last=3):
@@ -532,11 +712,11 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
         for protocol in magnitude.keys():
             magnitude[protocol] = np.concatenate(magnitude[protocol])
 
-        if "surround-mod" in protocol_name and len(sub_protocols) == 2:
+        if ("surround-mod" in protocol_name or "size-tuning" in protocol_name) and len(sub_protocols) == 2:
             cmi = compute_cmi(magnitude, sub_protocols[1], sub_protocols[0])
             suppression = compute_suppression(magnitude, sub_protocols[0], sub_protocols[1])
             ITI = []
-        elif 'surround-mod' in protocol_name and len(sub_protocols) == 3:
+        elif ("surround-mod" in protocol_name or "size-tuning" in protocol_name) and len(sub_protocols) == 3:
             ITI = compute_ITI(magnitude, sub_protocols[0], sub_protocols[1], sub_protocols[2])
             cmi, suppression = [], []
         else :
@@ -1289,7 +1469,7 @@ def magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials,
     print(f"✅ Plots and Excel file saved:\n{excel_path}")
 
 
-def histplot(sub_protocols, list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
+def histplot(list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
     """
     Function to plot a histogram comparing the distribution of two groups.
     variable: 'CMI' or 'suppression_index'
@@ -1588,6 +1768,156 @@ def perc_pref_contrast(groups_id, mag_per_session, sub_protocols, attr, fig_name
             df.to_excel(writer, sheet_name=group)
 
 
+
+def bubble_pref_contrast_size(pref_contrast, pref_size, contrasts, sizes, group_name):
+    """
+    Create a bubble plot: x=preferred contrast, y=preferred size, bubble size=% neurons.
+    
+    Arguments:
+        pref_contrast[group][session_idx] = array of preferred contrasts per neuron
+        pref_size[group][session_idx] = array of preferred sizes per neuron
+        contrasts = list of contrast values
+        sizes = list of size values
+        group_name = string
+    """
+    # Concatenate all sessions
+    all_pref_c = np.concatenate(pref_contrast[group_name])
+    all_pref_s = np.concatenate(pref_size[group_name])
+    
+    # Initialize counts array
+    counts = np.zeros((len(contrasts), len(sizes)))
+    
+    # Fill counts
+    for i, c in enumerate(contrasts):
+        for j, s in enumerate(sizes):
+            counts[i,j] = np.sum((all_pref_c == c) & (all_pref_s == s))
+    
+    # Convert counts to percentages
+    counts_pct = 100 * counts / len(all_pref_c)
+    
+    # Flatten arrays for plotting
+    x = np.repeat(contrasts, len(sizes))
+    y = np.tile(sizes, len(contrasts))
+    s = counts_pct.flatten() * 10  # scale bubble size (adjust factor for visibility)
+    
+    plt.figure(figsize=(6,5))
+    plt.scatter(x, y, s=s, alpha=0.6, edgecolor='k')
+    plt.xlabel('Preferred contrast')
+    plt.ylabel('Preferred size (deg)')
+    plt.title(f'{group_name}: preferred size vs contrast (bubble size=% neurons)')
+    plt.grid(True)
+    plt.show()
+
+
+
+def plot_ssi_bubble_WT_KO(pref_contrast, pref_size, ssi, contrasts, sizes, group_names):
+    """
+    Bubble plot comparing WT and KO:
+    - X-axis: preferred contrast
+    - Y-axis: preferred size
+    - Bubble size: number of neurons in each contrast x size bin
+    - Bubble color: mean SSI in that bin
+    
+    Arguments:
+        pref_contrast: dict[group] = array of preferred contrasts (all neurons across sessions)
+        pref_size: dict[group] = array of preferred sizes
+        ssi: dict[group] = array of SSI per neuron
+        contrasts: list of contrast values
+        sizes: list of size values
+        group_names: list of two group names, e.g., ['WT','KO']
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=True, sharey=True)
+    
+    # Determine global min/max for color scale
+    all_ssi = np.concatenate([ssi[g] for g in group_names])
+    vmin, vmax = np.min(all_ssi), np.max(all_ssi)
+    
+    # Determine max bubble size for scaling
+    max_count = 0
+    for g in group_names:
+        for c in contrasts:
+            for s in sizes:
+                mask = (pref_contrast[g] == c) & (pref_size[g] == s)
+                max_count = max(max_count, np.sum(mask))
+    
+    for ax, g in zip(axes, group_names):
+        x_vals, y_vals, s_vals, c_vals = [], [], [], []
+
+        for c in contrasts:
+            for s in sizes:
+                mask = (pref_contrast[g] == c) & (pref_size[g] == s)
+                n = np.sum(mask)
+                if n > 0:
+                    x_vals.append(c)
+                    y_vals.append(s)
+                    s_vals.append(200 * n / max_count)  # scale bubble size relative to max_count
+                    c_vals.append(np.mean(ssi[g][mask]))  # bubble color = mean SSI
+        
+        sc = ax.scatter(x_vals, y_vals, s=s_vals, c=c_vals, cmap='viridis', edgecolor='k', alpha=0.8)
+        ax.set_title(f'{g} neurons')
+        ax.set_xlabel('Preferred contrast')
+        ax.set_ylabel('Preferred size (deg)')
+        ax.grid(True)
+    
+    # Colorbar for SSI
+    cbar = fig.colorbar(sc, ax=axes.ravel().tolist(), shrink=0.8)
+    cbar.set_label('Mean SSI')
+    
+    plt.suptitle('Surround Suppression Index (SSI) vs Preferred Contrast & Size')
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()
+
+
+
+def plot_ssi_vs_prefcontrast(pref_contrast, ssi, group_names, contrasts):
+    """
+    Plot mean ± SEM of SSI for each preferred contrast, with a connecting line for each group.
+    
+    """
+    plt.figure(figsize=(7,6))
+    colors = ['blue', 'red']
+
+    for g, color in zip(group_names, colors):
+        means = []
+        sems = []
+
+        for c in contrasts:
+            mask = pref_contrast[g] == c
+            if np.any(mask):
+                means.append(np.mean(ssi[g][mask]))
+                sems.append(np.std(ssi[g][mask]) / np.sqrt(np.sum(mask)))
+            else:
+                means.append(np.nan)
+                sems.append(np.nan)
+
+        plt.errorbar(contrasts, means, yerr=sems, fmt='-o', color=color, capsize=4, label=g)
+
+    plt.xlabel('Preferred contrast')
+    plt.ylabel('SSI')
+    plt.title('Mean SSI ± SEM vs Preferred Contrast')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def save_ssi_to_excel(ssi_all_contrasts, contrasts, save_path):
+    """
+    Save SSI per neuron for each contrast to an Excel file.
+    
+    Args:
+        ssi_all_contrasts: dict, keys = group names, values = arrays (n_neurons x n_contrasts)
+        contrasts: list of contrast values corresponding to columns
+        save_path: str, full path including filename where Excel file will be saved
+    """
+    with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+        for group, ssi_array in ssi_all_contrasts.items():
+            # Create DataFrame: rows=neurons, columns=contrasts
+            df = pd.DataFrame(ssi_array, columns=[f"Contrast_{c}" for c in contrasts])
+            # Write to sheet named after the group
+            df.to_excel(writer, sheet_name=group, index=False)
+    print(f"Excel file saved at: {save_path}")
+
+
 def plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3):
     groups = list(groups_id.keys())
     print(mag_trial_indiv.keys())
@@ -1597,7 +1927,6 @@ def plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_n
         list2 = AI[groups[1]][protocol]
         
         histplot(
-            sub_protocols=sub_protocols,
             list1=list1,
             list2=list2,
             groups=groups,
@@ -1615,18 +1944,23 @@ if __name__ == "__main__":
     #-----------------------INPUTS-----------------------#
 
     excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\surround-mod-nathan-2CenterRadius\Analysis"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\size-tuning-log\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'test'
+    fig_name = 'size-tuning_all'
 
     #Name of the physion protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "surround-mod-2CenterRadius"
+    protocol_name = "size-tuning-protocol-log"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-10-0.25','center-surround_low_contrast-iso-0.25']  # e.g. ['center-10-1.0', 'center-20-1.0']
-    # Method od selection of responsive neurons: 'any', 'only' or 'and'
-       # selection_method:
+    sub_protocols = ['size-tuning-contrast-log-5-0.05', 'size-tuning-contrast-log-5-0.11', 'size-tuning-contrast-log-5-0.22','size-tuning-contrast-log-5-0.47','size-tuning-contrast-log-5-1.0',
+    'size-tuning-contrast-log-10-0.05', 'size-tuning-contrast-log-10-0.11', 'size-tuning-contrast-log-10-0.22','size-tuning-contrast-log-10-0.47','size-tuning-contrast-log-10-1.0',
+    'size-tuning-contrast-log-15-0.05', 'size-tuning-contrast-log-15-0.11', 'size-tuning-contrast-log-15-0.22','size-tuning-contrast-log-15-0.47','size-tuning-contrast-log-15-1.0',
+    'size-tuning-contrast-log-20-0.05', 'size-tuning-contrast-log-20-0.11', 'size-tuning-contrast-log-20-0.22','size-tuning-contrast-log-20-0.47','size-tuning-contrast-log-20-1.0',
+    'size-tuning-contrast-log-25-0.05', 'size-tuning-contrast-log-25-0.11', 'size-tuning-contrast-log-25-0.22','size-tuning-contrast-log-25-0.47','size-tuning-contrast-log-25-1.0',
+    'size-tuning-contrast-log-30-0.05', 'size-tuning-contrast-log-30-0.11', 'size-tuning-contrast-log-30-0.22','size-tuning-contrast-log-30-0.47','size-tuning-contrast-log-30-1.0',
+    'size-tuning-contrast-log-35-0.05', 'size-tuning-contrast-log-35-0.11', 'size-tuning-contrast-log-35-0.22','size-tuning-contrast-log-35-0.47','size-tuning-contrast-log-35-1.0',
+    'size-tuning-contrast-log-40-0.05', 'size-tuning-contrast-log-40-0.11', 'size-tuning-contrast-log-40-0.22','size-tuning-contrast-log-40-0.47','size-tuning-contrast-log-40-1.0']
        # 'any'  -> neurons responsive to at least one protocol in any group
        # 'only' -> neurons exclusive to a specific group (provide group_name)
        # 'and'  -> neurons shared between groups
@@ -1634,7 +1968,14 @@ if __name__ == "__main__":
     # For the methods 'only' and 'any': you should put the key of the group of protocols you are interested in from valid_sub_protocols. If you want to use method 'and', put None
     group_name = 'center'
     # Dict of protocol(s) used to select responsive neurons. 
-    valid_sub_protocols = {'center': ['center-10-0.25']} 
+    valid_sub_protocols = {'center': ['size-tuning-contrast-log-5-0.05', 'size-tuning-contrast-log-5-0.11', 'size-tuning-contrast-log-5-0.22','size-tuning-contrast-log-5-0.47','size-tuning-contrast-log-5-1.0',
+    'size-tuning-contrast-log-10-0.05', 'size-tuning-contrast-log-10-0.11', 'size-tuning-contrast-log-10-0.22','size-tuning-contrast-log-10-0.47','size-tuning-contrast-log-10-1.0',
+    'size-tuning-contrast-log-15-0.05', 'size-tuning-contrast-log-15-0.11', 'size-tuning-contrast-log-15-0.22','size-tuning-contrast-log-15-0.47','size-tuning-contrast-log-15-1.0',
+    'size-tuning-contrast-log-20-0.05', 'size-tuning-contrast-log-20-0.11', 'size-tuning-contrast-log-20-0.22','size-tuning-contrast-log-20-0.47','size-tuning-contrast-log-20-1.0',
+    'size-tuning-contrast-log-25-0.05', 'size-tuning-contrast-log-25-0.11', 'size-tuning-contrast-log-25-0.22','size-tuning-contrast-log-25-0.47','size-tuning-contrast-log-25-1.0',
+    'size-tuning-contrast-log-30-0.05', 'size-tuning-contrast-log-30-0.11', 'size-tuning-contrast-log-30-0.22','size-tuning-contrast-log-30-0.47','size-tuning-contrast-log-30-1.0',
+    'size-tuning-contrast-log-35-0.05', 'size-tuning-contrast-log-35-0.11', 'size-tuning-contrast-log-35-0.22','size-tuning-contrast-log-35-0.47','size-tuning-contrast-log-35-1.0',
+    'size-tuning-contrast-log-40-0.05', 'size-tuning-contrast-log-40-0.11', 'size-tuning-contrast-log-40-0.22','size-tuning-contrast-log-40-0.47','size-tuning-contrast-log-40-1.0']} 
     # Example of correct valid_sub_protocols {'looming': ['looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0']} 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
@@ -1645,6 +1986,14 @@ if __name__ == "__main__":
     'looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0'
     'black-sweeping-log-0.0', 'black-sweeping-log-0.1', 'black-sweeping-log-0.4','black-sweeping-log-1.0'
     'dimming-circle-log-0.0', 'dimming-circle-log-0.1', 'dimming-circle-log-0.4','dimming-circle-log-1.0'
+    'size-tuning-contrast-log-5-0.05', 'size-tuning-contrast-log-5-0.11', 'size-tuning-contrast-log-5-0.22','size-tuning-contrast-log-5-0.47','size-tuning-contrast-log-5-1.0',
+    'size-tuning-contrast-log-10-0.05', 'size-tuning-contrast-log-10-0.11', 'size-tuning-contrast-log-10-0.22','size-tuning-contrast-log-10-0.47','size-tuning-contrast-log-10-1.0',
+    'size-tuning-contrast-log-15-0.05', 'size-tuning-contrast-log-15-0.11', 'size-tuning-contrast-log-15-0.22','size-tuning-contrast-log-15-0.47','size-tuning-contrast-log-15-1.0',
+    'size-tuning-contrast-log-20-0.05', 'size-tuning-contrast-log-20-0.11', 'size-tuning-contrast-log-20-0.22','size-tuning-contrast-log-20-0.47','size-tuning-contrast-log-20-1.0',
+    'size-tuning-contrast-log-25-0.05', 'size-tuning-contrast-log-25-0.11', 'size-tuning-contrast-log-25-0.22','size-tuning-contrast-log-25-0.47','size-tuning-contrast-log-25-1.0',
+    'size-tuning-contrast-log-30-0.05', 'size-tuning-contrast-log-30-0.11', 'size-tuning-contrast-log-30-0.22','size-tuning-contrast-log-30-0.47','size-tuning-contrast-log-30-1.0',
+    'size-tuning-contrast-log-35-0.05', 'size-tuning-contrast-log-35-0.11', 'size-tuning-contrast-log-35-0.22','size-tuning-contrast-log-35-0.47','size-tuning-contrast-log-35-1.0',
+    'size-tuning-contrast-log-40-0.05', 'size-tuning-contrast-log-40-0.11', 'size-tuning-contrast-log-40-0.22','size-tuning-contrast-log-40-0.47','size-tuning-contrast-log-40-1.0'
 
 
     #Frame rate
@@ -1669,39 +2018,75 @@ if __name__ == "__main__":
 
     suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False) 
     
-    #magnitude_groups = normalize_magnitudes(groups_id, sub_protocols, magnitude_groups, norm_protocols = ['center-10-1.0', 'center-20-1.0']) #Uncomment if you want to normalize magnitudes by specific protocols (will take the max of the magnitude of protocols in norm_protocols)
-    representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
-                          individual_groups, sub_protocols, attr, save_path, fig_name, variable="suppression_index")
+    norm_protocols= ['size-tuning-contrast-log-5-0.05', 'size-tuning-contrast-log-5-0.11', 'size-tuning-contrast-log-5-0.22','size-tuning-contrast-log-5-0.47','size-tuning-contrast-log-5-1.0',
+    'size-tuning-contrast-log-10-0.05', 'size-tuning-contrast-log-10-0.11', 'size-tuning-contrast-log-10-0.22','size-tuning-contrast-log-10-0.47','size-tuning-contrast-log-10-1.0',
+    'size-tuning-contrast-log-15-0.05', 'size-tuning-contrast-log-15-0.11', 'size-tuning-contrast-log-15-0.22','size-tuning-contrast-log-15-0.47','size-tuning-contrast-log-15-1.0',
+    'size-tuning-contrast-log-20-0.05', 'size-tuning-contrast-log-20-0.11', 'size-tuning-contrast-log-20-0.22','size-tuning-contrast-log-20-0.47','size-tuning-contrast-log-20-1.0',
+    'size-tuning-contrast-log-25-0.05', 'size-tuning-contrast-log-25-0.11', 'size-tuning-contrast-log-25-0.22','size-tuning-contrast-log-25-0.47','size-tuning-contrast-log-25-1.0',
+    'size-tuning-contrast-log-30-0.05', 'size-tuning-contrast-log-30-0.11', 'size-tuning-contrast-log-30-0.22','size-tuning-contrast-log-30-0.47','size-tuning-contrast-log-30-1.0',
+    'size-tuning-contrast-log-35-0.05', 'size-tuning-contrast-log-35-0.11', 'size-tuning-contrast-log-35-0.22','size-tuning-contrast-log-35-0.47','size-tuning-contrast-log-35-1.0',
+    'size-tuning-contrast-log-40-0.05', 'size-tuning-contrast-log-40-0.11', 'size-tuning-contrast-log-40-0.22','size-tuning-contrast-log-40-0.47','size-tuning-contrast-log-40-1.0']  #Protocols to use for normalization of magnitudes
+    magnitude_groups = normalize_magnitudes(groups_id, sub_protocols, magnitude_groups, norm_protocols = norm_protocols) #Uncomment if you want to normalize magnitudes by specific protocols (will take the max of the magnitude of protocols in norm_protocols)
+    #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
+    #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable="suppression_index")
     
 
     
      #-------------------Call the functions to process and plot the data-------------------#
 
     #XY plot of the magnitudes of the responses to the two protocols
-    #XY_magnitudes(groups_id, magnitude_groups, sub_protocols, valid_sub_protocols, save_path, attr)
+    XY_magnitudes(groups_id, magnitude_groups, sub_protocols, valid_sub_protocols, save_path, attr)
     # Plot the % of responsive neurons per session
-    #plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
+    plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
     # Plot the average response during the stim period per session
-    #plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, sub_protocols)
+    plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, sub_protocols)
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
     #graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
     """if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2 and "surround" in protocol_name:
-        histplot(sub_protocols, cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
+        histplot(cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")
     #plot the distribution of suppression index"""
-    if len(list(groups_id.keys())) == 2 and any('center' in sp for sp in sub_protocols):
-        histplot(sub_protocols, suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
+    if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2:
+        histplot(suppression_groups[0], suppression_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable="suppression_index")
     """if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 3 and "surround" in protocol_name:
-        histplot(sub_protocols, ITI_groups[0], ITI_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "ITI")"""
+        histplot(ITI_groups[0], ITI_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "ITI")"""
     # Plot CDFs of neuron response magnitudes comparing groups
-    #plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, fig_name, save_path) 
+    plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, fig_name, save_path) 
     #plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
     #magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials, sub_protocols, groups_id)
-    #mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
+    mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
     #plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr, contrasts=[0.05, 0.14, 0.37, 1.0])
     #perc_pref_contrast(groups_id, mag_per_session, sub_protocols, attr, fig_name, save_path)
     #plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3)
 
     #plot_protocol_overlap(groups_id, df, valid_sub_protocols, save_path, fig_name)
+
+
+    #Uncomment if you analyze a size-tuning protocol and want to preferred contrast and size
+    # Reshape and normalize
+    reshaped, contrasts, sizes = reshape_mag_per_session(mag_per_session, sub_protocols, groups_id)
+
+    # Compute preferred contrast, size, and percentages
+    pref_contrast, pref_size, pref_contrast_pct, pref_size_pct, ssi, ssi_all_contrasts = preferred_contrast_size_ssi(reshaped, contrasts, sizes)
+
+
+    export_pref_pct_to_excel(pref_contrast_pct, pref_size_pct, contrasts, sizes, groups_id, save_path)
+    
+    #for group_name in groups_id.keys():
+        #bubble_pref_contrast_size(pref_contrast, pref_size, contrasts, sizes, group_name)
+
+    """ histplot(list1=ssi['WT'],
+        list2=ssi['KO'],
+        groups=['WT', 'KO'],
+        save_path=save_path,
+        fig_name=f"{fig_name}_preferred_contrast",
+        attr=attr,
+        variable="suppression_index")
+    """
+
+    plot_ssi_bubble_WT_KO(pref_contrast, pref_size, ssi, contrasts, sizes, list(groups_id.keys()))
+    plot_ssi_vs_prefcontrast(pref_contrast, ssi, list(groups_id.keys()), contrasts)
+    path = os.path.join(save_path, "ssi_per_contrast.xlsx")
+    save_ssi_to_excel(ssi_all_contrasts, contrasts, path)
 
 
