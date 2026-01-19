@@ -7,22 +7,27 @@ from scipy.signal import convolve
 from sklearn.linear_model import LinearRegression
 from scipy.ndimage import minimum_filter1d, maximum_filter1d, gaussian_filter1d
 import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
 
 import utils.xml_parser as xml_parser
 
 class CaImagingDataManager(object):
-    __slots__ = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay',
+    __slots__ = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay', '_suite2p_path',
                  'raw_F', 'raw_Fneu', 'fluorescence', 'f0', 'dFoF0',
                  'iscell', 'stat', 'ops', 'xml', 'fs', 'time_stamps',
                  '_to_update_ROIs_list', '_to_update_frames_list', '_list_ROIs_idx']
 
-    def __init__(self, base_path, neuropil_if=0.7, f0_method='sliding', neuron_type='PYR', starting_delay=0.1):
+    def __init__(self, base_path, neuropil_if=0.7, f0_method='sliding', neuron_type='PYR', starting_delay=0.1, suite2p_path=None):
         
         self._tseries_path = self.find_Tseries_folder(base_path)
         self._neuropil_if = neuropil_if
         self._f0_method = f0_method
         self._neuron_type = neuron_type
         self._starting_delay = starting_delay
+        self._suite2p_path = suite2p_path
+
+        if self._suite2p_path is None:
+            self._suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
 
         self.raw_F, self.raw_Fneu, self.iscell, self.stat, self.ops = self.load_suite2p()
         self._to_update_ROIs_list = ['raw_F', 'raw_Fneu', 'stat']
@@ -43,13 +48,13 @@ class CaImagingDataManager(object):
         self.dFoF0 = None
     
     def __str__(self) :
-        list_attr = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay',
+        list_attr = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay', '_suite2p_path',
                      'time_stamps', 'raw_F', 'raw_Fneu', 'fluorescence', 'f0', 'dFoF0', 
                      'iscell', 'stat', 'xml', 'fs','_list_ROIs_idx']
         return f"Available attributes : {list_attr}"
 
     def find_Tseries_folder(self, base_path):
-        file = [f for f in os.listdir(base_path) if f.startswith("TSeries")]
+        file = [f for f in os.listdir(base_path) if f.startswith("TSeries") and os.path.isdir(os.path.join(base_path, f))]
         if len(file) > 1:
             raise Exception("There are multiple Tseries in this directory please keep one")
         elif len(file) == 0 :
@@ -60,13 +65,12 @@ class CaImagingDataManager(object):
         return directory
 
     def load_suite2p(self):
-        suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
-        if os.path.exists(suite2p_path) :
-            raw_F = np.load(os.path.join(suite2p_path, "F.npy"), allow_pickle=True)
-            raw_Fneu = np.load(os.path.join(suite2p_path, "Fneu.npy"), allow_pickle=True)
-            iscell = np.load(os.path.join(suite2p_path, "iscell.npy"), allow_pickle=True)
-            stat = np.load((os.path.join(suite2p_path, "stat.npy")), allow_pickle=True)
-            ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
+        if os.path.exists(self._suite2p_path) :
+            raw_F = np.load(os.path.join(self._suite2p_path, "F.npy"), allow_pickle=True)
+            raw_Fneu = np.load(os.path.join(self._suite2p_path, "Fneu.npy"), allow_pickle=True)
+            iscell = np.load(os.path.join(self._suite2p_path, "iscell.npy"), allow_pickle=True)
+            stat = np.load((os.path.join(self._suite2p_path, "stat.npy")), allow_pickle=True)
+            ops = np.load((os.path.join(self._suite2p_path, "ops.npy")), allow_pickle=True).item()
         else : 
             raise Exception("suite2p folder not found.")
         return raw_F, raw_Fneu, iscell, stat, ops
@@ -93,8 +97,7 @@ class CaImagingDataManager(object):
     def save_mean_image(self, save_directory):
         save_image_dir = os.path.join(save_directory, "Mean_image_grayscale.png")
         if not os.path.exists(save_image_dir) :
-            suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
-            ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
+            ops = np.load((os.path.join(self._suite2p_path, "ops.npy")), allow_pickle=True).item()
             mean_image = ((ops['meanImg']))
             normalized_image = (mean_image - mean_image.min()) / (mean_image.max() - mean_image.min()) * 255
             normalized_image = normalized_image.astype(np.uint8)
@@ -105,8 +108,7 @@ class CaImagingDataManager(object):
     def save_max_proj_image(self, save_directory):
         save_image_dir = os.path.join(save_directory, "Max_proj_image_grayscale.png")
         if not os.path.exists(save_image_dir) :
-            suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
-            ops = np.load((os.path.join(suite2p_path, "ops.npy")), allow_pickle=True).item()
+            ops = np.load((os.path.join(self._suite2p_path, "ops.npy")), allow_pickle=True).item()
             max_proj_img = ((ops['max_proj']))
             normalized_image = (max_proj_img - max_proj_img.min()) / (max_proj_img.max() - max_proj_img.min()) * 255
             normalized_image = normalized_image.astype(np.uint8)
@@ -218,7 +220,61 @@ class CaImagingDataManager(object):
         if 'fluorescence' not in self._to_update_ROIs_list :
             self._to_update_ROIs_list.append('fluorescence')
 
-    def compute_F0(self, percentile=10, win=60, sig=60, save_directory=None):
+    def strided_app(self, a, L, S ):  # Window len = L, Stride len/stepsize = S
+        """ 
+        for sliding window analysis, see: 
+        https://numpy.org/doc/stable/reference/generated/numpy.lib.stride_tricks.sliding_window_view.html
+        """
+        nrows = ((a.size-L)//S)+1
+        n = a.strides[0]
+        return np.lib.stride_tricks.as_strided(a,
+                            shape=(nrows,L), strides=(S*n,n))
+
+    def sliding_percentile(self, array, percentile, Window):
+
+        x = np.zeros(len(array))
+
+        # using a sliding "view" of the array
+        y0 = self.strided_app(array, Window, 1)
+        
+        y = np.percentile(y0, percentile, axis=-1)
+        
+        # clean up boundaries
+        x[:int(Window/2)] = y[0]
+        x[int(Window/2):int(Window/2)+len(y)] = y
+        x[-int(Window/2):] = y[-1]
+
+        return x
+    
+    def compute_sliding_percentile(self, array, percentile, Window,
+                                   subsampling_window_factor=0.1,
+                                   with_smoothing=True):
+        """
+        sliding percentile over a window
+                with subsampling to make it more efficient
+                subsampling_window_factor=0 -> no subsampling !
+        """
+
+        subsampling = max([1,int(subsampling_window_factor*Window)])
+        Flow = np.zeros(array.shape)
+        indices = np.arange(array.shape[1])
+        sbsmplIndices = (indices%subsampling)==0
+        for roi in range(array.shape[0]):
+            Flow[roi,sbsmplIndices] = self.sliding_percentile(array[roi,sbsmplIndices], percentile,
+                                                        max([1,int(Window/subsampling)]))
+
+        if with_smoothing:
+            Flow[:,sbsmplIndices] = gaussian_filter1d(Flow[:,sbsmplIndices], 
+                                                            max([1,int(Window/subsampling)]), 
+                                                            axis=-1)
+
+        Flow[:,~sbsmplIndices] = interp1d(indices[sbsmplIndices], Flow[:,sbsmplIndices],
+                                        kind='linear', fill_value='extrapolate',
+                                        axis=-1)(indices[~sbsmplIndices])
+
+        return Flow
+    
+    def compute_F0(self, percentile=10, win=300, sig=60, save_directory=None, remove=True):
 
         if self._f0_method == 'hamming':
             f0_list = []
@@ -239,7 +295,11 @@ class CaImagingDataManager(object):
             f0 = gaussian_filter1d(self.fluorescence, sig)
             f0 = minimum_filter1d(f0, round(win * self.fs), mode='reflect')
             self.f0 = maximum_filter1d(f0, round(win * self.fs), mode='reflect')
-        
+
+        elif self._f0_method  == 'sliding_percentile':
+            self.f0 = self.compute_sliding_percentile(self.fluorescence, percentile,
+                                                      int(win * self.fs), subsampling_window_factor=0.1,
+                                                      with_smoothing=True)
         else :
             raise Exception(f"Invalid f0 calculation method selected : {self._f0_method}")
         
@@ -251,9 +311,12 @@ class CaImagingDataManager(object):
         #Remove Neurons with F0 less than 1 at any point in time
         invalid_f0_cells = [i for i, val in enumerate(self.f0) if np.any(val < 1)]
 
-        #Update metrics and iscell
-        self.update_iscell(invalid_f0_cells, save_directory)
-        self.remove_ROIs(invalid_f0_cells)     
+        if remove:
+            #Update metrics and iscell
+            self.update_iscell(invalid_f0_cells, save_directory)
+            self.remove_ROIs(invalid_f0_cells)
+
+        return invalid_f0_cells 
 
     def compute_dFoF0(self):
         normalized_F = np.copy(self.fluorescence)
