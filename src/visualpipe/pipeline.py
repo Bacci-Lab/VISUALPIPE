@@ -60,7 +60,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
         print(f'Neuron type: {neuron_type} ; F0 method: {F0_method}')
 
         speed_filter_kernel = 10
-        motion_filter_kernel = 10
+        facemotion_filter_kernel = 10
         pupil_filter_kernel = 10
         dFoF_filter_kernel = 10
         sliding_window = 300
@@ -86,7 +86,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
         min_rest_window = params.min_rest_window
 
         speed_filter_kernel = params.speed_filter_kernel
-        motion_filter_kernel = params.motion_filter_kernel
+        facemotion_filter_kernel = params.facemotion_filter_kernel
         pupil_filter_kernel = params.pupil_filter_kernel
         dFoF_filter_kernel = params.dFoF_filter_kernel
 
@@ -94,7 +94,11 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     print(f"    Processing session: {base_path}")
     
     #---------------------------------- Get metadata ----------------------
-    unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
+    metadata = file.get_metadata(base_path)
+    unique_id = metadata['date'] + '_' + metadata['time']
+    global_protocol = metadata['protocol']
+    experimenter = metadata['experimenter']
+    subject_id = metadata['subject_ID']
     subject_id_anibio = file.get_mouse_id(base_path, subject_id)
 
     #---------------------------------- Create saving folder ----------------------
@@ -232,12 +236,12 @@ def visual_pipe(base_path:str=None, input_gui=False) :
         real_time_states_facemotion, states_window_facemotion =\
             behavioral_states.split_stages(speed, facemotion, speed_threshold, facemotion_threshold, 
                                         ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
-                                        'std', speed_filter_kernel, motion_filter_kernel)
+                                        'std', speed_filter_kernel, facemotion_filter_kernel)
 
         behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
                                     ca_img_dm.time_stamps, real_time_states_facemotion, states_window_facemotion, 
                                     save_fig_dir, speed_threshold, facemotion_threshold,'std', 'facemotion', 
-                                    speed_filter_kernel, motion_filter_kernel, pupil_filter_kernel, dFoF_filter_kernel,
+                                    speed_filter_kernel, facemotion_filter_kernel, pupil_filter_kernel, dFoF_filter_kernel,
                                     svg=False)
 
         run_ratio_facemotion, as_ratio_facemotion, rest_ratio_facemotion =\
@@ -254,7 +258,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
             behavioral_states.stage_plot(speed, facemotion, pupil, ca_img_dm.dFoF0, 
                                         ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, 
                                         save_fig_dir, speed_threshold, pupil_threshold, pupil_threshold_type, 'pupil', 
-                                        speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
+                                        speed_filter_kernel, facemotion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
                                         svg=False)
         else :
             real_time_states_pupil, states_window_pupil =\
@@ -262,13 +266,13 @@ def visual_pipe(base_path:str=None, input_gui=False) :
                                                     speed_threshold, pupil_threshold, facemotion_threshold,
                                                     ca_img_dm.time_stamps, min_states_window, ca_img_dm.fs, 
                                                     pupil_threshold_type, 'std',
-                                                    speed_filter_kernel, pupil_filter_kernel, motion_filter_kernel)
+                                                    speed_filter_kernel, pupil_filter_kernel, facemotion_filter_kernel)
             
             behavioral_states.stage_plot_mixed(speed, facemotion, pupil, ca_img_dm.dFoF0, 
                                                 ca_img_dm.time_stamps, real_time_states_pupil, states_window_pupil, idx_lim_dark, ca_img_dm.fs,
                                                 save_fig_dir, speed_threshold, pupil_threshold, facemotion_threshold, 
                                                 pupil_threshold_type, 'std', 
-                                                speed_filter_kernel, motion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
+                                                speed_filter_kernel, facemotion_filter_kernel,  pupil_filter_kernel, dFoF_filter_kernel, 
                                                 svg=False)
 
         run_ratio_pupil, as_ratio_pupil, rest_ratio_pupil =\
@@ -536,7 +540,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
                 "Minimum AS window" : min_as_window,
                 "Minimum rest window" : min_rest_window,
                 "Speed filter kernel" : speed_filter_kernel,
-                "Motion filter kernel" : motion_filter_kernel,
+                "Motion filter kernel" : facemotion_filter_kernel,
                 "Pupil filter kernel" : pupil_filter_kernel,
                 "Fluorescence filter kernel" : dFoF_filter_kernel,
                 "Analyzed folder" : base_path,

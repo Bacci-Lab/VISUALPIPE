@@ -29,7 +29,7 @@ def get_spont_stim(visual_stim:VisualStim):
     
     return spont_stimuli_id, analyze_pupil
 
-def compute_spont_corr(behavior_spont, F_spontaneous, time_stamps_spont, sigma=0, label='', save_spont_dir='', permutation=True):
+def compute_spont_corr(behavior_spont, F_spontaneous, time_stamps_spont, sigma=0, label='', save_spont_dir='', permut_sample=1000, permutation=True):
 
     if sigma > 0 :
         F_spontaneous = gaussian_filter1d(F_spontaneous, sigma, axis=1)
@@ -40,7 +40,7 @@ def compute_spont_corr(behavior_spont, F_spontaneous, time_stamps_spont, sigma=0
     spont_behavior_corr = [float(value) for value in spont_behavior_corr]
 
     if permutation :
-        valid_neurons = permutation_test(F_spontaneous, behavior_spont, spont_behavior_corr, time_stamps_spont, label=label, savefolder=os.path.join(save_spont_dir, f"permutation_{label}"))
+        valid_neurons = permutation_test(F_spontaneous, behavior_spont, spont_behavior_corr, time_stamps_spont, samples=permut_sample, label=label, savefolder=os.path.join(save_spont_dir, f"permutation_{label}"))
         return spont_behavior_corr, valid_neurons
     
     else :

@@ -63,17 +63,19 @@ def get_mouse_id(path, filename):
         return None
 
 def get_metadata(path):
-    metadata_path = os.path.join(path, "metadata.json")
-    if os.path.exists(metadata_path):
-        with open(metadata_path, 'r') as file:
-            data = json.load(file)
-            unique_id = data['date'] + '_' + data['time']
-            global_protocol = data['protocol']
-            experimenter = data['experimenter']
-            subject_id = data['subject_ID']
-            return unique_id, global_protocol, experimenter, subject_id
-    else:
-        raise Exception(f"No JSON metadata file exists in this directory : {path}")
+
+    if os.path.isfile(os.path.join(path, 'metadata.json')):
+        with open(os.path.join(path, 'metadata.json'), 'r') as file:
+            metadata = json.load(file)
+    else :
+        metadata_path = glob.glob(os.path.join(path,  "*_metadata.txt"))
+        if len(metadata_path) != 0:
+            with open(metadata_path[0], 'r') as file:
+                metadata = json.load(file)
+        else:
+            raise Exception(f"No JSON or txt metadata file exists in this directory : {path}")
+    
+    return metadata
     
 def create_output_folder(path, unique_id):
     version = []

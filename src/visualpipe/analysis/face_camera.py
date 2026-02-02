@@ -7,14 +7,20 @@ from scipy.ndimage import gaussian_filter1d
 class FaceCamDataManager(object) :
     __slots__ = ['time_stamps', 'fs', 'facemotion', 'pupil', 'no_face_data']
     
-    def __init__(self, base_path, timestamp_start):
+    def __init__(self, base_path, timestamp_start=0, timestamp_end=0, approximate_time_stamps=False):
+        
         self.no_face_data = False
-        self.time_stamps = self.get_time_stamps(base_path, timestamp_start)
+        self.facemotion, self.pupil = self.get_face_metrics(base_path)
+
+        if approximate_time_stamps and not self.no_face_data:
+            self.time_stamps = np.linspace(timestamp_start, timestamp_end, len(self.pupil))
+        else :
+            self.time_stamps = self.get_time_stamps(base_path, timestamp_start)
+
         if self.time_stamps is not None :
             self.fs = 1. / np.mean(self.time_stamps[1:] - self.time_stamps[:-1])
         else :
             self.fs = None
-        self.facemotion, self.pupil = self.get_face_metrics(base_path)
 
     def __str__(self) :
         list_attr = ['time_stamps', 'fs', 'facemotion', 'pupil']

@@ -18,6 +18,6 @@ min_as_window = 1
 min_rest_window = 1
 
 speed_filter_kernel = 5
-motion_filter_kernel = 5
+facemotion_filter_kernel = 5
 pupil_filter_kernel = 5
 dFoF_filter_kernel = 5

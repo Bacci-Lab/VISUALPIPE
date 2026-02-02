@@ -10,10 +10,11 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
 import utils.xml_parser as xml_parser
+import utils.file as file
 
 class CaImagingDataManager(object):
     __slots__ = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay', '_suite2p_path',
-                 'raw_F', 'raw_Fneu', 'fluorescence', 'f0', 'dFoF0',
+                 'raw_F', 'raw_Fneu', 'fluorescence', 'f0', 'dFoF0', 'spikes',
                  'iscell', 'stat', 'ops', 'xml', 'fs', 'time_stamps',
                  '_to_update_ROIs_list', '_to_update_frames_list', '_list_ROIs_idx']
 
@@ -29,8 +30,8 @@ class CaImagingDataManager(object):
         if self._suite2p_path is None:
             self._suite2p_path = os.path.join(self._tseries_path, "suite2p", "plane0")
 
-        self.raw_F, self.raw_Fneu, self.iscell, self.stat, self.ops = self.load_suite2p()
-        self._to_update_ROIs_list = ['raw_F', 'raw_Fneu', 'stat']
+        self.raw_F, self.raw_Fneu, self.iscell, self.stat, self.ops, self.spikes = self.load_suite2p()
+        self._to_update_ROIs_list = ['raw_F', 'raw_Fneu', 'stat', 'spikes']
         bad_cells = [i for i, c in enumerate(self.iscell) if c[0] == 0]
         self.remove_ROIs(bad_cells) #remove cells that didn't pass manual curation in suite2p
         
@@ -41,7 +42,7 @@ class CaImagingDataManager(object):
         self.fs = (len(time_stamps) - 1) / time_stamps[-1]
         self.time_stamps = time_stamps + self._starting_delay
 
-        self._to_update_frames_list = ['time_stamps', 'raw_F', 'raw_Fneu']
+        self._to_update_frames_list = ['time_stamps', 'raw_F', 'raw_Fneu', 'spikes']
         
         self.fluorescence = None
         self.f0 = None
@@ -49,12 +50,12 @@ class CaImagingDataManager(object):
     
     def __str__(self) :
         list_attr = ['_tseries_path', '_neuropil_if', '_f0_method', '_neuron_type', '_starting_delay', '_suite2p_path',
-                     'time_stamps', 'raw_F', 'raw_Fneu', 'fluorescence', 'f0', 'dFoF0', 
+                     'time_stamps', 'raw_F', 'raw_Fneu', 'fluorescence', 'f0', 'dFoF0', 'spikes',
                      'iscell', 'stat', 'xml', 'fs','_list_ROIs_idx']
         return f"Available attributes : {list_attr}"
 
     def find_Tseries_folder(self, base_path):
-        file = [f for f in os.listdir(base_path) if f.startswith("TSeries") and os.path.isdir(os.path.join(base_path, f))]
+        file = [f.path for f in os.scandir(base_path) if f.is_dir() and f.name.startswith("TSeries")]
         if len(file) > 1:
             raise Exception("There are multiple Tseries in this directory please keep one")
         elif len(file) == 0 :
@@ -71,9 +72,10 @@ class CaImagingDataManager(object):
             iscell = np.load(os.path.join(self._suite2p_path, "iscell.npy"), allow_pickle=True)
             stat = np.load((os.path.join(self._suite2p_path, "stat.npy")), allow_pickle=True)
             ops = np.load((os.path.join(self._suite2p_path, "ops.npy")), allow_pickle=True).item()
+            spikes = np.load((os.path.join(self._suite2p_path, "spks.npy")), allow_pickle=True)
         else : 
             raise Exception("suite2p folder not found.")
-        return raw_F, raw_Fneu, iscell, stat, ops
+        return raw_F, raw_Fneu, iscell, stat, ops, spikes
 
     def load_xml(self, metadata=False):
         xml_direction = glob.glob(os.path.join(self._tseries_path, '*.xml'))[0]
@@ -412,6 +414,23 @@ class CaImagingDataManager(object):
 
         fig.savefig(os.path.join(save_dir, attr+"_raster.png"))
         plt.close(fig)
+
+    def save_microscop_param(self, save_directory=''):
+        data = {
+            "Number of channels" : self.xml['Nchannels'], 
+            "Laser wavelength" : self.xml['settings']['laserWavelength'],
+            "Objective lens" : self.xml['settings']['objectiveLens'],
+            "Objective lens mag" : self.xml['settings']['objectiveLensMag'],
+            "Optical zoom" : self.xml['settings']['opticalZoom'],
+            "Bit depth" : self.xml['settings']['bitDepth'],
+            "Dwell time" : self.xml['settings']['dwellTime'],
+            "Frame period" : self.xml['settings']['framePeriod'],
+            "Microns per pixel" : self.xml['settings']['micronsPerPixel'],
+            "ZAxis" : self.xml['settings']['positionCurrent'],
+            "2p laser power" : self.xml['settings']['twophotonLaserPower'],
+        }
+
+        file.save_json_in_text(data, os.path.join(save_directory, "2photon_settings.txt"))
 
 if __name__ == "__main__":
     starting_delay_2p = 0.1

@@ -66,3 +66,25 @@ def resample_signal(original_signal,
         return new_t, new_signal
     else :
         return new_signal
+
+def mean_on_intervals(x, intervals):
+    l = []
+    for i in range(len(intervals)) : 
+        l.append(x[:, intervals[i][0]:intervals[i][-1]])
+    return np.mean(np.concatenate(l, axis=1), axis=1)
+
+def normalize_min_max(x, axis=0):
+
+    dim = len(x.shape)
+    if dim > 2 :
+        raise Exception('x must be a 1D or 2D array')
+
+    max_val = np.max(x, axis=axis)
+    min_val = np.min(x, axis=axis)
+
+    if dim == 2 and x.shape[0] == max_val.shape[0] :
+        norm = ( (x.T - min_val) / (max_val - min_val) ).T
+    else :
+        norm = (x - min_val) / (max_val - min_val)
+        
+    return norm
