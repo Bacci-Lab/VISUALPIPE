@@ -43,7 +43,8 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
     exclude_start_session = round(1 * fs)
-    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest']/2, min_states_window['AS']/2]))
+    min_inter_interval_size = round(0.15 * fs) # lower bound of GCamp6s rise time
+    rise_time_frames = round(0.3 * fs) # upper bound of GCamp6s rise time
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
@@ -61,7 +62,8 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     ###------------------------------ Calculate active movement state -----------------------------###
     # default param: duration > 60 frames and speed > 0.5 s/m
     id_above_thr_speed = np.extract(speed[exclude_start_session:] >= speed_threshold, ids[exclude_start_session:])
-    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(0.3 * fs), min_inter_interval_size)
+    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, 
+                                                                                              rise_time_frames, min_inter_interval_size)
     
     Aroused_Running_index_check1 = []
     for i in Aroused_Running_index:
@@ -85,7 +87,8 @@ def split_stages(speed, behavior, speed_threshold:float, behav_threshold:float, 
     mask = np.isin(Aroused_stationary_index_check, delet_Running_IDX, invert=True)
     result = np.extract(mask, Aroused_stationary_index_check)
 
-    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, round(0.3 * fs), min_inter_interval_size)
+    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, 
+                                                                                                       rise_time_frames, min_inter_interval_size)
 
     Aroused_stationary_index_check1 = []
     for i in Aroused_stationary_index:
@@ -177,7 +180,8 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
     exclude_start_session = round(1 * fs)
-    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest']/2, min_states_window['AS']/2]))
+    min_inter_interval_size = round(0.15 * fs) # lower bound of GCamp6s rise time
+    rise_time_frames = round(0.3 * fs) # upper bound of GCamp6s rise time
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
@@ -206,7 +210,8 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     ###------------------------------ Calculate active movement state -----------------------------###
     # default param: duration > 60 frames and speed > 0.5 s/m
     id_above_thr_speed = np.extract(speed[exclude_start_session:] >= speed_threshold, ids[exclude_start_session:])
-    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(0.3 * fs), min_inter_interval_size)
+    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, 
+                                                                                              rise_time_frames, min_inter_interval_size)
     
     Aroused_Running_index_check1 = []
     for i in Aroused_Running_index:
@@ -232,7 +237,8 @@ def split_stages_mixed(speed, pupil, facemotion, idx_lim_dark,
     mask = np.isin(Aroused_stationary_index_check, delet_Running_IDX, invert=True)
     result = np.extract(mask, Aroused_stationary_index_check)
 
-    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, round(0.3 * fs), min_inter_interval_size)
+    Aroused_stationary_index, Aroused_stationary_window, Real_time_Aroused_stationary = find_intervals(result, min_states_window['AS'], real_time, 
+                                                                                                       rise_time_frames, min_inter_interval_size)
 
     Aroused_stationary_index_check1 = []
     for i in Aroused_stationary_index:
@@ -316,7 +322,8 @@ def split_stages_locomotion(speed, speed_threshold:float, real_time, min_states_
     undefined_state_idx = np.arange(0,len(speed))
     ids = np.arange(0, len(speed))
     exclude_start_session = round(1 * fs)
-    min_inter_interval_size = round(np.min([min_states_window['run']/2, min_states_window['rest']/2, min_states_window['AS']/2]))
+    min_inter_interval_size = round(0.15 * fs) # lower bound of GCamp6s rise time
+    rise_time_frames = round(0.3 * fs) # upper bound of GCamp6s rise time
 
     if speed_filter_kernel > 0 :
         speed = gaussian_filter1d(speed, speed_filter_kernel)
@@ -324,7 +331,8 @@ def split_stages_locomotion(speed, speed_threshold:float, real_time, min_states_
     ###------------------------------ Calculate active movement state -----------------------------###
     # default param: duration > 60 frames and speed > 0.5 s/m
     id_above_thr_speed = np.extract(speed[exclude_start_session:] >= speed_threshold, ids[exclude_start_session:])
-    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time, round(0.3 * fs), min_inter_interval_size)
+    Aroused_Running_index, Aroused_Running_window, Real_Time_Aroused_Running = find_intervals(id_above_thr_speed, min_states_window['run'], real_time,
+                                                                                              rise_time_frames, min_inter_interval_size)
     
     Aroused_Running_index_check1 = []
     for i in Aroused_Running_index:
