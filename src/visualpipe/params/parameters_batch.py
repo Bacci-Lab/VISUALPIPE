@@ -13,11 +13,11 @@ facemotion_threshold = 2
 pupil_threshold = 0.5
 pupil_threshold_type = 'quantile' #std or quantile
 
-min_run_window = 1.5
-min_as_window = 1
-min_rest_window = 1
+min_run_window = 2
+min_as_window = 2
+min_rest_window = 1.5
 
-speed_filter_kernel = 5
-facemotion_filter_kernel = 5
-pupil_filter_kernel = 5
-dFoF_filter_kernel = 5
+speed_filter_kernel = 10
+facemotion_filter_kernel = 10
+pupil_filter_kernel = 10
+dFoF_filter_kernel = 10
