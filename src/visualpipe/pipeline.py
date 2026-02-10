@@ -142,6 +142,11 @@ def visual_pipe(base_path:str=None, input_gui=False) :
                                             post_smoothing=2./50.)
 
     if not face_cam_dm.no_face_data :
+        """face_cam_dm.time_stamps
+        n = min(len(face_cam_dm.pupil), len(face_cam_dm.time_stamps))
+        face_cam_dm.pupil = face_cam_dm.pupil[:n]
+        face_cam_dm.time_stamps = face_cam_dm.time_stamps[:n]
+        face_cam_dm.facemotion = face_cam_dm.facemotion[:n]"""
         pupil = general_functions.resample_signal(face_cam_dm.pupil, 
                                                 t_sample=face_cam_dm.time_stamps, 
                                                 new_freq=ca_img_dm.fs, 
