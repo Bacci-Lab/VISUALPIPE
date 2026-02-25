@@ -945,7 +945,7 @@ def plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_n
 
 def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity, save_path, attr):
 
-    color = {'WT': 'orange', 'KO': 'skyblue'}
+    color = {'WT': '#BB81BE', 'KO': '#568B86'}
 
     if len(sub_protocols) == 2:
         protocol_x = sub_protocols[0]
@@ -955,6 +955,8 @@ def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity,
         excel_path = os.path.join(save_path, f"{protocol_x}_vs_{protocol_y}.xlsx")
         wb = Workbook()
         wb.remove(wb.active)  # Remove default empty sheet
+
+        plt.figure(figsize=(6, 6))
 
         for group in groups_id.keys():
 
@@ -1000,10 +1002,12 @@ def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity,
         plt.title(f"Response magnitudes ({attr}) for "
                   f"{str(protocol_validity)+'-responsive' if not get_centered else 'centered'} neurons")
         plt.legend()
+        plt.gca().set_aspect('equal', adjustable='box')
 
         # Save figure
         fig_name = f"{protocol_x}_vs_{protocol_y}"
         plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=300)
+        plt.savefig(os.path.join(save_path, f"{fig_name}_magnitude_response_{attr}.jpeg"), dpi=600)
         plt.show()
 
         # Save Excel file
@@ -1668,6 +1672,128 @@ def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_
     df = pd.DataFrame(excel_dict)
     df.to_excel(os.path.join(save_path, f"{fig_name}_representative_traces_{variable}_{attr}.xlsx"),
                 index=False)
+    
+
+def representative_traces_joint(frame_rate,
+                                                            suppression_groups,
+                                                            cmi_groups,
+                                                            magnitude_groups,
+                                                            groups_id,
+                                                            individual_groups,
+                                                            sub_protocols,
+                                                            attr,
+                                                            save_path,
+                                                            fig_name):
+    
+    if not cmi_groups or not suppression_groups:
+        print("No CMI or suppression index data available.")
+        return
+
+    excel_dict = {}
+    fig, ax = plt.subplots(2, len(groups_id), figsize=(14, 8))
+    baseline_len = int(1 * frame_rate)
+
+    center_protocol = sub_protocols[0]  # normalize everything to this
+
+    for i, group in enumerate(groups_id.keys()):
+        id_group = groups_id[group]
+
+        SI = suppression_groups[id_group]
+        CMI = cmi_groups[id_group]
+
+        median_SI = np.median(SI)
+        median_CMI = np.median(CMI)
+
+        # --- Compute Euclidean distance to joint median ---
+        distances = np.sqrt((SI - median_SI)**2 + (CMI - median_CMI)**2)
+
+        # Consider top 5% closest ROIs
+        threshold = np.percentile(distances, 5)
+        candidate_ids = np.where(distances <= threshold)[0]
+        if len(candidate_ids) == 0:
+            candidate_ids = [np.argmin(distances)]
+
+        # --- Select least noisy among candidates ---
+        noise_values = []
+        for idx in candidate_ids:
+            noise_per_protocol = []
+            for protocol in sub_protocols:
+                trace = individual_groups[id_group][protocol][idx]
+                #noise_per_protocol.append(np.std(trace[:baseline_len]))
+                baseline_std = np.std(trace[:baseline_len])
+                response_amp = np.percentile(trace, 95) - np.mean(trace[:baseline_len])
+                snr = response_amp / baseline_std if baseline_std > 0 else 0
+                noise_per_protocol.append(snr)
+            noise_values.append(np.mean(noise_per_protocol))
+
+        rep_idx = candidate_ids[np.argmin(noise_values)]
+        rep_SI = SI[rep_idx]
+        rep_CMI = CMI[rep_idx]
+
+        rep_trace = {protocol: individual_groups[id_group][protocol][rep_idx]
+                     for protocol in sub_protocols}
+
+        # --- Normalize by center protocol ---
+        center_max = np.percentile(rep_trace[center_protocol], 95)
+        min_len = min(len(t) for t in rep_trace.values())
+        time = np.linspace(0, min_len, min_len) / frame_rate - 1
+
+        if "Time (s)" not in excel_dict:
+            excel_dict["Time (s)"] = time
+
+        for protocol in sub_protocols:
+            normalized = rep_trace[protocol][:min_len] / center_max
+            excel_dict[f"{group}_{protocol}_representative"] = normalized
+
+            ax[0, i].plot(
+                time,
+                gaussian_filter1d(normalized, sigma=1),
+                lw=2,
+                label=protocol
+            )
+
+        ax[0, i].set_title(f"{group} — Representative ROI")
+        ax[0, i].set_ylabel(f"{attr} normalized to {center_protocol}")
+        ax[0, i].set_xlabel("Time (s)")
+        ax[0, i].legend()
+
+        ax[0, i].text(
+            0.98, 0.02,
+            f"SI = {rep_SI:.2f}, CMI = {rep_CMI:.2f}",
+            transform=ax[0, i].transAxes,
+            ha='right', va='bottom',
+            fontsize=9,
+            bbox=dict(boxstyle="round", facecolor="white", alpha=0.7)
+        )
+
+        # --- Bar plot of magnitudes, normalized by center protocol ---
+        center_mag = magnitude_groups[id_group][center_protocol][rep_idx]
+        magnitudes = [magnitude_groups[id_group][protocol][rep_idx] / center_mag
+                      for protocol in sub_protocols]
+
+        ax[1, i].bar([protocol for protocol in sub_protocols],
+                     magnitudes,
+                     color=['skyblue', 'orange'], width=0.3)
+        ax[1, i].set_ylabel(f"Response magnitude ({attr}) normalized to {center_protocol}")
+        ax[1, i].set_title(f"{group} — Response magnitudes")
+
+    plt.tight_layout()
+    fig.savefig(
+        os.path.join(save_path,
+                     f"{fig_name}_representative_traces_joint_least_noisy_center_protocol_{attr}.jpeg"),
+        dpi=300,
+        bbox_inches='tight'
+    )
+    plt.show()
+
+    df = pd.DataFrame(excel_dict)
+    df.to_excel(
+        os.path.join(save_path,
+                     f"{fig_name}_representative_traces_joint_least_noisy_center_protocol_{attr}.xlsx"),
+        index=False
+    )
+
+
 
 
 def plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, file_name, save_path):
@@ -2044,8 +2170,9 @@ if __name__ == "__main__":
     'size-tuning-contrast-log-40-0.05', 'size-tuning-contrast-log-40-0.11', 'size-tuning-contrast-log-40-0.22','size-tuning-contrast-log-40-0.47','size-tuning-contrast-log-40-1.0']  #Protocols to use for normalization of magnitudes
     #magnitude_groups = normalize_magnitudes(groups_id, sub_protocols, magnitude_groups, norm_protocols = norm_protocols) #Uncomment if you want to normalize magnitudes by specific protocols (will take the max of the magnitude of protocols in norm_protocols)
     #representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
-    #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable="suppression_index")
-    
+    #                      individual_groups, sub_protocols, attr, save_path, fig_name, variable="CMI")
+    #representative_traces_joint(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
+    #                            individual_groups, sub_protocols, attr, save_path, fig_name)
 
     
      #-------------------Call the functions to process and plot the data-------------------#
