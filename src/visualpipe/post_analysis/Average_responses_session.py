@@ -11,7 +11,7 @@ import seaborn as sns
 sys.path.append("./src")
 
 import visualpipe.utils.file as file
-from visualpipe.analysis.ca_imaging import CaImagingDataManager
+from visualpipe.analysis.Ca_imaging import CaImagingDataManager
 
 def graph_averages(file_name, attr, save_path, trials, protocols, frame_rate, valid_neurons, all_protocols, dt_prestim, get_valid):
     """
