@@ -593,7 +593,7 @@ def adaptation_index(sub_protocols, groups_id, mag_trial_indiv, first=3, last=3)
     return AI
 
 
-def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot, red_ch = 'green'):
+def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot, red_ch = 'green', direction = 'max'):
     #Define trial period names based on attribute
     period_names, trial_periods = get_period_names(attr)
     # Initialize group-level containers
@@ -662,7 +662,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 
                 stim_id = stimuli_df[stimuli_df.name == protocol].index[0]
                 n_trials = trials[trial_periods[1]][stim_id].shape[1]
-                #all_magnitudes = np.zeros((len(valid_neurons), n_trials))  # each row = a neuron, each column = trial
+                all_magnitudes = np.zeros((len(valid_neurons), n_trials))  # each row = a neuron, each column = trial
 
                 # Get traces from responsive-neurons for that protocol from pre, stim and post periods and concatenate along time
                 traces_sep = [trials[period][stim_id][valid_neurons, :] for period in period_names]
@@ -691,13 +691,13 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
                 # Now compute the average response per trial for each neuron, subtracting the baseline of that trial
                 session_mag_list = []
-                """
+                
                 for trial in range(0,n_trials):
                     avg_trial = []
                     # Only compute baseline if attr == 'dFoF0-baseline'
                     if attr == 'dFoF0-baseline':
                         baseline = np.mean(trials['pre_trial_fluorescence'][stim_id][valid_neurons, trial, :], axis=1)
-
+                    """
                     for trial_period in trial_periods:
                         trial_trace = trials[trial_period][stim_id][valid_neurons, trial, :]
                         if attr == 'dFoF0-baseline':
@@ -717,9 +717,8 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                 if protocol not in mag_trial_indiv[key]:
                     mag_trial_indiv[key][protocol] = [all_magnitudes]
                 else:
-                    mag_trial_indiv[key][protocol].append(all_magnitudes)
-        perTrials_groups[key] = perTrials # store the average response per trial for each protocol, for that group"""
-        
+                    mag_trial_indiv[key][protocol].append(all_magnitudes)"""
+        #perTrials_groups[key] = perTrials # store the average response per trial for each protocol, for that group
         
         for protocol in magnitude.keys():
             magnitude[protocol] = np.concatenate(magnitude[protocol])
@@ -2158,7 +2157,7 @@ if __name__ == "__main__":
 
     groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
-    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False, red_ch=color_ch) 
+    suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False, red_ch = color_ch, direction = 'max') 
     
     norm_protocols= ['size-tuning-contrast-log-5-0.05', 'size-tuning-contrast-log-5-0.11', 'size-tuning-contrast-log-5-0.22','size-tuning-contrast-log-5-0.47','size-tuning-contrast-log-5-1.0',
     'size-tuning-contrast-log-10-0.05', 'size-tuning-contrast-log-10-0.11', 'size-tuning-contrast-log-10-0.22','size-tuning-contrast-log-10-0.47','size-tuning-contrast-log-10-1.0',
@@ -2184,7 +2183,7 @@ if __name__ == "__main__":
     # Plot the average response during the stim period per session
     plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, sub_protocols)
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
-    graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
+    #graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
     """if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2 and "surround" in protocol_name:
         histplot(cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")"""

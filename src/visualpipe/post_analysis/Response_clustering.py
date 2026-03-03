@@ -43,7 +43,7 @@ def get_valid_neurons_session(validity, protocol):
     
     return valid_neurons
 
-def process_data(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:float, attr:str='z-scores'):
+def process_data(red_path: None, df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:float, attr:str='z-scores', direction:str='max'):
     """
     Process all neurons from a given group of mice and compute their 
     (1) normalized traces to be used for clustering, 
@@ -114,8 +114,8 @@ def process_data(df:pd.DataFrame, groups_id:dict, sub_protocol:str, frame_rate:f
                     validity['looming-stim-log-1.0'] = validity.pop(stim_name)
             # Determine which neurons are valid
             """valid_neurons = get_valid_neurons_session(validity, sub_protocol)"""
-            valid_neurons, proportion = compare_groups.select_neurons(validity, valid_sub_protocols, selection_method, group_name,
-                   get_centered, stimuli_df, trials, period_names, attr, plot=False) #extract responsive neurons (and centered if get_centered = True)
+            valid_neurons, proportion = compare_groups.select_neurons(red_path, validity, valid_sub_protocols, selection_method, group_name,
+                   get_centered, stimuli_df, trials, period_names, attr, plot=False, direction=direction) #extract responsive neurons (and centered if get_centered = True)
             nb_valid_neurons = len(valid_neurons)
             all_neurons += nb_valid_neurons
 
@@ -620,7 +620,7 @@ if __name__ == "__main__":
     valid_sub_protocols = {'looming': ['looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0'],
                            'dimming': ['dimming-circle-log-0.0', 'dimming-circle-log-0.1', 'dimming-circle-log-0.4','dimming-circle-log-1.0']} 
 
-    attr='dFoF0-baseline'  # 'z-scores' or 'dFoF0-baseline'
+    attr='z-scores'  # 'z-scores' or 'dFoF0-baseline'
 
     get_centered = False
 
@@ -629,13 +629,16 @@ if __name__ == "__main__":
 
     max_clusters = 10
 
+    #'green' if you want to analyze the green channel, 'red-green' to analyze which are also red
+    red_ch = 'green'
+
     #-------------------------------------------------------------------------#
 
     df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
     groups_id = {'WT': 0, 'KO': 1}
 
-    normalized_traces_groups, single_traces_groups, magnitude_groups, response_mean_groups, all_neurons_groups, mouse_avg_zscore_groups, mouse_sem_zscore_groups = process_data(df, groups_id, sub_protocol, frame_rate, attr=attr)
+    normalized_traces_groups, single_traces_groups, magnitude_groups, response_mean_groups, all_neurons_groups, mouse_avg_zscore_groups, mouse_sem_zscore_groups = process_data(red_path=None, df=df, groups_id=groups_id, sub_protocol=sub_protocol, frame_rate=frame_rate, attr=attr, direction='max')
 
     """
     #------------------- Cluster the two groups separately -------------------#
@@ -697,6 +700,7 @@ if __name__ == "__main__":
 
     # For storing cluster data
     joint_cluster_data = {}
+    excel_dict= {}
     wt_cluster_counts = np.zeros(len(np.unique(cluster_labels)), dtype=int)
     ko_cluster_counts = np.zeros(len(np.unique(cluster_labels)), dtype=int)
 
@@ -711,6 +715,10 @@ if __name__ == "__main__":
         idx_ko = idx_cluster[group_labels[idx_cluster] == 'KO']
         traces_wt_k = all_traces[idx_wt]
         traces_ko_k = all_traces[idx_ko]
+        magnitude_wt_k = compare_groups.compute_magnitude(frame_rate, traces_wt_k, magnitude_method = 'mean')
+        magnitude_ko_k = compare_groups.compute_magnitude(frame_rate, traces_ko_k, magnitude_method = 'mean')
+        excel_dict[f'Cluster {k}_wt'] = magnitude_wt_k
+        excel_dict[f'Cluster {k}_ko'] = magnitude_ko_k
         mean_wt = np.mean(traces_wt_k, axis=0) if len(idx_wt) > 0 else np.zeros(all_traces.shape[1])
         sem_wt = stats.sem(traces_wt_k, axis=0) if len(idx_wt) > 1 else np.zeros(all_traces.shape[1])
         mean_ko = np.mean(traces_ko_k, axis=0) if len(idx_ko) > 0 else np.zeros(all_traces.shape[1])
@@ -724,6 +732,25 @@ if __name__ == "__main__":
         plot_raster_cluster_group(k, norm_traces, idx_wt, idx_ko, time, attr, xticks, save_path, fig_name, show=True)
         # Plot traces
         plot_avg_cluster_traces_group(k, joint_cluster_data[k], time, attr, xticks, save_path, fig_name, show=True)
+
+    magnitude_df = pd.DataFrame(
+        {k: pd.Series(v) for k, v in excel_dict.items()})
+    magnitude_df.to_excel(os.path.join(save_path, f"clusters_magnitudes.xlsx"),
+                index=False)
+    
+    trace_export = {}
+
+    for k in joint_cluster_data:
+
+        # WT
+        trace_export[f'Cluster{k}_WT_mean'] = joint_cluster_data[k]['WT']['mean']
+        trace_export[f'Cluster{k}_WT_sem']  = joint_cluster_data[k]['WT']['sem']
+
+        # KO
+        trace_export[f'Cluster{k}_KO_mean'] = joint_cluster_data[k]['KO']['mean']
+        trace_export[f'Cluster{k}_KO_sem']  = joint_cluster_data[k]['KO']['sem']
+    traces_df = pd.DataFrame(trace_export)
+    traces_df.to_excel(os.path.join(save_path, f"clusters_traces.xlsx"), index=False)
 
     # Normalize to percentages
     wt_percentages = 100 * wt_cluster_counts / np.sum(group_labels == 'WT')
@@ -740,7 +767,7 @@ if __name__ == "__main__":
     # Plot pie chart for KO
     pie_chart_clusters(ko_percentages, n_clusters_joint, 'KO', attr = attr, save_path=save_path, fig_name=fig_name, show=True) 
 
-
+    """
     #Compute magnitudes for each trial for that protocol
     valid_sub_protocols = {'looming': ['looming-stim-log-1.0']}
     group_name = 'looming'
@@ -750,7 +777,7 @@ if __name__ == "__main__":
     magnitude_method = 'auc' #'auc', 'peak' or 'filtered_peak', 'mean'
     selection_method = 'any'
     frame_rate = 30
-    attr = 'dFoF0-baseline'
+    attr = 'z_scores'
 
     _, _, _, nb_neurons, _, _, _, _, _, _, _, _, _, _, mag_trial_indiv = compare_groups.process_group(df, groups_id, attr, valid_sub_protocols, [sub_protocol], protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False)
 
@@ -783,7 +810,7 @@ if __name__ == "__main__":
 
     joint_cluster_data = {}  # store mean/SEM per cluster per group
 
-    """for protocol in [sub_protocol]:
+    for protocol in [sub_protocol]:
         for k in cluster_ids:
             idx_cluster = np.where(cluster_labels == k)[0]  # all neurons in cluster k
 
@@ -808,13 +835,14 @@ if __name__ == "__main__":
                 }
 
             # Optional: plot the average traces
-            plot_avg_cluster_traces_group(k, joint_cluster_data[k], time, attr, xticks, save_path, fig_name, show=True)"""
+            plot_avg_cluster_traces_group(k, joint_cluster_data[k], time, attr, xticks, save_path, fig_name, show=True)
 
 
     AI_clusters = {}  # dictionary to store adaptation indices per cluster
 
 
     for k in range(n_clusters_joint): 
-        plot_adaptation_index(k, [sub_protocol], groups_id, mag_trial_indiv_per_cluster[k], attr, fig_name, save_path, first=3, last=3)
+        plot_adaptation_index(k, [sub_protocol], groups_id, mag_trial_indiv_per_cluster[k], attr, fig_name, save_path, first=3, last=3) """
+    
 
     
