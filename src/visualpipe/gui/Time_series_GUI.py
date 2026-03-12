@@ -6,6 +6,10 @@ from PyQt5.QtGui import QIntValidator
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+if __name__ == "__main__":
+    import sys 
+    sys.path.append("./")
+    sys.path.append("./src")
 import visualpipe.utils.general_functions as general_functions
 
 class TimeSeriesUI(object):
@@ -297,7 +301,7 @@ if __name__ == "__main__":
     import os
     from pathlib import Path
 
-    import utils.file as file
+    import visualpipe.utils.file as file
 
     class MainWindow(QtWidgets.QMainWindow):
         def __init__(self, h5_filepath, visual_stim_filepath):
@@ -320,8 +324,13 @@ if __name__ == "__main__":
     path = Path(save_dir)
     base_path = path.parent.absolute()
 
-    unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
-    id_version = save_dir.split('_')[5]
+    metadata = file.get_metadata(base_path)
+    unique_id = metadata['date'] + '_' + metadata['time']
+    global_protocol = metadata['protocol']
+    experimenter = metadata['experimenter']
+    subject_id = metadata['subject_ID']
+    id_version = save_dir.split('_')[7]
+    print(id_version)
 
     filename_h5 = "_".join([unique_id, id_version, 'postprocessing']) + ".h5"
     h5_filepath = os.path.join(save_dir, filename_h5)

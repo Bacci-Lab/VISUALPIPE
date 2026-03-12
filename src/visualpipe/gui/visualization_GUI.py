@@ -747,7 +747,11 @@ if __name__ == "__main__":
     path = Path(output_folder)
     base_path = path.parent.absolute()
 
-    unique_id, global_protocol, experimenter, subject_id = file.get_metadata(base_path)
+    metadata = file.get_metadata(base_path)
+    unique_id = metadata['date'] + '_' + metadata['time']
+    global_protocol = metadata['protocol']
+    experimenter = metadata['experimenter']
+    subject_id = metadata['subject_ID']
     foldername = os.path.basename(output_folder)
     id_version = foldername.split('_')[5]
     

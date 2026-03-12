@@ -341,7 +341,8 @@ class CategorizeCells(object):
 
         path = Path(self.output_dir)
         base_path = path.parent.absolute()
-        unique_id, _, _, _ = file.get_metadata(base_path)
+        metadata = file.get_metadata(base_path)
+        unique_id = metadata['date'] + '_' + metadata['time']
         foldername = os.path.basename(self.output_dir)
         id_version = foldername.split('_')[5]
         
