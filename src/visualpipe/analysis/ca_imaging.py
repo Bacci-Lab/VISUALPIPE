@@ -161,12 +161,12 @@ class CaImagingDataManager(object):
         
         self._list_ROIs_idx = np.delete(self._list_ROIs_idx, bad_cells)
     
-    def detect_bad_neuropils(self, save_directory=None):
+    def detect_bad_neuropils(self, threshold=1.6, save_directory=None):
 
         raw_Fneu_filtered = gaussian_filter1d(self.raw_Fneu, 10)
         raw_F_filtered = gaussian_filter1d(self.raw_F, 10)
 
-        bad_cells = [i for i in range(len(raw_F_filtered)) if np.std(raw_F_filtered[i])/np.std(raw_Fneu_filtered[i]) < 1.6]
+        bad_cells = [i for i in range(len(raw_F_filtered)) if np.std(raw_F_filtered[i])/np.std(raw_Fneu_filtered[i]) < threshold]
         self.update_iscell(bad_cells, save_directory)
         self.remove_ROIs(bad_cells)
 

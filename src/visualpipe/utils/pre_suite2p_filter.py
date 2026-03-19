@@ -10,7 +10,7 @@ def pre_suite2p_filter(base_path):
     print('Original number of neurons :', len(detected_roi))
 
     #---------------------------------- Detect ROIs with bad neuropils ------------------
-    ca_img_dm.detect_bad_neuropils(save_directory=ca_img_dm._suite2p_path)
+    ca_img_dm.detect_bad_neuropils(threshold=1.6, save_directory=ca_img_dm._suite2p_path)
     kept2p_ROI = ca_img_dm._list_ROIs_idx
     print('After removing bad neuropil neurons, nb of neurons :', len(kept2p_ROI))
 
