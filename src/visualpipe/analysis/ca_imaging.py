@@ -156,7 +156,7 @@ class CaImagingDataManager(object):
         for i in bad_cells_2p_index:
             self.iscell[i][0] = 0
             if save_directory is not None:
-                save_path = os.path.join(save_directory, 'iscell_post')
+                save_path = os.path.join(save_directory, 'iscell')
                 np.save(save_path, self.iscell, allow_pickle=True)
         
         self._list_ROIs_idx = np.delete(self._list_ROIs_idx, bad_cells)
