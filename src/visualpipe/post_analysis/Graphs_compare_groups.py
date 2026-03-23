@@ -2094,8 +2094,8 @@ if __name__ == "__main__":
 
     #-----------------------INPUTS-----------------------#
 
-    excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\surround-mod-nathan-2CenterRadius\Analysis"
+    excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe_PYR.xlsx"
+    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\vision_survey\Analysis"
     
     #Will be included in all names of saved figures
     fig_name = 'test'
@@ -2140,13 +2140,13 @@ if __name__ == "__main__":
     dt_prestim = 1
 
     # Decide if you want to plot the dFoF0 baseline substraced or the z-scores
-    attr = 'dFoF0-baseline'  # 'dFoF0-baseline' or 'z_scores'
+    attr = 'z_scores'  # 'dFoF0-baseline' or 'z_scores'
 
     # Decide if you want to only keep neurons that are centered
     get_centered = True  # True or False
 
     #Decide if you want to plot green only neurons, or red-green ones
-    color_ch = 'red-green'  # 'green' or 'red-green'
+    color_ch = 'green'  # 'green' or 'red-green'
 
     # Decide on the way to calculate the amplitude of response
     magnitude_method = 'mean' #'auc', 'peak' or 'filtered_peak', 'mean'
