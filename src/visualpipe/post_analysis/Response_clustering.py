@@ -735,7 +735,7 @@ if __name__ == "__main__":
 
     magnitude_df = pd.DataFrame(
         {k: pd.Series(v) for k, v in excel_dict.items()})
-    magnitude_df.to_excel(os.path.join(save_path, f"clusters_magnitudes.xlsx"),
+    magnitude_df.to_excel(os.path.join(save_path, f"{fig_name}_clusters_magnitudes.xlsx"),
                 index=False)
     
     trace_export = {}
@@ -750,7 +750,7 @@ if __name__ == "__main__":
         trace_export[f'Cluster{k}_KO_mean'] = joint_cluster_data[k]['KO']['mean']
         trace_export[f'Cluster{k}_KO_sem']  = joint_cluster_data[k]['KO']['sem']
     traces_df = pd.DataFrame(trace_export)
-    traces_df.to_excel(os.path.join(save_path, f"clusters_traces.xlsx"), index=False)
+    traces_df.to_excel(os.path.join(save_path, f"{fig_name}_clusters_traces.xlsx"), index=False)
 
     # Normalize to percentages
     wt_percentages = 100 * wt_cluster_counts / np.sum(group_labels == 'WT')
