@@ -24,6 +24,10 @@ def load_session_data(session_path):
     if 'looming-stim' in validity:
         validity['looming-stim-log-1.0'] = validity.pop('looming-stim')
 
+    stimuli_df['name'] = stimuli_df['name'].replace('center-1.0', 'center-20-1.0')
+    if 'center-1.0' in validity:
+        validity['center-20-1.0'] = validity.pop('center-1.0')
+
     stimuli_df['name'] = stimuli_df['name'].replace('center', 'center-20-1.0')
     if 'center' in validity:
         validity['center-20-1.0'] = validity.pop('center')
@@ -35,6 +39,10 @@ def load_session_data(session_path):
     stimuli_df['name'] = stimuli_df['name'].replace('center-surround-iso', 'center-surround_high_contrast-iso-1.0')
     if 'center-surround-iso' in validity:
         validity['center-surround_high_contrast-iso-1.0'] = validity.pop('center-surround-iso')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround_high_contrast-iso', 'center-surround_high_contrast-iso-1.0')
+    if 'center-surround_high_contrast-iso' in validity:
+        validity['center-surround_high_contrast-iso-1.0'] = validity.pop('center-surround_high_contrast-iso')
 
     stimuli_df['name'] = stimuli_df['name'].replace('surround-iso_ctrl', 'surround-iso_ctrl-20-1.0')
     if 'surround-iso_ctrl' in validity:
@@ -636,7 +644,12 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
             if red_ch == 'red-green':
                 red_path = os.path.join(session_path, 'red_channel/red_green_cells.npy')
                 if not os.path.exists(red_path):
-                    print('No red-green cells file found, skipping this session')
+                    print('No red-green file found, skipping this session')
+                    continue
+            elif red_ch == 'green-only':
+                red_path = os.path.join(session_path, 'red_channel/only_green.npy')
+                if not os.path.exists(red_path):
+                    print('No green only file found, skipping this session')
                     continue
             else:
                 red_path = None
@@ -678,7 +691,7 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
                         single_neurons_group[protocol][:, :min_len],
                         traces_concat[:, :min_len]])
 
-                avg_session_trace = np.mean(traces_concat, axis=0) # average trace of all neurons in that session and for that protocol
+                avg_session_trace = np.nanmean(traces_concat, axis=0) # average trace of all neurons in that session and for that protocol
                 avg_data[protocol].append(avg_session_trace)
 
                 stim_traces = trials[period_names[1]][stim_id][valid_neurons, :] #extract traces in the stim period for all neurons in that session
@@ -761,8 +774,8 @@ def process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, proto
 
 
         # Compute average and SEM across neurons
-        avg = {protocol: np.mean(avg_data[protocol], axis=0) for protocol in sub_protocols} 
-        sem = {protocol: stats.sem(avg_data[protocol], axis=0) for protocol in sub_protocols}
+        avg = {protocol: np.nanmean(avg_data[protocol], axis=0) for protocol in sub_protocols} 
+        sem = {protocol: stats.sem(avg_data[protocol], axis=0, nan_policy='omit') for protocol in sub_protocols}
         print(f"List of % of responsive neurons per session for {key}: {proportion_list}")
 
         suppression_groups.append(suppression)
@@ -2146,7 +2159,7 @@ if __name__ == "__main__":
     get_centered = True  # True or False
 
     #Decide if you want to plot green only neurons, or red-green ones
-    color_ch = 'green'  # 'green' or 'red-green'
+    color_ch = 'red-green'  # 'green-only' or 'red-green'. None if you don't have a red image
 
     # Decide on the way to calculate the amplitude of response
     magnitude_method = 'mean' #'auc', 'peak' or 'filtered_peak', 'mean'
