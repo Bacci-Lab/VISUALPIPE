@@ -27,6 +27,10 @@ def load_session_data(session_path):
     stimuli_df['name'] = stimuli_df['name'].replace('center-1.0', 'center-20-1.0')
     if 'center-1.0' in validity:
         validity['center-20-1.0'] = validity.pop('center-1.0')
+    
+    stimuli_df['name'] = stimuli_df['name'].replace('center-0.2', 'center-20-0.25')
+    if 'center-0.2' in validity:
+        validity['center-20-0.25'] = validity.pop('center-0.2')
 
     stimuli_df['name'] = stimuli_df['name'].replace('center', 'center-20-1.0')
     if 'center' in validity:
@@ -35,6 +39,18 @@ def load_session_data(session_path):
     stimuli_df['name'] = stimuli_df['name'].replace('center-surround-cross', 'center-surround_high_contrast-cross-20.0-1.0')
     if 'center-surround-cross' in validity:
         validity['center-surround_high_contrast-cross-20.0-1.0'] = validity.pop('center-surround-cross')
+    
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround_high_contrast-cross', 'center-surround_high_contrast-cross-20.0-1.0')
+    if 'center-surround-high-contrast-cross' in validity:
+        validity['center-surround_high_contrast-cross-20.0-1.0'] = validity.pop('center-surround_high_contrast-cross')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround_low_contrast-iso', 'center-surround_low_contrast-iso-0.25')
+    if 'center-surround_low_contrast-iso' in validity:
+        validity['center-surround_low_contrast-iso-0.25'] = validity.pop('center-surround_low_contrast-iso')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('center-surround_low_contrast-cross', 'center-surround_low_contrast-cross-20.0-0.25')
+    if 'center-surround_low_contrast-cross' in validity:
+        validity['center-surround_low_contrast-cross-20.0-0.25'] = validity.pop('center-surround_low_contrast-cross')
 
     stimuli_df['name'] = stimuli_df['name'].replace('center-surround-iso', 'center-surround_high_contrast-iso-1.0')
     if 'center-surround-iso' in validity:
@@ -47,6 +63,14 @@ def load_session_data(session_path):
     stimuli_df['name'] = stimuli_df['name'].replace('surround-iso_ctrl', 'surround-iso_ctrl-20-1.0')
     if 'surround-iso_ctrl' in validity:
         validity['surround-iso_ctrl-20-1.0'] = validity.pop('surround-iso_ctrl')
+    
+    stimuli_df['name'] = stimuli_df['name'].replace('surround-iso_ctrl-1.0', 'surround-iso_ctrl-20-1.0')
+    if 'surround-iso_ctrl-1.0' in validity:
+        validity['surround-iso_ctrl-20-1.0'] = validity.pop('surround-iso_ctrl-1.0')
+
+    stimuli_df['name'] = stimuli_df['name'].replace('surround-cross_ctrl-1.0', 'surround-cross_ctrl-20-1.0')
+    if 'surround-cross_ctrl-1.0' in validity:
+        validity['surround-cross_ctrl-20-1.0'] = validity.pop('surround-cross_ctrl-1.0')
 
     stimuli_df['name'] = stimuli_df['name'].replace('surround-cross_ctrl', 'surround-cross_ctrl-20-1.0')
     if 'surround-cross_ctrl' in validity:
