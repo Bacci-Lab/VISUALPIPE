@@ -186,6 +186,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     ca_img_dm.compute_dFoF0()
 
     #---------------------------------- Plot calcium imaging traces ----------------------
+    ca_img_dm.plot_roi_mask(save_dir=save_fig_dir)
     ca_img_dm.plot('f0', sigma=0, mean=True, save_dir=save_fig_dir, legend=True)
     ca_img_dm.plot('fluorescence', sigma=10, save_dir=save_fig_dir, legend=True)
     ca_img_dm.plot('dFoF0', sigma=10, save_dir=save_fig_dir, legend=True)

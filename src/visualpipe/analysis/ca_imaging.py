@@ -415,6 +415,28 @@ class CaImagingDataManager(object):
         fig.savefig(os.path.join(save_dir, attr+"_raster.png"))
         plt.close(fig)
 
+    def plot_roi_mask(self, proj='max_proj', save_dir=''):
+
+        img = self.ops[proj]
+
+        x, y = [], []
+        for i in range(len(self.stat)): 
+            x.append(self.stat[i]['xpix'])
+            y.append(self.stat[i]['ypix'])
+
+        x = np.concatenate(x)
+        y = np.concatenate(y)
+
+        fig, ax = plt.subplots()
+
+        ax.imshow(img, cmap='gray')
+        ax.scatter(x, y, color='yellowgreen', alpha=0.01)
+        ax.axis('off')
+
+        savepath = os.path.join(save_dir, 'ROI_mask.png')
+        fig.savefig(savepath, bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
+
     def save_microscop_param(self, save_directory=''):
         data = {
             "Number of channels" : self.xml['Nchannels'], 
