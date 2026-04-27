@@ -385,6 +385,9 @@ def visual_pipe(base_path:str=None, input_gui=False) :
             #plot trial-averaged traces per arousal states
             trials.plot_trials_per_states(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
 
+            # plot pie chart of responsive neurons
+            trials.pie_chart_responsiveness(i, save_fig_dir)
+
     print("    ------------> Done")
 
     #---------------------------------- Spontaneous behaviour ----------------------------------

@@ -1147,6 +1147,37 @@ class Trial(object):
             fig.savefig(save_path + ".png")
             plt.close(fig)
 
+    def pie_chart_responsiveness(self, stimuli_id:int, save_dir:str) :
+
+        stim_name = self.visual_stim.protocol_df.iloc[stimuli_id]['name']
+
+        def autopct_hide_zero(pct):
+            return f'{pct:.1f}%' if pct > 0 else ''
+
+        fig = plt.figure(figsize=(2, 2))
+        nb_responsive_pos = (np.array(self.responsive[stimuli_id])[:, 0] == 1).sum() / len(self.responsive[stimuli_id])
+        nb_responsive_neg = (np.array(self.responsive[stimuli_id])[:, 0] == -1).sum() / len(self.responsive[stimuli_id])
+        non_responsive = 1 - nb_responsive_pos - nb_responsive_neg
+
+        values = [nb_responsive_pos, nb_responsive_neg, non_responsive]
+        labels = ['pos resp.', 'neg resp.', 'non resp.']
+        colors = ['indianred', 'lightskyblue','lightgray']
+
+        labels = [labels[i] if values[i] != 0 else '' for i in range(len(values))]
+
+        _, _, autotexts = plt.pie(values, labels=labels, colors=colors, autopct=autopct_hide_zero, startangle=90, 
+                                wedgeprops=dict(linewidth=0, edgecolor='w'), 
+                                textprops={'fontsize': 10, 'fontname':'Calibri'})
+        
+        for at in autotexts:
+            at.set_fontsize(14)
+
+        plt.title(stim_name)
+        
+        save_path = os.path.join(save_dir, "pie_chart_" + stim_name)
+        fig.savefig(save_path + ".png", bbox_inches="tight")
+        plt.close(fig)
+
     #-------------SAVE FUNCTIONS---------------
     def save_protocol_validity(self, save_dir, filename):
         protocol_validity = []
