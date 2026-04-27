@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os.path
 from scipy import stats
+import seaborn as sns
+from scipy.ndimage import gaussian_filter1d
+
 def Visualize_baseline(smooth_signal, baseline):
     plt.figure(figsize=(10, 6))
     plt.hist(smooth_signal, bins=100, color='skyblue', edgecolor='black', alpha=0.7, label='Smooth Signal Histogram')
@@ -95,4 +98,54 @@ def stim_period(protocol_duration_s,Photon_fre, mean_F_specific_protocol,std_F_s
         os.mkdir(save_direction1)
     save_direction = os.path.join(save_direction1, fig_name)
     fig.savefig(save_direction)
+    plt.close(fig)
+
+def general_figure(time, neural_traces, behavioral_data, filter_kernel, speed_corr_list, save_dir):
+
+    custom_params = {"axes.spines.right": False, "axes.spines.top": False, "axes.spines.bottom": False, "axes.spines.left": False}
+    sns.set_theme(style="white", rc=custom_params)
+    color = {'Speed' : 'goldenrod', 'Pupil' : 'black', 'Facemotion' : 'gray', r'Normalized $\Delta$F/F mean' : 'dodgerblue'}
+
+    idx_sorted = np.argsort(speed_corr_list)
+    neural_traces_sorted = neural_traces[idx_sorted]
+    mean_dF = gaussian_filter1d(np.mean(neural_traces, axis=0), filter_kernel['Neuronal activity'])
+
+    for key in behavioral_data.keys():
+        behavioral_data[key] = gaussian_filter1d(behavioral_data[key], filter_kernel[key])
+
+    behavioral_data.update({r'Normalized $\Delta$F/F mean' : mean_dF})
+
+    fig = plt.figure(figsize=(24, 20))
+    gs = fig.add_gridspec(len(behavioral_data.keys())*3+12, 45)
+
+    # Behavioral data and mean dF/F0
+    for i, key in enumerate(behavioral_data.keys()):
+
+        ax = fig.add_subplot(gs[i*3:i*3+2, :43])
+        ax.set_title(key, fontsize=25, y=1.0, horizontalalignment='center')
+        ax.plot(time, behavioral_data[key], linewidth=4, color=color[key])
+        ax.set_xticks([])
+        ax.margins(x=0)
+        if key == 'Speed' :
+            ax.set_ylabel('cm/s', fontsize=20)
+        ax.set_facecolor("white")
+        plt.yticks(fontsize=20)
+
+    # Neuronal activity map
+    ax1 = fig.add_subplot(gs[len(behavioral_data.keys())*3:len(behavioral_data.keys())*3+11, :43])
+    ax1.set_title('Normalized neuronal activity (sorted by speed correlation)', fontsize=25, y=1.0, horizontalalignment='center')
+    ax1.pcolormesh(neural_traces_sorted, cmap='Greys')
+    ax1.set_xlabel('Time (s)', fontsize=20)
+    ax1.margins(x=0)
+    ax1.set_ylabel('Neuron', fontsize=20)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+
+    m = ax1.pcolormesh(neural_traces_sorted, cmap='Greys')
+    ax1b = fig.add_subplot(gs[len(behavioral_data.keys())*3:len(behavioral_data.keys())*3+11, 44:45])
+    fig.colorbar(m, cax=ax1b)
+    plt.yticks(fontsize=20)
+
+    save_path = os.path.join(save_dir, "general_figure.png")
+    fig.savefig(save_path)
     plt.close(fig)

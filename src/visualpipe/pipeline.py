@@ -7,6 +7,7 @@ import pandas as pd
 import h5py
 import datetime
 import sys
+from sklearn.preprocessing import MinMaxScaler
 sys.path.append("./src")
 
 from analysis.speed_computation import compute_speed
@@ -21,6 +22,7 @@ from analysis.trial import Trial
 import analysis.behavioral_states as behavioral_states
 import analysis.spontaneous as spont
 import params.parameters_batch as params
+import utils.figures as figures
 
 def visual_pipe(base_path:str=None, input_gui=False) :
     
@@ -197,6 +199,18 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     facemotion_corr_list = [spearmanr(facemotion, ROI)[0] for ROI in ca_img_dm.dFoF0]
     pupil_corr_list = [spearmanr(pupil, ROI)[0] for ROI in ca_img_dm.dFoF0]
     print("    ------------> Done")
+    
+    #---------------------------------- Plot General Figure ----------------------
+    scaler = MinMaxScaler()
+    pupil_norm = scaler.fit_transform(pupil.reshape(-1, 1)).reshape(-1)
+    scaler = MinMaxScaler()
+    facemotion_norm = scaler.fit_transform(facemotion.reshape(-1, 1)).reshape(-1)
+
+    behavioral_data = {'Speed' : speed, 'Pupil' : pupil_norm, 'Facemotion' : facemotion_norm}
+    neural_traces = (ca_img_dm.dFoF0.T / np.max(ca_img_dm.dFoF0, axis=1)).T # normalized
+    filter_kernel = {'Speed' : speed_filter_kernel, 'Pupil' : pupil_filter_kernel, 'Facemotion' : facemotion_filter_kernel, 'Neuronal activity' : dFoF_filter_kernel}
+
+    figures.general_figure(ca_img_dm.time_stamps, neural_traces, behavioral_data, filter_kernel, speed_corr_list, save_fig_dir)
 
     #---------------------------------- Load Photodiode data -----------------------------
     print("Loading photodiode data")
