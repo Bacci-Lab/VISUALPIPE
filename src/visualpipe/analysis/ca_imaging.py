@@ -8,6 +8,7 @@ from sklearn.linear_model import LinearRegression
 from scipy.ndimage import minimum_filter1d, maximum_filter1d, gaussian_filter1d
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+from skimage.measure import find_contours
 
 import utils.xml_parser as xml_parser
 import utils.file as file
@@ -415,27 +416,37 @@ class CaImagingDataManager(object):
         fig.savefig(os.path.join(save_dir, attr+"_raster.png"))
         plt.close(fig)
 
-    def plot_roi_mask(self, proj='max_proj', save_dir=''):
+def plot_roi_mask(self, proj='max_proj', save_dir=''):
 
-        img = self.ops[proj]
+    img = self.ops[proj]
+    Ly, Lx = self.ops['Ly'], self.ops['Lx']
+    mask_rois = np.zeros((Ly, Lx), dtype=np.uint8)
+    
+    for i in range(len(self.stat)): 
+        # build binary mask
+        mask = np.zeros((Ly, Lx), dtype=np.uint8)
+        mask[self.stat[i]['ypix'], self.stat[i]['xpix']] = 1
+        mask_rois += mask
 
-        x, y = [], []
-        for i in range(len(self.stat)): 
-            x.append(self.stat[i]['xpix'])
-            y.append(self.stat[i]['ypix'])
+    # extract contours
+    contours = find_contours(mask_rois, level=0.5)
 
-        x = np.concatenate(x)
-        y = np.concatenate(y)
+    fig, ax = plt.subplots()
 
-        fig, ax = plt.subplots()
+    ax.imshow(img, cmap='gray')
 
-        ax.imshow(img, cmap='gray')
-        ax.scatter(x, y, color='yellowgreen', alpha=0.01)
-        ax.axis('off')
+    # draw all contours of all ROIs
+    for contour in contours:
+        ax.plot(contour[:, 1],
+                contour[:, 0],
+                color='limegreen',
+                linewidth=0.5)
+            
+    ax.axis('off')
 
-        savepath = os.path.join(save_dir, 'ROI_mask.png')
-        fig.savefig(savepath, bbox_inches='tight', pad_inches=0)
-        plt.close(fig)
+    savepath = os.path.join(save_dir, 'ROI_mask.png')
+    fig.savefig(savepath, bbox_inches='tight', pad_inches=0)
+    plt.close(fig)
 
     def save_microscop_param(self, save_directory=''):
         data = {
