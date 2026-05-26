@@ -419,7 +419,10 @@ class CaImagingDataManager(object):
     def plot_roi_mask(self, proj='max_proj', save_dir=''):
 
         img = self.ops[proj]
+
         Ly, Lx = self.ops['Ly'], self.ops['Lx']
+        img_corrected = np.zeros((Ly, Lx))
+        img_corrected[self.ops['yrange'][0]:self.ops['yrange'][1], self.ops['xrange'][0]:self.ops['xrange'][1]] = img
         mask_rois = np.zeros((Ly, Lx), dtype=np.uint8)
         
         for i in range(len(self.stat)): 
@@ -433,7 +436,7 @@ class CaImagingDataManager(object):
 
         fig, ax = plt.subplots()
 
-        ax.imshow(img, cmap='gray')
+        ax.imshow(img_corrected, cmap='gray')
 
         # draw all contours of all ROIs
         for contour in contours:
