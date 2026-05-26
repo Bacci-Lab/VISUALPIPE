@@ -162,7 +162,7 @@ def visual_pipe(base_path:str=None, input_gui=False) :
         pupil = general_functions.scale_trace(pupil)
         facemotion = general_functions.scale_trace(facemotion)
     else :
-        facemotion, pupil = [np.nan] * len(new_time_stamps), [np.nan] * len(new_time_stamps)
+        facemotion, pupil = np.array([np.nan] * len(new_time_stamps)), np.array([np.nan] * len(new_time_stamps))
 
     print("    ------------> Done")
 
@@ -202,12 +202,15 @@ def visual_pipe(base_path:str=None, input_gui=False) :
     print("    ------------> Done")
     
     #---------------------------------- Plot General Figure ----------------------
-    scaler = MinMaxScaler()
-    pupil_norm = scaler.fit_transform(pupil.reshape(-1, 1)).reshape(-1)
-    scaler = MinMaxScaler()
-    facemotion_norm = scaler.fit_transform(facemotion.reshape(-1, 1)).reshape(-1)
+    if not face_cam_dm.no_face_data :
+        scaler = MinMaxScaler()
+        pupil_norm = scaler.fit_transform(pupil.reshape(-1, 1)).reshape(-1)
+        scaler = MinMaxScaler()
+        facemotion_norm = scaler.fit_transform(facemotion.reshape(-1, 1)).reshape(-1)
 
-    behavioral_data = {'Speed' : speed, 'Pupil' : pupil_norm, 'Facemotion' : facemotion_norm}
+        behavioral_data = {'Speed' : speed, 'Pupil' : pupil_norm, 'Facemotion' : facemotion_norm}
+    else :
+        behavioral_data = {'Speed' : speed}
     neural_traces = (ca_img_dm.dFoF0.T / np.max(ca_img_dm.dFoF0, axis=1)).T # normalized
     filter_kernel = {'Speed' : speed_filter_kernel, 'Pupil' : pupil_filter_kernel, 'Facemotion' : facemotion_filter_kernel, 'Neuronal activity' : dFoF_filter_kernel}
 
