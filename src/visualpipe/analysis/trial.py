@@ -1150,16 +1150,17 @@ class Trial(object):
     def pie_chart_responsiveness(self, stimuli_id:int, save_dir:str) :
 
         stim_name = self.visual_stim.protocol_df.iloc[stimuli_id]['name']
+        nb_neurons = len(self.responsive[stimuli_id])
 
         def autopct_hide_zero(pct):
             return f'{pct:.1f}%' if pct > 0 else ''
 
         fig = plt.figure(figsize=(2, 2))
-        nb_responsive_pos = (np.array(self.responsive[stimuli_id])[:, 0] == 1).sum() / len(self.responsive[stimuli_id])
-        nb_responsive_neg = (np.array(self.responsive[stimuli_id])[:, 0] == -1).sum() / len(self.responsive[stimuli_id])
-        non_responsive = 1 - nb_responsive_pos - nb_responsive_neg
+        nb_responsive_pos = (np.array(self.responsive[stimuli_id])[:, 0] == 1).sum() 
+        nb_responsive_neg = (np.array(self.responsive[stimuli_id])[:, 0] == -1).sum()
+        non_responsive = nb_neurons - nb_responsive_pos - nb_responsive_neg
 
-        values = [nb_responsive_pos, nb_responsive_neg, non_responsive]
+        values = [nb_responsive_pos / nb_neurons, nb_responsive_neg / nb_neurons, non_responsive / nb_neurons]
         labels = ['pos resp.', 'neg resp.', 'non resp.']
         colors = ['indianred', 'lightskyblue','lightgray']
 
