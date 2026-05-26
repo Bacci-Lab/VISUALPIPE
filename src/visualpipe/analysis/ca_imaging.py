@@ -416,37 +416,37 @@ class CaImagingDataManager(object):
         fig.savefig(os.path.join(save_dir, attr+"_raster.png"))
         plt.close(fig)
 
-def plot_roi_mask(self, proj='max_proj', save_dir=''):
+    def plot_roi_mask(self, proj='max_proj', save_dir=''):
 
-    img = self.ops[proj]
-    Ly, Lx = self.ops['Ly'], self.ops['Lx']
-    mask_rois = np.zeros((Ly, Lx), dtype=np.uint8)
-    
-    for i in range(len(self.stat)): 
-        # build binary mask
-        mask = np.zeros((Ly, Lx), dtype=np.uint8)
-        mask[self.stat[i]['ypix'], self.stat[i]['xpix']] = 1
-        mask_rois += mask
+        img = self.ops[proj]
+        Ly, Lx = self.ops['Ly'], self.ops['Lx']
+        mask_rois = np.zeros((Ly, Lx), dtype=np.uint8)
+        
+        for i in range(len(self.stat)): 
+            # build binary mask
+            mask = np.zeros((Ly, Lx), dtype=np.uint8)
+            mask[self.stat[i]['ypix'], self.stat[i]['xpix']] = 1
+            mask_rois += mask
 
-    # extract contours
-    contours = find_contours(mask_rois, level=0.5)
+        # extract contours
+        contours = find_contours(mask_rois, level=0.5)
 
-    fig, ax = plt.subplots()
+        fig, ax = plt.subplots()
 
-    ax.imshow(img, cmap='gray')
+        ax.imshow(img, cmap='gray')
 
-    # draw all contours of all ROIs
-    for contour in contours:
-        ax.plot(contour[:, 1],
-                contour[:, 0],
-                color='limegreen',
-                linewidth=0.5)
-            
-    ax.axis('off')
+        # draw all contours of all ROIs
+        for contour in contours:
+            ax.plot(contour[:, 1],
+                    contour[:, 0],
+                    color='limegreen',
+                    linewidth=0.5)
+                
+        ax.axis('off')
 
-    savepath = os.path.join(save_dir, 'ROI_mask.png')
-    fig.savefig(savepath, bbox_inches='tight', pad_inches=0)
-    plt.close(fig)
+        savepath = os.path.join(save_dir, 'ROI_mask.png')
+        fig.savefig(savepath, bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
 
     def save_microscop_param(self, save_directory=''):
         data = {
