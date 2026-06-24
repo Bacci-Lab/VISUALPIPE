@@ -1545,7 +1545,7 @@ def histplot(list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
         for l in [list1, list2]:
             bins = np.linspace(-1, 1, 17)
             labels = [f"{round(bins[i],2)} to {round(bins[i+1],2)}" for i in range(len(bins)-1)]
-            labeled = pd.cut(l, bins=bins, labels=labels)
+            labeled = pd.cut(l,bins=bins,labels=labels,include_lowest=True)
             labels_list += labeled.astype(str).tolist()
     elif variable == 'ITI':
         for l in [list1, list2]:
@@ -1601,9 +1601,22 @@ def histplot(list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
     # Optionally convert counts to percentages
     pivot_df_percent = pivot_df.div(pivot_df.sum(axis=0), axis=1) * 100
 
-    # Save percentages to Excel
+    raw_df = pd.DataFrame({
+    f"{groups[0]}_{variable}": pd.Series(list1),
+    f"{groups[1]}_{variable}": pd.Series(list2)})
+
     with pd.ExcelWriter(os.path.join(save_path, f"{fig_name}_{variable}_{attr}.xlsx")) as writer:
-        pivot_df_percent.to_excel(writer, sheet_name="Percentages")
+
+        pivot_df_percent.to_excel(
+            writer,
+            sheet_name="Percentages"
+        )
+
+        raw_df.to_excel(
+            writer,
+            sheet_name="Raw_data",
+            index=False
+        )
     
 
 def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_groups, groups_id,
@@ -1634,7 +1647,7 @@ def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_
         mask = np.where(np.abs(cmi - median) <= 0.02)[0]
 
         if len(mask) == 0:
-            print(f"⚠️ No traces within ±0.2 of the median for group {group}. Using closest value instead.")
+            print(f"⚠️ No traces within ±0.02 of the median for group {group}. Using closest value instead.")
             mask = [np.argmin(np.abs(cmi - median))]
 
         candidate_ids = mask
