@@ -204,7 +204,7 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, direction
         else:
             not_centered.append(neuron)
     proportion_centered = 100*len(centered_neurons)/trials[period_names[1]][0].shape[0]
-
+    print(centered_neurons)
     if plot and len(centered_neurons)!=0:
         def plot_for_neurons(neurons, title):
             fig, axes = plt.subplots(3, 3, figsize=(15, 12))
@@ -245,13 +245,19 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, direction
 
             plt.suptitle(title, fontsize=16)
             plt.tight_layout(rect=[0, 0, 1, 0.96])
+            fig.savefig(
+                os.path.join(save_path, f"{title.replace(' ', '_').lower()}.svg"),
+                bbox_inches='tight'
+            )
             plt.show()
 
         # Plot centered neurons
-        plot_for_neurons(centered_neurons, 'Centered Neurons')
+        if len(centered_neurons) > 0:
+            plot_for_neurons(centered_neurons, 'Centered Neurons')
 
         # Plot not centered neurons
-        plot_for_neurons(not_centered, 'Not Centered Neurons') 
+        if len(not_centered) > 0:
+            plot_for_neurons(not_centered, 'Not Centered Neurons')
     return centered_neurons, not_centered
 
 def select_neurons(red_path, validity, valid_sub_protocols, selection_method, group_name,
@@ -1643,8 +1649,8 @@ def representative_traces(frame_rate, suppression_groups, cmi_groups, magnitude_
         median = np.median(cmi)
         print(f"Group {group}: median {variable} = {median:.2f}")
 
-        # Select traces within ±0.2 around the median
-        mask = np.where(np.abs(cmi - median) <= 0.02)[0]
+        # Select traces within ±0.02 around the median
+        mask = np.where(np.abs(cmi - median -0.04) <= 0.01)[0]
 
         if len(mask) == 0:
             print(f"⚠️ No traces within ±0.02 of the median for group {group}. Using closest value instead.")
