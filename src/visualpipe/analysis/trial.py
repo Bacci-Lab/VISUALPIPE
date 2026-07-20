@@ -329,6 +329,98 @@ class Trial(object):
         
         return trial_response_bounds, responsive, reliability
     
+
+    def find_responsive_rois_noPlot(self, dt_min:float=0.2):
+        """
+        Find responsive neurons using the method from C.G. Sweeney (2025) and T.D. Marks (2021) for the reliability metric.
+        
+        :param float dt_min: Time duration threshold
+        
+        :return trial_response_bounds (dict): Dictionnary with stimuli index as keys. It contains a list of boundaries defining the interval of the trace considered to compute the AUC.
+        :return responsive (dict): Dictionnary with stimuli index as keys. It contains a list of integer (-1, 0, 1) indicating whether or not a ROI is responsive (1 if it is activated/prolonged, 0 if no and -1 if it is supressed).
+        :return reliability (dict): Dictionnary with stimuli index as keys. It contains a list of tuple of format (r, p) corresponding to a neuron with r the reliability metrics and p the p-value of the two-tailed one-sample t-test.
+        """
+
+        responsive = {}
+        trial_response_bounds = {}
+        reliability = {}
+
+        nb_frames_min = dt_min * self.ca_img.fs
+        positive = None
+
+        min_nb_trials = 7
+
+        for i in self.trial_fluorescence.keys():
+
+            responsive_roi = []
+            trial_response_bounds_roi = []
+            reliability_roi = []
+
+            # For stimuli of duration under 2.5s, decrease auc threshold with a cross-product
+            stim_dt = self.visual_stim.protocol_df['duration'][i] + self.dt_post_stim
+            if stim_dt < 2.5 :
+                self.auc_thr = self.auc_thr * stim_dt / 2.5
+
+            for roi_idx in range(len(self.ca_img._list_ROIs_idx)):
+                roi_trial_average = self.trial_averaged_zscores[i][roi_idx]
+                roi_trial = self.trial_zscores[i][roi_idx]
+                max_val, min_val = np.max(roi_trial_average), np.min(roi_trial_average)
+                
+                # Compute ROI reliability
+                if len(roi_trial) >= min_nb_trials :
+                    r_dist, r_null_dist = self.compute_reliability(roi_trial, n_samples=1000)
+                    reliability_roi.append(np.mean(r_dist))
+                else :
+                    r_dist, _ = self.compute_reliability(roi_trial, n_samples=50)
+                    reliability_roi.append(np.mean(r_dist))
+
+                if max_val > 1 and max_val > np.abs(min_val):
+                    positive = True
+                    start_idx, end_idx = self.find_bounds(np.argmax(roi_trial_average), roi_trial_average >= 0)
+                elif min_val < -1 :
+                    #In case the neuron is not activated/prolonged, check if it is supressed.
+                    positive = False
+                    start_idx, end_idx = self.find_bounds(np.argmin(roi_trial_average), roi_trial_average <= 0)
+                else :
+                    start_idx, end_idx = 0, 0
+
+                trial_response_bounds_roi.append([start_idx, end_idx])
+                
+                if end_idx - start_idx + 1 >= nb_frames_min : #time duration constraint
+                    time = np.linspace(0, stim_dt, len(roi_trial_average))
+                    auc = metrics.auc(time[start_idx:end_idx+1], roi_trial_average[start_idx:end_idx+1])
+                    if np.abs(auc) >= self.auc_thr : #AUC constraint
+
+                        if len(roi_trial) >= min_nb_trials :
+                            perc_th = np.percentile(r_null_dist, 95)
+                            pval = np.sum(np.array(r_null_dist) >= np.mean(r_dist)) / len(r_null_dist)
+                            if np.mean(r_dist) > perc_th :
+                                if positive :
+                                    responsive_roi.append((1, pval))
+                                else :
+                                    responsive_roi.append((-1, pval))
+                            else :
+                                responsive_roi.append((0, pval))
+                        else :
+                            if positive :
+                                responsive_roi.append((1, None))
+                            else :
+                                responsive_roi.append((-1, None))
+                    else :
+                        responsive_roi.append((0, None))
+                else :
+                    responsive_roi.append((0, None))
+
+            responsive.update({i : responsive_roi})
+            trial_response_bounds.update({i : trial_response_bounds_roi})
+            reliability.update({i : reliability_roi})
+        
+        self.trial_response_bounds = trial_response_bounds
+        self.responsive = responsive
+        self.reliability = reliability
+        
+        return trial_response_bounds, responsive, reliability
+    
     def compute_reliability(self, roi_trials_traces, n_samples=1):
         """
         Compute the reliability using the method from T.D. Marks (2021). To compute reliability, the function splits the trials randomly in two halves, trial-averages the two groups and calculates the Pearson's correlation. The process is done n_samples times and averaged.
