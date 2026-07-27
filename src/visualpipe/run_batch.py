@@ -1,10 +1,10 @@
 """
 This module provides a function to run a batch process for running visual pipelines on a list of file paths.
 """
-from pipeline import visual_pipe
+from pipeline import visual_pipe, visual_pipe_shortversion
 import traceback
 
-def run_batch(filepath) :
+def run_batch(filepath, pipeline_func=visual_pipe) :
     """
     Executes a batch process for running visual pipelines on a list of file paths.
 
@@ -29,7 +29,7 @@ def run_batch(filepath) :
     
     for path in path_lists:
         try :
-            save_dir = visual_pipe(path)
+            save_dir = pipeline_func(path)
             outputs_folders.append(save_dir)
         except Exception as e :
             print(f"Pipeline failed for {path}")
@@ -52,5 +52,6 @@ if __name__ == "__main__":
 
     # Change filepath of the text file containing the list of sessions to run
     filepath = r'Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\looming-sweeping-log/looming_paths.txt'
-    
-    run_batch(filepath)
+
+    # Change pipeline_func to visual_pipe to run the full pipeline or visual_pipe_shortversion to run the short version
+    run_batch(filepath, pipeline_func=visual_pipe_shortversion)
