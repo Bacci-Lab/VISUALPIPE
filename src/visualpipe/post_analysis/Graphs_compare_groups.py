@@ -1585,9 +1585,9 @@ def histplot(list1, list2, groups, save_path, fig_name, attr, variable="CMI"):
     plt.title(f"{variable} for {groups[0]} vs {groups[1]}")
     plt.tight_layout()
     textstr = (
-        f'{groups[0]} median = {np.median(list1):.2f}, p {'(vs 0)' if variable!='ITI' else '(vs 0.5)'} = {p_value_1:.3g}\n'
-        f'{groups[1]} median = {np.median(list2):.2f}, p {'(vs 0)' if variable!='ITI' else '(vs 0.5)'} = {p_value_2:.3g}\n'
-        f'{groups[0]} vs {groups[1]} (Mann–Whitney) p = {p_value_mwu:.3g}'
+        f"{groups[0]} median = {np.median(list1):.2f}, p {'(vs 0)' if variable!='ITI' else '(vs 0.5)'} = {p_value_1:.3g}\n"
+        f"{groups[1]} median = {np.median(list2):.2f}, p {'(vs 0)' if variable!='ITI' else '(vs 0.5)'} = {p_value_2:.3g}\n"
+        f"{groups[0]} vs {groups[1]} (Mann–Whitney) p = {p_value_mwu:.3g}"
     )
     # Position textbox on plot
     plt.gca().text(0.99, 0.97, textstr,
