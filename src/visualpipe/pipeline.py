@@ -926,7 +926,7 @@ def visual_pipe_shortversion(base_path:str=None, input_gui=False) :
                 #plot trial-averaged z-score traces
                 trials.plot_stim_response(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
 
-                if np.abs(trials.responsive[i][k]) == 1 :
+                if np.abs(trials.responsive[i][k][0]) == 1 :
                     #plot trial-averaged traces per arousal states only for responsive neurons
                     trials.plot_trials_per_states(i, k, save_dir, folder_prefix="_".join([unique_id, id_version]))
             
