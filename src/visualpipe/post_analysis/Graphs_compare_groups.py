@@ -188,21 +188,28 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, direction
     centered_neurons = []
     not_centered = []
     for neuron in neurons_list:  # Iterate over all neurons
-        magnitudes_neuron = {stimulus: [] for stimulus in stimuli}
-        # build magnitude dictionary for the mapping stimuli
-        for stimulus in stimuli:
-            stimulus_id = stimuli_df[stimuli_df.name == stimulus].index[0]
-            trial_neuron = trials[period_names[1]][stimulus_id][neuron, int(frame_rate*0.5):]  # Exclude first 0.5s
-            magnitudes_neuron[stimulus] = np.mean(trial_neuron)
-        # Find the stimulus with max response
-        if direction == 'max':
-            max_stimulus = max(magnitudes_neuron, key=magnitudes_neuron.get)
-        elif direction == 'min':
-            max_stimulus = min(magnitudes_neuron, key=magnitudes_neuron.get)
-        if max_stimulus == 'quick-spatial-mapping-center':
-            centered_neurons.append(neuron)
-        else:
+        #### TEST ####
+        stimulus = 'quick-spatial-mapping-center'
+        stim_idx = stimuli_df[stimuli_df.name == stimulus].index[0]
+        if np.trapezoid(trials[period_names[1]][stim_idx][neuron, :], dx=1/frame_rate) < 5:
             not_centered.append(neuron)
+        ##############
+        else:
+            magnitudes_neuron = {stimulus: [] for stimulus in stimuli}
+            # build magnitude dictionary for the mapping stimuli
+            for stimulus in stimuli:
+                stimulus_id = stimuli_df[stimuli_df.name == stimulus].index[0]
+                trial_neuron = trials[period_names[1]][stimulus_id][neuron, int(frame_rate*0.5):]  # Exclude first 0.5s
+                magnitudes_neuron[stimulus] = np.mean(trial_neuron)
+            # Find the stimulus with max response
+            if direction == 'max':
+                max_stimulus = max(magnitudes_neuron, key=magnitudes_neuron.get)
+            elif direction == 'min':
+                max_stimulus = min(magnitudes_neuron, key=magnitudes_neuron.get)
+            if max_stimulus == 'quick-spatial-mapping-center':
+                centered_neurons.append(neuron)
+            else:
+                not_centered.append(neuron)
     proportion_centered = 100*len(centered_neurons)/trials[period_names[1]][0].shape[0]
     print(centered_neurons)
     if plot and len(centered_neurons)!=0:
