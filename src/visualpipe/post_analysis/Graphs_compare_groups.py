@@ -1014,8 +1014,8 @@ def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity,
             y_values = magnitude[protocol_y]
 
             # Clamp values
-            x_values = np.clip(x_values, -0.1, 2.0)
-            y_values = np.clip(y_values, -0.1, 2.0)
+            x_values = np.clip(x_values, -0.1, 30)
+            y_values = np.clip(y_values, -0.1, 30)
 
             # Add to Excel
             ws = wb.create_sheet(title=group)
@@ -1027,21 +1027,21 @@ def XY_magnitudes(groups_id, magnitude_groups, sub_protocols, protocol_validity,
             plt.scatter(x_values, y_values, marker='o', c=color[group], alpha=0.5, label=f'{group} neurons')
 
         # Add dashed x=y line
-        lims = [-0.1, 2.0]
+        lims = [-0.1, 30]
         plt.plot(lims, lims, 'k--', alpha=0.7, label="x = y")
 
         # FIXED TICKS
-        # Regular ticks from 0 to 2 with 0.5 spacing
-        regular_ticks = np.arange(0, 2.01, 0.5)  # 0, 0.5, 1.0, 1.5, 2.0
+        # Regular ticks from 0 to 30 with 0.5 spacing
+        regular_ticks = np.arange(0, 30.01, 5)  # 0, 0.5, 1.0, 1.5, 2.0
 
         # Add the special edge ticks
-        ticks = np.concatenate(([-0.1], regular_ticks))  # -0.1 and 2.1 are outside the normal range
+        ticks = np.concatenate(([-0.1], regular_ticks))  # -0.1 and 30.1 are outside the normal range
         tick_labels = []
         for t in ticks:
             if t == -0.1:
                 tick_labels.append("<-0.1")
-            elif t == 2.0:
-                tick_labels.append(">2.0")
+            elif t == 30.0:
+                tick_labels.append(">30.0")
             else:
                 tick_labels.append(f"{t:.1f}")
         plt.xlabel(f"Magnitude of response to {protocol_x}")
@@ -2209,7 +2209,7 @@ if __name__ == "__main__":
     get_centered = True  # True or False
 
     #Decide if you want to plot green only neurons, or red-green ones
-    color_ch = 'red-green'  # 'green-only' or 'red-green'. None if you don't have a red image
+    color_ch = None  # 'green-only' or 'red-green'. None if you don't have a red image
 
     # Decide on the way to calculate the amplitude of response
     magnitude_method = 'mean' #'auc', 'peak' or 'filtered_peak', 'mean'
