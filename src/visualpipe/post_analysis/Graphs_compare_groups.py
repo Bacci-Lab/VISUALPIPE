@@ -188,28 +188,29 @@ def get_centered_neurons(stimuli_df, neurons_list, trials, attr, plot, direction
     centered_neurons = []
     not_centered = []
     for neuron in neurons_list:  # Iterate over all neurons
+        """
         #### TEST ####
         stimulus = 'quick-spatial-mapping-center'
         stim_idx = stimuli_df[stimuli_df.name == stimulus].index[0]
         if np.trapezoid(trials[period_names[1]][stim_idx][neuron, :], dx=1/frame_rate) < 5:
             not_centered.append(neuron)
         ##############
+        else:"""
+        magnitudes_neuron = {stimulus: [] for stimulus in stimuli}
+        # build magnitude dictionary for the mapping stimuli
+        for stimulus in stimuli:
+            stimulus_id = stimuli_df[stimuli_df.name == stimulus].index[0]
+            trial_neuron = trials[period_names[1]][stimulus_id][neuron, int(frame_rate*0.5):]  # Exclude first 0.5s
+            magnitudes_neuron[stimulus] = np.mean(trial_neuron)
+        # Find the stimulus with max response
+        if direction == 'max':
+            max_stimulus = max(magnitudes_neuron, key=magnitudes_neuron.get)
+        elif direction == 'min':
+            max_stimulus = min(magnitudes_neuron, key=magnitudes_neuron.get)
+        if max_stimulus == 'quick-spatial-mapping-center':
+            centered_neurons.append(neuron)
         else:
-            magnitudes_neuron = {stimulus: [] for stimulus in stimuli}
-            # build magnitude dictionary for the mapping stimuli
-            for stimulus in stimuli:
-                stimulus_id = stimuli_df[stimuli_df.name == stimulus].index[0]
-                trial_neuron = trials[period_names[1]][stimulus_id][neuron, int(frame_rate*0.5):]  # Exclude first 0.5s
-                magnitudes_neuron[stimulus] = np.mean(trial_neuron)
-            # Find the stimulus with max response
-            if direction == 'max':
-                max_stimulus = max(magnitudes_neuron, key=magnitudes_neuron.get)
-            elif direction == 'min':
-                max_stimulus = min(magnitudes_neuron, key=magnitudes_neuron.get)
-            if max_stimulus == 'quick-spatial-mapping-center':
-                centered_neurons.append(neuron)
-            else:
-                not_centered.append(neuron)
+            not_centered.append(neuron)
     proportion_centered = 100*len(centered_neurons)/trials[period_names[1]][0].shape[0]
     print(centered_neurons)
     if plot and len(centered_neurons)!=0:
@@ -2157,17 +2158,17 @@ if __name__ == "__main__":
 
     #-----------------------INPUTS-----------------------#
 
-    excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe_PYR.xlsx"
-    save_path = r"Y:\raw-imaging\Nathan\PYR\Visualpipe_postanalysis\vision_survey\Analysis"
+    excel_sheet_path = r"Y:\raw-imaging\Nathan\Nathan_sessions_visualpipe_SNCG.xlsx"
+    save_path = r"Y:\raw-imaging\Nathan\SNCG\Visualpipe_postanalysis\looming-sweeping-log\Analysis"
     
     #Will be included in all names of saved figures
-    fig_name = 'test'
+    fig_name = 'looming100%'
 
     #Name of the physion protocol to analyze (e.g. 'surround-mod', 'visual-survey'...)
-    protocol_name = "surround-mod-2CenterRadius"
+    protocol_name = "looming-sweeping-log"
 
     # Write the protocols you want to plot 
-    sub_protocols = ['center-10-0.25', 'center-10-1.0']
+    sub_protocols = ['looming-stim-log-1.0']
        # 'any'  -> neurons responsive to at least one protocol in any group
        # 'only' -> neurons exclusive to a specific group (provide group_name)
        # 'and'  -> neurons shared between groups
@@ -2175,7 +2176,7 @@ if __name__ == "__main__":
     # For the methods 'only' and 'any': you should put the key of the group of protocols you are interested in from valid_sub_protocols. If you want to use method 'and', put None
     group_name = 'center'
     # Dict of protocol(s) used to select responsive neurons. 
-    valid_sub_protocols = {'center': ['center-10-0.25','center-20-0.25','center-10-1.0','center-20-1.0']} 
+    valid_sub_protocols = {'center': ['looming-stim-log-1.0']} 
     # Example of correct valid_sub_protocols {'looming': ['looming-stim-log-0.0', 'looming-stim-log-0.1', 'looming-stim-log-0.4','looming-stim-log-1.0']} 
     '''quick-spatial-mapping-center', 'quick-spatial-mapping-left', 'quick-spatial-mapping-right',
         'quick-spatial-mapping-up', 'quick-spatial-mapping-down',
@@ -2206,7 +2207,7 @@ if __name__ == "__main__":
     attr = 'z_scores'  # 'dFoF0-baseline' or 'z_scores'
 
     # Decide if you want to only keep neurons that are centered
-    get_centered = True  # True or False
+    get_centered = False  # True or False
 
     #Decide if you want to plot green only neurons, or red-green ones
     color_ch = None  # 'green-only' or 'red-green'. None if you don't have a red image
@@ -2218,7 +2219,7 @@ if __name__ == "__main__":
     #----------------------------------------------------#
     df = utils.load_excel_sheet(excel_sheet_path, protocol_name)
 
-    groups_id = {'WT': 0, 'KO': 1}  # keys are group names, e.g 'WT': 0, 'KO': 1
+    groups_id = {'WT': 0}  # keys are group names, e.g 'WT': 0, 'KO': 1
 
     suppression_groups, magnitude_groups, stim_groups, nb_neurons, avg_groups, sem_groups, cmi_groups, ITI_groups, proportions_groups, individual_groups, perTrials_groups, mag_trials, sem_trials, mag_per_session, mag_trial_indiv = process_group(df, groups_id, attr, valid_sub_protocols, sub_protocols, protocol_name, selection_method, group_name, frame_rate, magnitude_method, get_centered, plot=False, red_ch = color_ch, direction = 'max') 
     
@@ -2244,9 +2245,9 @@ if __name__ == "__main__":
     # Plot the % of responsive neurons per session
     plot_perc_responsive(groups_id, proportions_groups, save_path, fig_name)
     # Plot the average response during the stim period per session
-    plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, sub_protocols)
+    #plot_avg_session(groups_id, stim_groups, attr, save_path, fig_name, sub_protocols)
     # Plot the average z-scores or dFoF0-baseline trace for responsive neurons
-    #graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
+    graph_averages(frame_rate, groups_id, fig_name, attr, save_path, sub_protocols, valid_sub_protocols, avg_groups, sem_groups, nb_neurons)
     #plot the distribution of CMI 
     """if len(list(groups_id.keys())) == 2 and len(sub_protocols) == 2 and "surround" in protocol_name:
         histplot(cmi_groups[0], cmi_groups[1], list(groups_id.keys()), save_path, fig_name, attr, variable = "CMI")"""
@@ -2259,7 +2260,7 @@ if __name__ == "__main__":
     #plot_cdf_magnitudes(groups_id, magnitude_groups, sub_protocols, attr, magnitude_method, fig_name, save_path) 
     #plot_per_trial(groups_id, nb_neurons, perTrials_groups, sub_protocols, frame_rate, dt_prestim, fig_name, attr, save_path)
     #magnitude_per_trial(fig_name, save_path, nb_neurons, mag_trials, sem_trials, sub_protocols, groups_id)
-    mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
+    #mean_mag_per_protocol(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr)
     #plot_MI_control(groups_id, magnitude_groups, sub_protocols, save_path, fig_name, attr, contrasts=[0.05, 0.14, 0.37, 1.0])
     #perc_pref_contrast(groups_id, mag_per_session, sub_protocols, attr, fig_name, save_path)
     #plot_adaptation_index(sub_protocols, groups_id, mag_trial_indiv, attr, fig_name, save_path, first=3, last=3)
